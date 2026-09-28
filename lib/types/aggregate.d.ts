@@ -42,6 +42,8 @@ export interface PricingOptions {
     readonly rules: readonly PriceRule[];
     /** Rate used by a route no rule matches. */
     readonly fallback: PriceRate;
+    /** Per-route rates the reader saved, keyed by the exact `provider/model`. */
+    readonly overrides: ReadonlyMap<string, PriceRate>;
     /** Parsed peak windows in Beijing time. */
     readonly peakWindows: readonly PeakWindow[];
     /** When true, Saturday and Sunday are never peak. */

@@ -13,11 +13,21 @@
  * @module dsh-local-usage/tests/assemble
  */
 
-import { describe, expect, it } from 'vitest'
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
-import { apply, DEFAULT_CONFIG, REPORT_PATH } from '../src/index.ts'
+import { apply, DEFAULT_CONFIG, PRICING_PATH, REPORT_PATH } from '../src/index.ts'
+
+// Every test mounts the plugin, which hydrates the rate table from `DSH_HOME`.
+// Pointing that at a fresh directory keeps the suite off the developer's real
+// machine and gives each case an empty table to start from.
+beforeEach(async () => {
+  process.env.DSH_HOME = await mkdtemp(join(tmpdir(), 'dlu-assemble-'))
+})
 
 const MS_PER_DAY = 86_400_000
 /** A fixed instant, so a window can be expressed as whole days around it. */
@@ -77,6 +87,8 @@ interface FakeLog {
 
 interface Mounted {
   readonly route: { readonly fetch: (request: Request) => Promise<Response> }
+  /** The rate-table route the same activation registered. */
+  readonly pricing: { readonly fetch: (request: Request) => Promise<Response> }
   /** Session ids the exact read was asked for, in call order. */
   readonly exactReads: string[]
   /** Session ids each batch projection was asked for. */
@@ -92,7 +104,7 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean): Mounte
   const exactReads: string[] = []
   const batches: (readonly string[])[] = []
   const invalidated: ((session: { id: string }) => void)[] = []
-  let route: { fetch: (request: Request) => Promise<Response> } | undefined
+  const routes = new Map<string, { fetch: (request: Request) => Promise<Response> }>()
 
   const engine: Record<string, unknown> = {
     listSessions: () => Promise.resolve([...logs.keys()].map(id => record(id, logs.get(id)?.seeded === true, logs.get(id)?.cwd))),
@@ -127,7 +139,7 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean): Mounte
   }
 
   const ctx = {
-    connection: { fetch: { register: (candidate: typeof route) => { route = candidate; return () => Promise.resolve() } } },
+    connection: { fetch: { register: (candidate: { path: string; fetch: (request: Request) => Promise<Response> }) => { routes.set(candidate.path, candidate); return () => Promise.resolve() } } },
     sessionQuery: engine,
     logger: { warn: () => {} },
     on: (name: string, handler: (session: { id: string }) => void) => { if (name === 'session/event') invalidated.push(handler) },
@@ -136,9 +148,13 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean): Mounte
 
   apply(ctx, DEFAULT_CONFIG)
 
+  const route = routes.get(REPORT_PATH)
+  const pricing = routes.get(PRICING_PATH)
   if (route === undefined) throw new Error('apply did not register the report route')
+  if (pricing === undefined) throw new Error('apply did not register the pricing route')
   return {
     route,
+    pricing,
     exactReads,
     batches,
     offersBatch,
@@ -281,5 +297,59 @@ describe('assembleReport: the fold cache', () => {
     await report(mounted)
 
     expect(mounted.batches).toEqual([['a', 'b'], ['a']])
+  })
+})
+
+describe('the pricing route', () => {
+  /** Post one body to the rate-table route. */
+  async function post(mounted: Mounted, body: unknown): Promise<Response> {
+    return await mounted.pricing.fetch(new Request(new URL(PRICING_PATH, 'http://localhost'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }))
+  }
+
+  const RATE = { input: 3, cacheRead: 0.3, cacheWrite: 3, output: 9 }
+
+  it('stores an override and bills a later report at it', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 1, 1) }]])
+    const mounted = mount(logs, true)
+
+    // The route is priced by the fallback card before the write.
+    const before = await report(mounted)
+    const beforeCost = (before.totals as { cost: number }).cost
+
+    const response = await post(mounted, { set: { 'p/m': RATE } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ overrides: { 'p/m': RATE } })
+
+    const after = await report(mounted)
+    expect((after.totals as { cost: number }).cost).toBeGreaterThan(beforeCost)
+    expect((after.routeRates as { route: string; source: string }[])[0])
+      .toMatchObject({ route: 'p/m', source: 'override' })
+  })
+
+  it('clears an override with a null rate', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 1, 1) }]])
+    const mounted = mount(logs, true)
+
+    await post(mounted, { set: { 'p/m': RATE } })
+    const cleared = await post(mounted, { set: { 'p/m': null } })
+
+    expect(await cleared.json()).toEqual({ overrides: {} })
+  })
+
+  it('refuses a body it cannot vouch for', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 1, 1) }]])
+    const mounted = mount(logs, true)
+
+    expect((await post(mounted, { set: { 'p/m': { input: 1 } } })).status).toBe(400)
+    expect((await post(mounted, { set: { 'p/m': { ...RATE, output: -1 } } })).status).toBe(400)
+    expect((await post(mounted, { routes: {} })).status).toBe(400)
+    expect((await post(mounted, { set: { '': RATE } })).status).toBe(400)
+    // And nothing was written by any of them.
+    const after = await report(mounted)
+    expect((after.routeRates as { source: string }[])[0]?.source).toBe('fallback')
   })
 })

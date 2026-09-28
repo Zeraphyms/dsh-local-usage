@@ -85,17 +85,52 @@ export interface UsageSessionRow extends UsageCosted {
     readonly updatedAt: number;
 }
 /** One configured rate card, in currency units per one million tokens. */
-export interface UsagePriceRow {
+export interface UsagePriceRow extends UsageRate {
     /** Case-insensitive substring matched against `provider/model`; empty for the fallback card. */
     readonly match: string;
+}
+/** The four bucket prices of one rate card, without the rule that supplied them. */
+export interface UsageRate {
     /** Cache-miss prompt tokens. */
     readonly input: number;
     /** Cache-hit prompt tokens. */
     readonly cacheRead: number;
-    /** Cache-write prompt tokens. */
+    /** Cache-write prompt tokens; providers without a separate write charge repeat `input`. */
     readonly cacheWrite: number;
     /** Generated tokens. */
     readonly output: number;
+}
+/** Where one route's effective rate came from. */
+export type UsageRateSource = 'override' | 'rule' | 'fallback';
+/**
+ * One route the window recorded, with the off-peak rate it was priced at.
+ *
+ * Published so the panel can show which card actually claimed each route — a
+ * substring rule quietly pricing a route it was never written for is the failure
+ * mode this surface exists to make visible — and so the rate editor opens on the
+ * values in effect rather than on a guess.
+ */
+export interface UsageRouteRate {
+    /** `provider/model` exactly as the log recorded it. */
+    readonly route: string;
+    /** Off-peak rate; the peak multiplier is applied per sample on top of this. */
+    readonly rate: UsageRate;
+    /** Which of the three sources supplied {@link rate}. */
+    readonly source: UsageRateSource;
+    /** The matched rule's `match` string, present only when `source` is `rule`. */
+    readonly rule?: string;
+    /** Tokens this route was billed for in the window; the table is ordered by it. */
+    readonly tokens: number;
+}
+/** One write to the per-route rate overrides. */
+export interface UsagePricingUpdate {
+    /** Routes to write; a `null` rate clears the override and returns the route to its rule. */
+    readonly set: Record<string, UsageRate | null>;
+}
+/** What a pricing write answers with. */
+export interface UsagePricingResult {
+    /** Every override in effect after the write, keyed by route. */
+    readonly overrides: Record<string, UsageRate>;
 }
 /** One request to assemble a report. */
 export interface UsageInsightsRequest {
@@ -184,6 +219,13 @@ export interface UsageInsightsReport {
     readonly prices: readonly UsagePriceRow[];
     /** Rate applied to a route no card matches. */
     readonly fallbackPrice: UsagePriceRow;
+    /**
+     * Every route the window recorded, with the rate it was priced at.
+     *
+     * Ordered by descending token volume, which is the order the rate editor is
+     * read in: the routes that cost something first.
+     */
+    readonly routeRates: readonly UsageRouteRate[];
     /** Peak windows in Beijing time as `HH:MM-HH:MM`; empty means every hour is off-peak. */
     readonly peakWindows: readonly string[];
     /** Whether weekends are always billed off-peak. */

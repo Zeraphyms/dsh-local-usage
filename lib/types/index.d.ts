@@ -18,6 +18,8 @@ import type { Context } from '@deepseek-ai/cordis';
 export type * from './types.ts';
 /** Exact route the browser half calls; it sits behind the carrier's trust fence. */
 export declare const REPORT_PATH = "/api/dsh-local-usage/report";
+/** Exact route the browser half writes the per-route rate table to. */
+export declare const PRICING_PATH = "/api/dsh-local-usage/pricing";
 /** Plugin name the loader row addresses. */
 export declare const name = "dsh-local-usage";
 /** Services this plugin cannot work without: the carrier's route registry and the session reads. */

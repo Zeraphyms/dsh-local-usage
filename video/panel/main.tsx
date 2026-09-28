@@ -23,8 +23,9 @@ import { createRoot } from 'react-dom/client'
 import { UsagePanel } from '../../src/client/UsagePanel.tsx'
 import type { UsagePanelProps } from '../../src/client/UsagePanel.tsx'
 import { zh } from '../../src/client/locales.ts'
+import type { UsageRate } from '../../src/types.ts'
 import { styles } from '../../src/client/styles.ts'
-import { makeReport } from './fixture.ts'
+import { makeReport, readOverrides, setOverrides } from './fixture.ts'
 
 const styleTag = document.createElement('style')
 styleTag.dataset.pluginCss = 'dsh-local-usage'
@@ -52,6 +53,17 @@ const props = {
     void refresh
     return Promise.resolve(makeReport(from, to))
   },
+  // Standing in for the Host's write: the harness keeps the edits in memory and
+  // the next read re-prices against them, which is what the panel then renders.
+  saveRates: (update: { set: Record<string, UsageRate | null> }) => {
+    const routes = new Map(Object.entries(readOverrides()))
+    for (const [route, rate] of Object.entries(update.set)) {
+      if (rate === null) routes.delete(route)
+      else routes.set(route, rate)
+    }
+    setOverrides(routes)
+    return Promise.resolve({ overrides: readOverrides() })
+  },
   t: translate,
   usePanelInfo: (selector: (info: { activePanelId: string }) => unknown) => selector({ activePanelId: 'usage' }),
 } as unknown as UsagePanelProps
@@ -72,6 +84,8 @@ interface PanelHandle {
   back: () => Promise<void>
   /** Switch the product theme the panel renders under. */
   setTheme: (theme: 'light' | 'dark') => Promise<void>
+  /** Pin a header popover open by its trigger's aria-label. */
+  openPopover: (label: string) => Promise<void>
 }
 
 declare global {
@@ -121,6 +135,19 @@ window.__panel = {
     throw new Error(`video/panel: no calendar cell for "${day}"`)
   },
   back: () => clickByText('返回日历'),
+  openPopover: async (label: string) => {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const trigger = document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+      if (trigger !== null) {
+        trigger.click()
+        await nextPaint()
+        await new Promise(resolve => setTimeout(resolve, 160))
+        return
+      }
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    throw new Error(`video/panel: no popover trigger labelled "${label}"`)
+  },
   setTheme: async (theme: 'light' | 'dark') => {
     if (theme === 'dark') document.body.dataset.dsDarkTheme = ''
     else delete document.body.dataset.dsDarkTheme

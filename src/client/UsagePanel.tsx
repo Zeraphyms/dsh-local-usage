@@ -24,15 +24,23 @@ import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } 
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { UsageDayRow, UsageInsightsReport } from '../types.ts'
+import type {
+  UsageDayRow,
+  UsageInsightsReport,
+  UsagePricingResult,
+  UsagePricingUpdate,
+} from '../types.ts'
 import { CalendarHeatmap } from './CalendarHeatmap.tsx'
 import { cacheHitRate } from './cache-rate.ts'
 import { DayDetail } from './DayDetail.tsx'
+import { DataSourceNotes } from './DataSourceNotes.tsx'
+import { Popover, RateIcon, SourceIcon } from './Popover.tsx'
+import { PricingNotes } from './PricingNotes.tsx'
+import { DEFAULT_RANKING_LIMIT, ProjectRanking } from './ProjectRanking.tsx'
+import { ReliabilityNotes } from './ReliabilityNotes.tsx'
 import { Tile } from './Tile.tsx'
 import { dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
-import { DataSourceNotes } from './DataSourceNotes.tsx'
-import { PricingNotes } from './PricingNotes.tsx'
-import { ReliabilityNotes } from './ReliabilityNotes.tsx'
+import { tokensOf } from './tokens.ts'
 import { formatCost, formatDay, formatInteger, formatPercent, formatTokens } from './format.ts'
 import type { UsageInsightsLocaleKey } from './locales.ts'
 import { css } from './classes.ts'
@@ -66,6 +74,8 @@ export interface UsagePanelInjected {
   locale: () => string
   /** Assemble the report; `refresh` discards the Host's per-session fold cache. */
   report: (refresh: boolean, from: number, to: number) => Promise<UsageInsightsReport>
+  /** Persist one write to the per-route rate table and answer with what is in effect. */
+  saveRates: (update: UsagePricingUpdate) => Promise<UsagePricingResult>
 }
 
 /** Full component props assembled by the main slot renderer. */
@@ -162,18 +172,16 @@ class PanelBoundary extends Component<
   }
 }
 
-/** Tokens of one day row. */
-function tokensOf(row: UsageDayRow): number {
-  return row.uncachedInputTokens + row.outputTokens + row.cacheReadTokens + row.cacheWriteTokens
-}
-
 /**
  * Render the Usage statistics panel.
  * @param props - panel runtime, dictionary, and the injected report reader.
  * @returns the panel content.
  */
-export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePanelProps): ReactNode {
-  const [rangeId, setRangeId] = useState('month')
+export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo }: UsagePanelProps): ReactNode {
+  // Today by default: the question this panel is opened with is almost always
+  // "what has this session cost me", and the range selector is one click away
+  // from every wider window.
+  const [rangeId, setRangeId] = useState('day')
   const [request, setRequest] = useState(0)
   // Two reads, two states. The calendar's window is the expensive one — the first
   // request after a Host restart is what reads every log — and a range change
@@ -186,6 +194,9 @@ export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePa
   const [selectedDay, setSelectedDay] = useState<string | undefined>(undefined)
   const [dayState, setDayState] = useState<DayState>({ status: 'idle' })
   const [dayRequest, setDayRequest] = useState(0)
+  // Bumped after a rate write, so every view re-prices against the new table
+  // without discarding the Host's fold cache: the samples did not change.
+  const [pricingRevision, setPricingRevision] = useState(0)
   // The cell a return trip should land on. Kept after the day closes so leaving
   // a day page puts the reader back on the day they left, not at the top of a
   // year of cells they would have to find again.
@@ -216,7 +227,7 @@ export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePa
       () => { if (current) setGridState({ status: 'error' }) },
     )
     return () => { current = false }
-  }, [active, report, request, gridFrom, gridTo])
+  }, [active, report, request, pricingRevision, gridFrom, gridTo])
 
   // The selected range, folded over the same samples. It waits for the window to
   // settle rather than racing it: two requests in flight together would each see
@@ -240,7 +251,7 @@ export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePa
       () => { if (current) setSummaryState({ status: 'error' }) },
     )
     return () => { current = false }
-  }, [active, report, rangeFrom, rangeTo, rangeIsWindow, summaryRequest, gridState])
+  }, [active, report, rangeFrom, rangeTo, rangeIsWindow, summaryRequest, pricingRevision, gridState])
 
   // The day page's own fold. Cheap by construction: the samples behind it are
   // already in the Host's memory, so narrowing the window to one day re-prices
@@ -266,7 +277,7 @@ export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePa
       () => { if (current) setDayState({ status: 'error' }) },
     )
     return () => { current = false }
-  }, [active, dayRequest, report, selectedDay])
+  }, [active, dayRequest, report, pricingRevision, selectedDay])
 
   // Read per render, never memoized: the locale id is an input to every figure
   // below, and the panel re-renders on a locale switch because its dictionary
@@ -306,6 +317,15 @@ export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePa
     const time = dayTime(value)
     return time === undefined ? '' : t(weekdayKey(time))
   }, [t])
+
+  // A rate write is followed by a re-read with the cache intact: the *samples*
+  // did not change, only the prices applied to them.
+  const saveRateTable = useCallback(async (update: UsagePricingUpdate): Promise<void> => {
+    await saveRates(update)
+    setPricingRevision(value => value + 1)
+  }, [saveRates])
+
+  const rangeLabel = t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')
 
   const gridDays = gridState.status === 'ready' ? gridState.report.days : []
   const peak = gridDays.reduce<UsageDayRow | undefined>(
@@ -364,14 +384,53 @@ export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePa
                     </button>
                   ))}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={gridState.status === 'loading'}
-                  onClick={() => { setRequest(value => value + 1) }}
-                >
-                  {t('refresh')}
-                </Button>
+                <div className={css.tools}>
+                  {/* Both of these are consulted rather than read through, so
+                      they live beside the figures as hover panels instead of at
+                      the bottom of a column the reader has to scroll. They read
+                      the year's report, so they arrive with it. */}
+                  {gridState.status !== 'ready' ? null : (
+                    <>
+                  <Popover
+                    id="dlu-rates"
+                    label={t('pricingTitle')}
+                    hint={t('pricingTooltip')}
+                    icon={<RateIcon />}
+                    width={700}
+                  >
+                    <PricingNotes
+                      report={gridState.report}
+                      locale={activeLocale}
+                      t={t}
+                      formatTokens={tokens}
+                      onSaveRates={saveRateTable}
+                    />
+                  </Popover>
+                  <Popover
+                    id="dlu-source"
+                    label={t('dataTitle')}
+                    hint={t('dataTooltip')}
+                    icon={<SourceIcon />}
+                    width={560}
+                  >
+                    <DataSourceNotes
+                      report={gridState.report}
+                      weeks={WINDOW_WEEKS}
+                      locale={activeLocale}
+                      t={t}
+                    />
+                  </Popover>
+                    </>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={gridState.status === 'loading'}
+                    onClick={() => { setRequest(value => value + 1) }}
+                  >
+                    {t('refresh')}
+                  </Button>
+                </div>
               </div>
             </header>
 
@@ -418,6 +477,20 @@ export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePa
                     )
                     : <p className={css.status} role="status">{t('loading')}</p>}
 
+                {summaryState.status === 'ready'
+                  ? (
+                    <ProjectRanking
+                      report={summaryState.report}
+                      rangeLabel={rangeLabel}
+                      limit={DEFAULT_RANKING_LIMIT}
+                      t={t}
+                      formatCost={money}
+                      formatTokens={tokens}
+                      formatInteger={integer}
+                    />
+                  )
+                  : null}
+
                 <CalendarHeatmap
                   from={gridFrom}
                   to={gridTo}
@@ -438,13 +511,6 @@ export function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePa
                     t={t}
                     integer={integer}
                     percent={percent}
-                  />
-                  <PricingNotes report={gridState.report} locale={activeLocale} t={t} />
-                  <DataSourceNotes
-                    report={gridState.report}
-                    weeks={WINDOW_WEEKS}
-                    locale={activeLocale}
-                    t={t}
                   />
                   {gridState.report.unpricedRoutes.length === 0 ? null : (
                     <p className={css.warning} role="note">

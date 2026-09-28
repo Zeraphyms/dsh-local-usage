@@ -25,12 +25,17 @@ import { buildReport, reliabilityOf, reliabilityWithin, samplesOf } from './aggr
 import type { PricingOptions, ReliabilityDay, SessionUsageInput, UsageSample } from './aggregate.ts'
 import { parsePeakWindow } from './pricing.ts'
 import type { PeakWindow, PriceRate, PriceRule } from './pricing.ts'
-import type { UsageInsightsReport } from './types.ts'
+import { createRateStore, pricingFilePath, readRate, resolveDshHome } from './rates.ts'
+import type { RateStore } from './rates.ts'
+import type { UsageInsightsReport, UsagePricingUpdate, UsageRate } from './types.ts'
 
 export type * from './types.ts'
 
 /** Exact route the browser half calls; it sits behind the carrier's trust fence. */
 export const REPORT_PATH = '/api/dsh-local-usage/report'
+
+/** Exact route the browser half writes the per-route rate table to. */
+export const PRICING_PATH = '/api/dsh-local-usage/pricing'
 
 /**
  * Session logs folded concurrently by the exact-read path.
@@ -300,6 +305,7 @@ async function assembleReport(
   ctx: Context,
   cache: Map<string, CachedSession>,
   config: UsageInsightsConfig,
+  rates: RateStore,
   request: { refresh: boolean; from: number | undefined; to: number | undefined },
 ): Promise<UsageInsightsReport> {
   if (request.refresh) cache.clear()
@@ -377,15 +383,15 @@ async function assembleReport(
     }
   }
 
-  return buildReport(inputs, pricingOptions(config), {
+  return buildReport(inputs, pricingOptions(config, rates), {
     generatedAt: Date.now(),
     unreadableSessions: unreadable,
     cached,
   })
 }
 
-/** Resolve the configured rate card and peak schedule into fold options. */
-function pricingOptions(config: UsageInsightsConfig): PricingOptions {
+/** Resolve the configured rate card, the reader's overrides, and the peak schedule. */
+function pricingOptions(config: UsageInsightsConfig, rates: RateStore): PricingOptions {
   const windows: PeakWindow[] = []
   for (const spec of config.peakWindows) {
     const window = parsePeakWindow(spec)
@@ -397,6 +403,7 @@ function pricingOptions(config: UsageInsightsConfig): PricingOptions {
     currency: config.currency,
     rules,
     fallback,
+    overrides: rates.read(),
     peakWindows: windows,
     peakWeekdaysOnly: config.peakWeekdaysOnly,
     peakMultiplier: config.peakMultiplier,
@@ -408,11 +415,12 @@ async function handleReport(
   ctx: Context,
   cache: Map<string, CachedSession>,
   config: UsageInsightsConfig,
+  rates: RateStore,
   request: Request,
 ): Promise<Response> {
   const url = new URL(request.url)
   try {
-    const report = await assembleReport(ctx, cache, config, {
+    const report = await assembleReport(ctx, cache, config, rates, {
       refresh: url.searchParams.get('refresh') === '1',
       from: numberParam(url.searchParams, 'from'),
       to: numberParam(url.searchParams, 'to'),
@@ -422,6 +430,64 @@ async function handleReport(
     const message = error instanceof Error ? error.message : String(error)
     ctx.logger.warn(`dsh-local-usage: report failed: ${message}`)
     return Response.json({ error: message }, { status: 500, headers: { 'cache-control': 'no-store' } })
+  }
+}
+
+/**
+ * Read one pricing write off an untrusted body.
+ *
+ * Every rate is validated before it reaches the store, so a malformed request
+ * costs a 400 rather than a poisoned table: this file is what every later report
+ * is priced with.
+ *
+ * @param value - the parsed request body.
+ * @returns the update to apply, or `undefined` when the body is not one.
+ */
+function parsePricingUpdate(value: unknown): UsagePricingUpdate | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const set = (value as { set?: unknown }).set
+  if (typeof set !== 'object' || set === null) return undefined
+  const parsed: Record<string, UsageRate | null> = {}
+  for (const [route, candidate] of Object.entries(set as Record<string, unknown>)) {
+    if (route.length === 0) return undefined
+    if (candidate === null) {
+      parsed[route] = null
+      continue
+    }
+    const rate = readRate(candidate)
+    if (rate === undefined) return undefined
+    parsed[route] = rate
+  }
+  return { set: parsed }
+}
+
+/** Answer one rate-table write with the table now in effect. */
+async function handlePricing(
+  ctx: Context,
+  rates: RateStore,
+  request: Request,
+): Promise<Response> {
+  const headers = { 'cache-control': 'no-store' }
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return Response.json({ error: 'expected a JSON body' }, { status: 400, headers })
+  }
+  const update = parsePricingUpdate(body)
+  if (update === undefined) {
+    return Response.json(
+      { error: 'expected { set: { "<route>": {input, cacheRead, cacheWrite, output} | null } }' },
+      { status: 400, headers },
+    )
+  }
+  try {
+    const overrides = await rates.write(update)
+    return Response.json({ overrides }, { headers })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    ctx.logger.warn(`dsh-local-usage: pricing write failed: ${message}`)
+    return Response.json({ error: message }, { status: 500, headers })
   }
 }
 
@@ -438,7 +504,7 @@ interface UsageInsightsConnection {
   readonly fetch: {
     register(route: {
       readonly path: string
-      readonly methods: readonly ('GET' | 'HEAD')[]
+      readonly methods: readonly ('GET' | 'HEAD' | 'POST')[]
       readonly requestBody: 'buffered'
       readonly fetch: (request: Request) => Promise<Response>
     }): () => Promise<void>
@@ -465,6 +531,9 @@ function connectionOf(ctx: Context): UsageInsightsConnection {
 export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG): void {
   const resolved = resolveConfig(config)
   const cache = new Map<string, CachedSession>()
+  // The reader's own rate corrections, hydrated once here and mirrored to disk
+  // on every write.
+  const rates = createRateStore(pricingFilePath(resolveDshHome()))
   // A session's samples stop being valid the moment it records another event.
   ctx.on('session/event', (session) => {
     cache.delete(session.id)
@@ -474,8 +543,17 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
       path: REPORT_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => handleReport(ctx, cache, resolved, request),
+      fetch: request => handleReport(ctx, cache, resolved, rates, request),
     }),
     'dsh-local-usage: report route',
+  )
+  ctx.effect(
+    () => connectionOf(ctx).fetch.register({
+      path: PRICING_PATH,
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: request => handlePricing(ctx, rates, request),
+    }),
+    'dsh-local-usage: pricing route',
   )
 }

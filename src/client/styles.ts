@@ -120,11 +120,14 @@ export const styles = String.raw`
 
 /* ── Summary: one hero figure, then supporting tiles ───────────────────── */
 
+/* The figures are the header of the page, not the page: the hero and its tiles
+ * share one row so the ranking below them starts high on the screen. */
 .dlu-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 18px 0;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 10px 22px;
+  align-items: center;
+  padding: 12px 0;
   border-top: 0.5px solid var(--dsw-alias-border-l2);
   border-bottom: 0.5px solid var(--dsw-alias-border-l2);
 }
@@ -132,7 +135,9 @@ export const styles = String.raw`
 .dlu-hero {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  padding-right: 22px;
+  border-right: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .dlu-heroLabel {
@@ -142,7 +147,7 @@ export const styles = String.raw`
 }
 
 .dlu-heroValue {
-  font-size: 34px;
+  font-size: 27px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.08;
@@ -158,23 +163,23 @@ export const styles = String.raw`
 
 .dlu-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(114px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
 }
 
 .dlu-tile {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 7px 9px;
   background: var(--dsw-alias-bg-layer-1);
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
 }
 
 .dlu-tileValue {
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
@@ -182,7 +187,7 @@ export const styles = String.raw`
 }
 
 .dlu-tileLabel {
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1.4;
   color: var(--dsw-alias-label-tertiary);
 }
@@ -807,13 +812,362 @@ export const styles = String.raw`
   color: var(--dsw-alias-label-secondary);
 }
 
+
+/* ── Header tools: the rate table and the provenance block ────────────── */
+
+.dlu-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dlu-popoverHost {
+  position: relative;
+  display: inline-flex;
+}
+
+.dlu-iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 28px;
+  block-size: 28px;
+  padding: 0;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dlu-iconButton:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dlu-iconButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 1px;
+}
+
+.dlu-iconButton[aria-expanded='true'] {
+  color: var(--dsw-alias-link);
+  border-color: var(--dsw-alias-link);
+}
+
+/* Anchored to the trigger and scrollable: the rate panel carries a table and an
+ * editor, and neither is allowed to push the panel off the bottom of the frame. */
+.dlu-popoverPanel {
+  position: absolute;
+  z-index: 30;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-end: 0;
+  inline-size: var(--dlu-popover-inline, 560px);
+  max-block-size: min(70vh, 640px);
+  max-inline-size: calc(100vw - 32px);
+  overflow: auto;
+  padding: 14px 16px 16px;
+  text-align: start;
+  background: var(--dsw-alias-bg-overlay);
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.18);
+}
+
+.dlu-popoverTitle {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ── Project ranking ──────────────────────────────────────────────────── */
+
+.dlu-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 16px;
+}
+
+.dlu-rankHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.dlu-rankTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-rankScope {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-rankList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One grid for the column heads and every row, so a number's meaning is stated
+ * once at the top instead of beside each figure. */
+.dlu-rankRow {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) minmax(80px, 1.3fr) 86px 92px 54px;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.dlu-rankRowHead {
+  padding-block: 0 5px;
+  font-size: 10.5px;
+  color: var(--dsw-alias-label-caption);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.dlu-rankPlace {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-caption);
+}
+
+.dlu-rankName {
+  min-width: 0;
+}
+
+.dlu-rankNameText {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-rankPath {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+  color: var(--dsw-alias-label-caption);
+  overflow-wrap: anywhere;
+}
+
+/* The bar is the share of the leader, so the ranking stays readable when one
+ * project dominates: scaled to the total, every other row would be a sliver. */
+.dlu-rankBar {
+  block-size: 8px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 9%, transparent);
+  border-radius: 999px;
+}
+
+.dlu-rankBarFill {
+  display: block;
+  block-size: 100%;
+  background: var(--dsw-alias-link);
+  border-radius: inherit;
+}
+
+.dlu-rankTokens,
+.dlu-rankCost,
+.dlu-rankSessions {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-secondary);
+  text-align: right;
+}
+
+.dlu-rankCost {
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-rankMore {
+  align-self: flex-start;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+}
+
+.dlu-rankMore:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dlu-rankMore:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 1px;
+}
+
+.dlu-rankMore:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* ── Rate editor ──────────────────────────────────────────────────────── */
+
+.dlu-editor {
+  padding-top: 12px;
+  margin-top: 14px;
+  border-top: 0.5px dashed var(--dsw-alias-border-l2);
+}
+
+.dlu-editorTitle {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-editorHint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-editorTable {
+  inline-size: 100%;
+  font-size: 11.5px;
+  border-collapse: collapse;
+}
+
+.dlu-editorTable th {
+  padding: 0 0 6px;
+  font-weight: 400;
+  color: var(--dsw-alias-label-caption);
+  text-align: left;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.dlu-editorTable .dlu-numeric {
+  text-align: right;
+}
+
+.dlu-editorTable td {
+  padding: 5px 0;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.dlu-editorTable th[scope='row'] {
+  max-inline-size: 168px;
+  padding-right: 8px;
+}
+
+.dlu-editorSource {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.dlu-editorSource[data-source='override'] {
+  color: var(--dsw-alias-link);
+}
+
+.dlu-editorField {
+  inline-size: 60px;
+  padding: 3px 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-primary);
+  text-align: right;
+  background: var(--dsw-alias-bg-base);
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+}
+
+.dlu-editorField:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 0;
+}
+
+.dlu-editorField[aria-invalid='true'] {
+  border-color: var(--dsw-alias-state-error-primary);
+}
+
+.dlu-editorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.dlu-editorStatus {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-editorError {
+  font-size: 11px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.dlu-visuallyHidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  /* One figure per row: the hero stops sharing a line with its tiles, and the
+   * ranking drops the bar rather than crushing six columns into a phone. */
+  .dlu-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dlu-hero {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .dlu-rankRow {
+    grid-template-columns: 26px minmax(0, 1fr) 84px 62px;
+  }
+
+  .dlu-rankBar,
+  .dlu-rankSessions {
+    display: none;
+  }
+
+  /* A narrow viewport has no room for a 640px panel anchored to a trigger, so
+   * the panel becomes a sheet under the header instead of overflowing it. */
+  .dlu-popoverPanel {
+    position: fixed;
+    inset-inline: 16px;
+    inset-block-start: 88px;
+    inline-size: auto;
+    max-inline-size: none;
+    max-block-size: calc(100vh - 150px);
+  }
+}
+
 @media (max-width: 560px) {
   .dlu-panel {
     padding: 20px 16px 40px;
   }
 
   .dlu-heroValue {
-    font-size: 28px;
+    font-size: 24px;
   }
 
   /* Six columns of figures on a phone: keep them, but tighten the type and the

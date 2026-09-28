@@ -29,6 +29,7 @@ import type {
   UsageModelRow,
   UsageProjectRow,
   UsageReliability,
+  UsageRouteRate,
   UsageSessionRow,
   UsageSignalRow,
   UsageTokens,
@@ -66,6 +67,8 @@ export interface PricingOptions {
   readonly rules: readonly PriceRule[]
   /** Rate used by a route no rule matches. */
   readonly fallback: PriceRate
+  /** Per-route rates the reader saved, keyed by the exact `provider/model`. */
+  readonly overrides: ReadonlyMap<string, PriceRate>
   /** Parsed peak windows in Beijing time. */
   readonly peakWindows: readonly PeakWindow[]
   /** When true, Saturday and Sunday are never peak. */
@@ -417,6 +420,11 @@ function clock(minutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
+/** Total tokens of one accumulator, for ordering a token-volume ranking. */
+function bucketTokens(bucket: Bucket): number {
+  return bucket.uncachedInputTokens + bucket.outputTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens
+}
+
 /** Costed fields without the internal session set. */
 function costedOf(bucket: Bucket): UsageCosted {
   return {
@@ -471,6 +479,7 @@ export function buildReport(
         sample.route,
         peak,
         options.peakMultiplier,
+        options.overrides,
       )
       const cost = costOf(sample.tokens, rate)
       firstSampleTime ??= sample.time
@@ -539,6 +548,22 @@ export function buildReport(
     }))
     .sort((left, right) => right.cost - left.cost || right.outputTokens - left.outputTokens)
 
+  // The rate each route is priced at, resolved off-peak: a sample's own
+  // selection has the peak multiplier baked in, and the editor below it edits
+  // the base rate the multiplier is applied to.
+  const routeRates: UsageRouteRate[] = [...byRoute.entries()]
+    .map(([route, bucket]) => {
+      const base = selectRate(options.rules, options.fallback, route, false, options.peakMultiplier, options.overrides)
+      return {
+        route,
+        rate: base.rate,
+        source: base.source,
+        ...base.rule === undefined ? {} : { rule: base.rule },
+        tokens: bucketTokens(bucket),
+      }
+    })
+    .sort((left, right) => right.tokens - left.tokens || left.route.localeCompare(right.route))
+
   const projects: UsageProjectRow[] = [...byProject.entries()]
     .map(([path, bucket]) => ({
       path,
@@ -578,6 +603,7 @@ export function buildReport(
       cacheWrite: options.fallback.cacheWrite,
       output: options.fallback.output,
     },
+    routeRates,
     peakWindows: options.peakWindows.map(window => `${clock(window.start)}-${clock(window.end)}`),
     peakWeekdaysOnly: options.peakWeekdaysOnly,
   }

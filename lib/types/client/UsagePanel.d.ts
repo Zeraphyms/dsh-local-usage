@@ -22,7 +22,7 @@
 import { type ReactNode } from 'react';
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client';
-import type { UsageInsightsReport } from '../types.ts';
+import type { UsageInsightsReport, UsagePricingResult, UsagePricingUpdate } from '../types.ts';
 /** Registration-side face the panel reads its data through. */
 export interface UsagePanelInjected {
     /** Key this panel occupies in the main column, matching the sidebar entry. */
@@ -39,6 +39,8 @@ export interface UsagePanelInjected {
     locale: () => string;
     /** Assemble the report; `refresh` discards the Host's per-session fold cache. */
     report: (refresh: boolean, from: number, to: number) => Promise<UsageInsightsReport>;
+    /** Persist one write to the per-route rate table and answer with what is in effect. */
+    saveRates: (update: UsagePricingUpdate) => Promise<UsagePricingResult>;
 }
 /** Full component props assembled by the main slot renderer. */
 export type UsagePanelProps = PropsRuntime<'main'> & PropsLocale<'usage'> & InjectFace<UsagePanelInjected>;
@@ -47,4 +49,4 @@ export type UsagePanelProps = PropsRuntime<'main'> & PropsLocale<'usage'> & Inje
  * @param props - panel runtime, dictionary, and the injected report reader.
  * @returns the panel content.
  */
-export declare function UsagePanel({ panelId, locale, report, t, usePanelInfo }: UsagePanelProps): ReactNode;
+export declare function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo }: UsagePanelProps): ReactNode;

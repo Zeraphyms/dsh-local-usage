@@ -47,6 +47,7 @@ export function normalizeReport(value: WireReport): UsageInsightsReport {
     unpricedTokens: value.unpricedTokens ?? 0,
     cached: value.cached ?? false,
     peakMultiplier: value.peakMultiplier ?? 1,
+    routeRates: (value.routeRates ?? []).map(route => ({ ...route, tokens: route.tokens ?? 0 })),
     prices: value.prices ?? [],
     fallbackPrice: value.fallbackPrice ?? NO_RATE,
     peakWindows: value.peakWindows ?? [],

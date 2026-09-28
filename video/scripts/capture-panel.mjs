@@ -49,15 +49,6 @@ async function peakDay(page) {
   })
 }
 
-/** Open one `<details>` disclosure by the text of its summary. */
-async function openDisclosure(page, text) {
-  await page.evaluate(label => {
-    const summary = [...document.querySelectorAll('summary')]
-      .find(node => (node.textContent ?? '').trim() === label)
-    summary?.closest('details')?.setAttribute('open', '')
-  }, text)
-}
-
 await mkdir(OUT, { recursive: true })
 const browser = await chromium.launch({
   headless: true,
@@ -108,12 +99,14 @@ await shot('day-dark')
 await page.evaluate(() => window.__panel.setTheme('light'))
 await page.evaluate(() => window.__panel.back())
 
-// 5. The two disclosures that carry the panel's provenance.
+// 5. The header's two reference panels, pinned open.
 await page.evaluate(() => window.__panel.setRange('全年'))
-await openDisclosure(page, '计价方式')
+await page.evaluate(() => window.__panel.openPopover('计价方式'))
 await shot('pricing-light')
-await openDisclosure(page, '用量依据')
+await page.evaluate(() => window.__panel.openPopover('计价方式'))
+await page.evaluate(() => window.__panel.openPopover('用量依据'))
 await shot('provenance-light')
+await page.evaluate(() => window.__panel.openPopover('用量依据'))
 
 await browser.close()
 console.log(`captured panel states into ${OUT}`)

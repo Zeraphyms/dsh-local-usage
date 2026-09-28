@@ -14,7 +14,7 @@
  * @module dsh-local-usage/pricing
  */
 
-import type { UsageTokens } from './types.ts'
+import type { UsageRateSource, UsageTokens } from './types.ts'
 
 /** Minutes to add to UTC to reach Beijing time; China observes no daylight saving. */
 export const BEIJING_OFFSET_MINUTES = 480
@@ -97,14 +97,34 @@ export function isPeakTime(
   return windows.some(window => minutes >= window.start && minutes < window.end)
 }
 
+/** Which card claimed a route, and at what rate. */
+export interface RateSelection {
+  /** Effective rate, peak multiplier already applied. */
+  readonly rate: PriceRate
+  /** Whether a configured card — a rule or an override — claimed the route. */
+  readonly matched: boolean
+  /** Where {@link rate} came from. */
+  readonly source: UsageRateSource
+  /** The rule's `match` string, present only when `source` is `rule`. */
+  readonly rule?: string
+}
+
 /**
  * Select the rate card one route is priced with.
+ *
+ * Three sources, in order: an exact per-route override the reader saved, then
+ * the first substring rule that claims the route, then the fallback. The override
+ * comes first because it is the only one written for a specific route; the
+ * substring match is a convenient guess that can quietly claim a route it was
+ * never meant for, which is why the report publishes the source alongside.
+ *
  * @param rules - configured rules in match order.
- * @param fallback - rate used when no rule matches.
+ * @param fallback - rate used when neither an override nor a rule applies.
  * @param route - `provider/model` the usage was attributed to.
  * @param peak - whether the sample is inside a peak window.
  * @param peakMultiplier - factor applied to every rate during peak windows.
- * @returns the effective rate and whether a configured rule matched.
+ * @param overrides - per-route rates the reader saved, keyed by exact route.
+ * @returns the effective rate, whether a configured card claimed it, and which.
  */
 export function selectRate(
   rules: readonly PriceRule[],
@@ -112,23 +132,35 @@ export function selectRate(
   route: string,
   peak: boolean,
   peakMultiplier: number,
-): { rate: PriceRate; matched: boolean } {
+  overrides?: ReadonlyMap<string, PriceRate>,
+): RateSelection {
+  const override = overrides?.get(route)
   const needle = route.toLocaleLowerCase()
-  const rule = rules.find(candidate => needle.includes(candidate.match.toLocaleLowerCase()))
+  const rule = override === undefined
+    ? rules.find(candidate => needle.includes(candidate.match.toLocaleLowerCase()))
+    : undefined
   // Projected rather than returned as-is: a rule carries its own `match` key,
   // which is configuration, not a rate.
-  const matched: PriceRate = rule === undefined
-    ? fallback
-    : { input: rule.input, cacheRead: rule.cacheRead, cacheWrite: rule.cacheWrite, output: rule.output }
-  if (!peak || peakMultiplier === 1) return { rate: matched, matched: rule !== undefined }
+  const chosen: PriceRate = override
+    ?? (rule === undefined
+      ? fallback
+      : { input: rule.input, cacheRead: rule.cacheRead, cacheWrite: rule.cacheWrite, output: rule.output })
+  const source: UsageRateSource = override !== undefined ? 'override' : rule === undefined ? 'fallback' : 'rule'
+  const selection: RateSelection = {
+    rate: chosen,
+    matched: source !== 'fallback',
+    source,
+    ...rule === undefined ? {} : { rule: rule.match },
+  }
+  if (!peak || peakMultiplier === 1) return selection
   return {
+    ...selection,
     rate: {
-      input: matched.input * peakMultiplier,
-      cacheRead: matched.cacheRead * peakMultiplier,
-      cacheWrite: matched.cacheWrite * peakMultiplier,
-      output: matched.output * peakMultiplier,
+      input: chosen.input * peakMultiplier,
+      cacheRead: chosen.cacheRead * peakMultiplier,
+      cacheWrite: chosen.cacheWrite * peakMultiplier,
+      output: chosen.output * peakMultiplier,
     },
-    matched: rule !== undefined,
   }
 }
 

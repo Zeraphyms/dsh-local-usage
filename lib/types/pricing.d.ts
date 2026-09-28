@@ -13,7 +13,7 @@
  *
  * @module dsh-local-usage/pricing
  */
-import type { UsageTokens } from './types.ts';
+import type { UsageRateSource, UsageTokens } from './types.ts';
 /** Minutes to add to UTC to reach Beijing time; China observes no daylight saving. */
 export declare const BEIJING_OFFSET_MINUTES = 480;
 /** Currency units per one million tokens, split by the bucket the provider bills. */
@@ -66,19 +66,35 @@ export declare function beijingClock(time: number): {
  * @returns true when the instant is billed at the peak rate.
  */
 export declare function isPeakTime(time: number, windows: readonly PeakWindow[], weekdaysOnly: boolean): boolean;
+/** Which card claimed a route, and at what rate. */
+export interface RateSelection {
+    /** Effective rate, peak multiplier already applied. */
+    readonly rate: PriceRate;
+    /** Whether a configured card — a rule or an override — claimed the route. */
+    readonly matched: boolean;
+    /** Where {@link rate} came from. */
+    readonly source: UsageRateSource;
+    /** The rule's `match` string, present only when `source` is `rule`. */
+    readonly rule?: string;
+}
 /**
  * Select the rate card one route is priced with.
+ *
+ * Three sources, in order: an exact per-route override the reader saved, then
+ * the first substring rule that claims the route, then the fallback. The override
+ * comes first because it is the only one written for a specific route; the
+ * substring match is a convenient guess that can quietly claim a route it was
+ * never meant for, which is why the report publishes the source alongside.
+ *
  * @param rules - configured rules in match order.
- * @param fallback - rate used when no rule matches.
+ * @param fallback - rate used when neither an override nor a rule applies.
  * @param route - `provider/model` the usage was attributed to.
  * @param peak - whether the sample is inside a peak window.
  * @param peakMultiplier - factor applied to every rate during peak windows.
- * @returns the effective rate and whether a configured rule matched.
+ * @param overrides - per-route rates the reader saved, keyed by exact route.
+ * @returns the effective rate, whether a configured card claimed it, and which.
  */
-export declare function selectRate(rules: readonly PriceRule[], fallback: PriceRate, route: string, peak: boolean, peakMultiplier: number): {
-    rate: PriceRate;
-    matched: boolean;
-};
+export declare function selectRate(rules: readonly PriceRule[], fallback: PriceRate, route: string, peak: boolean, peakMultiplier: number, overrides?: ReadonlyMap<string, PriceRate>): RateSelection;
 /**
  * Price one bucket set at one rate.
  * @param tokens - bucket counts to price.

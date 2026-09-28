@@ -82,6 +82,8 @@ describe('selectRate', () => {
     expect(selected).toEqual({
       rate: { input: 4.5, cacheRead: 0.15, cacheWrite: 4.5, output: 13.5 },
       matched: true,
+      source: 'rule',
+      rule: 'v4-pro',
     })
   })
 
@@ -90,7 +92,8 @@ describe('selectRate', () => {
   })
 
   it('falls back when no rule claims the route', () => {
-    expect(selectRate(RULES, FALLBACK, 'other/gpt', false, 2)).toEqual({ rate: FALLBACK, matched: false })
+    expect(selectRate(RULES, FALLBACK, 'other/gpt', false, 2))
+      .toEqual({ rate: FALLBACK, matched: false, source: 'fallback' })
   })
 
   it('scales every bucket by the peak multiplier', () => {

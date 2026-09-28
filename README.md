@@ -61,9 +61,13 @@ A profile's bundle list is composed when its process boots. Installing through *
 
 The panel is global, so it belongs to the profile rather than to one Session, and it stays available while you switch conversations.
 
-The range selector chooses the lens: **Today**, **Last 7 days**, **This month**, **This quarter**, or **This year**. Every range ends with today, so "this month" means the month so far rather than a completed calendar month.
+The range selector chooses the lens: **Today**, **Last 7 days**, **This month**, **This quarter**, or **This year**. Every range ends with today, so "this month" means the month so far rather than a completed calendar month. **Today is the default**, because the question the panel is usually opened with is what the current session has cost so far.
 
-Below it a hero figure states total spend over the selected range, above a row of tiles carrying total tokens, the input, output, and cache buckets, the cache hit rate, the billed call count, and the number of contributing sessions. The day page states the same tiles for its one day, so a day whose caching broke is visible from the page that exists to explain it.
+Beside the hero figure sits a row of tiles carrying total tokens, the input, output, and cache buckets, the cache hit rate, the billed call count, and the number of contributing sessions. They share one line with the hero rather than taking a block of their own, so the figures read as the page's header instead of as its content. The day page states the same tiles for its one day, so a day whose caching broke is visible from the page that exists to explain it.
+
+Below them, **Tokens by project** ranks the working directories the selected range's tokens went to: rank, project, a bar, tokens, cost and sessions, ten rows at a time, with the rest one click away. The bar is a share of the *leader* rather than of the total, so the ranking stays readable when one project dominates. This list follows the range selector — switching to **Last 7 days** re-ranks the same week the tiles above are reporting.
+
+The header's right corner carries two icons beside **Recount**: the rate table, and where the figures come from. Both are consulted rather than read through, so they open on hover and pin on click, and neither takes a block out of the column.
 
 The calendar is the stable frame: it is Sunday-first with a one-glyph weekday gutter — `日 一 二 三 四 五 六` in Chinese, `S M T W T F S` in English, from the dictionary rather than from a hard-coded set — spans a rolling 52 weeks ending with the current one, and does not change when the range does. Cells are fixed squares whose edge is measured from the panel: while a year of columns fits at the minimum edge they grow to fill it, and below that the grid keeps the minimum edge and drops its oldest weeks, so it never scrolls sideways however narrow the panel gets — including with the sidebar expanded. Cells carry no border; intensity is the only mark on them, and hovering one opens a card with that day's cost, total tokens, input, output, and cache-read tokens, and call count. The card's figures are exact — every digit, grouped the reader's way — because a rounded count is the one thing a drill-down cannot answer.
 
@@ -107,13 +111,21 @@ It reads as an explanation of the figures above rather than a report of its own:
 
 Each rate card states `input`, `cacheRead`, `cacheWrite`, and `output` in currency units per one million tokens, plus the `match` substring that claims a route. The shipped defaults are DeepSeek's published off-peak CNY prices for `deepseek-flash` and `deepseek-v4-pro`; a route served through an aggregator or a reseller must be priced by the operator, and the page names every route that fell back to the default rate instead of implying a figure it cannot support.
 
+**Pricing a route exactly.** A substring rule is convenient and quietly wrong the moment a route it was never written for contains the substring — `ds123/glm-5.3-flash` is claimed by the `flash` card and billed as DeepSeek Flash. The rate panel lists every route the window recorded, with the rate it was actually priced at and a badge naming the source (a rule, the fallback rate, or your own override), and each of the four prices can be typed over. An override outranks the rules for that exact route, is saved on this machine, and is used by the very next report.
+
+```sh
+$DSH_HOME/local-usage/pricing.json     # what the editor writes; ~/.dsh by default
+```
+
+The file is the only state this plugin keeps. A write goes through `POST /api/dsh-local-usage/pricing` on the same route family the panel reads its report from, is validated before it is stored, and is persisted through a temporary sibling and a rename, so an interrupted write cannot leave a half-written table behind. **Reset** on a row clears its override and returns the route to its rule.
+
 ### What the money figure is worth
 
-Cost is this plugin's own arithmetic, not a figure read back from a provider: `tokens × configured rate` per bucket, with peak or off-peak decided from each call's own instant. The panel states the formula, the rates actually in effect, and the peak schedule under **計價方式 / How cost is computed**, because the ways an estimate can differ from an invoice are exactly what a reader would otherwise assume were included — prepaid credit, package plans, volume discounts, granted balance, aggregator markups and reseller margins are all invisible here. Treat the provider's invoice as authoritative.
+Cost is this plugin's own arithmetic, not a figure read back from a provider: `tokens × configured rate` per bucket, with peak or off-peak decided from each call's own instant. The panel states the formula, the rates actually in effect, and the peak schedule in the header's rate panel, because the ways an estimate can differ from an invoice are exactly what a reader would otherwise assume were included — prepaid credit, package plans, volume discounts, granted balance, aggregator markups and reseller margins are all invisible here. Pricing a route by hand removes the estimate's largest source of error for that route; everything else on that list stays invisible either way. Treat the provider's invoice as authoritative.
 
 ### Where the figures come from
 
-The panel states its own provenance under **Where these figures come from / 用量依据**: the harness keeps no usage database, so the statistics are folded from the durable session event logs themselves — every session on the host, across all working directories, read through the session query service and replay-validated. That block also names the on-disk shape (`<DSH_HOME>/sessions/<cwd>/<session>/session.v3.jsonl.zstd`), what is left out (a fork's inherited prefix, calls still in flight, unreadable logs), the fact that nothing is uploaded and no external request is made, and the counts for the read that produced the figures on screen.
+The panel states its own provenance in the header's provenance panel: the harness keeps no usage database, so the statistics are folded from the durable session event logs themselves — every session on the host, across all working directories, read through the session query service and replay-validated. That block also names the on-disk shape (`<DSH_HOME>/sessions/<cwd>/<session>/session.v3.jsonl.zstd`), what is left out (a fork's inherited prefix, calls still in flight, unreadable logs), the fact that nothing is uploaded and no external request is made, and the counts for the read that produced the figures on screen.
 
 ### What the figures mean
 
@@ -146,7 +158,9 @@ That message means the entry reached the Loader without its `inject` list and di
 
 ### The Host fold
 
-`UsageInsightsController` enumerates sessions through `ctx.sessionQuery.listSessions()`, which reads no event logs, then reads each log once through `ctx.sessionQuery.readSession()` under a fixed read concurrency. Reading is the expensive half and folding is not, so the cache stores each session's extracted samples — not a finished report — and every call re-prices them against the current configuration; a configuration change therefore takes effect without re-reading a single log. A session's entry is dropped the moment it records another event, and a request may force a full re-read.
+The Host half enumerates sessions through `ctx.sessionQuery.listSessions()`, which reads no event logs, then reads the logs it has not folded yet down one of two paths: the engine's batch projection when the mounted build offers one, and the per-session exact read for a log carrying a fork-inherited prefix, whose length only that read reports. Reading is the expensive half and folding is not, so the cache stores each session's extracted samples — not a finished report — and every call re-prices them against the configuration and the reader's overrides in effect at that moment; changing a price therefore takes effect without re-reading a single log. A session's entry is dropped the moment it records another event, and a request may force a full re-read.
+
+Two routes reach that fold: `GET /api/dsh-local-usage/report` answers with a report for a window, and `POST /api/dsh-local-usage/pricing` writes the per-route override table. The write is validated field by field before it is stored, because the file it lands in is what every later report is priced with, and it is the plugin's only durable state.
 
 A forked session's log begins with its parent's inherited prefix and those turns were already billed under the parent, so only the events at or after the snapshot's `inheritedEventCount` are folded. Session titles are folded from the complete log, inherited prefix included, because a title is a fact about the conversation rather than about its billing.
 
@@ -186,6 +200,8 @@ None; this package neither assembles nor sends a provider request.
 These limits define what the page can report; they are current package constraints.
 
 - **Prices are configuration, not billing** — the harness records tokens and never currency, so every money figure is `tokens × configured rate`; a route with no matching card is priced at the fallback rate and named in the page's warning line rather than silently estimated.
+- **An override names one route, exactly** — the editor keys on the `provider/model` string the log recorded, so an aggregator that renames a route needs a new entry, and there is no wildcard form. The editor lists the routes the *current window* recorded; an override for a route that has stopped being used stays in `pricing.json` and comes back the next time the route appears.
+- **The rate editor is not a price list you can plan from** — it edits what this machine bills at, and it is deliberately add-free: there is no way to declare a route that has never been used, and no place to keep a provider's catalogue.
 - **Chinese public holidays are not modelled** — peak windows follow the published Beijing-time schedule for Monday through Friday, so a holiday weekday inside a window is billed at the peak rate.
 - **Two locales are shipped** — Chinese and English. A third language registered by a language pack resolves key-by-key through English, so it renders an English sentence until that pack also registers a `usage` dictionary. Copy is bilingual; the figures are not, because a locale with no `Intl` data behind it silently renders the default locale's numbers.
 - **The language is the harness's, not the panel's** — there is no per-panel language selection. A reader who wants Chinese figures on an English harness has to change the harness's language, which changes every surface rather than this one.

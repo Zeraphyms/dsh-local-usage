@@ -28,19 +28,22 @@ function Fact({ label, children }: { readonly label: string; readonly children: 
   )
 }
 
-/**
- * Render the provenance disclosure.
- * @param props - the report's live counts, the host facts, the calendar window, and the dictionary.
- * @returns the disclosure block.
- */
-export function DataSourceNotes({ report, weeks, locale, t }: {
+/** Props for the provenance popover's body. */
+export interface DataSourceNotesProps {
   readonly report: UsageInsightsReport
   /** Week columns the calendar spans, stated so the window is not a guess. */
   readonly weeks: number
   /** Active locale id; the counts below are grouped the reader's way. */
   readonly locale: string
   readonly t: PropsLocale<'usage'>['t']
-}): ReactNode {
+}
+
+/**
+ * Render the provenance body.
+ * @param props - the report's live counts, the host facts, the calendar window, and the dictionary.
+ * @returns the facts list.
+ */
+export function DataSourceNotes({ report, weeks, locale, t }: DataSourceNotesProps): ReactNode {
   const counts = t('dataCounts', {
     count: formatInteger(report.scannedSessions, locale),
     unreadable: report.unreadableSessions === 0
@@ -49,25 +52,22 @@ export function DataSourceNotes({ report, weeks, locale, t }: {
     source: report.cached ? t('dataCountsCached') : t('dataCountsFresh'),
   })
   return (
-    <details className={css.disclosure}>
-      <summary className={css.disclosureSummary}>{t('dataTitle')}</summary>
-      <div className={css.disclosureBody}>
-        <p>{t('dataIntro')}</p>
-        <dl className={css.facts}>
-          <Fact label={t('dataWhereLabel')}>
-            <code>{t('dataWherePath')}</code>
-            <span>{t('dataWhereValue')}</span>
-          </Fact>
-          <Fact label={t('dataHowLabel')}>{t('dataHowValue')}</Fact>
-          <Fact label={t('dataScopeLabel')}>{t('dataScopeValue')}</Fact>
-          <Fact label={t('dataWindowLabel')}>
-            {t('dataWindowValue', { weeks: String(weeks), days: String(weeks * 7) })}
-          </Fact>
-          <Fact label={t('dataExcludedLabel')}>{t('dataExcludedValue')}</Fact>
-          <Fact label={t('dataFlowLabel')}>{t('dataFlow')}</Fact>
-        </dl>
-        <p className={css.pricingHint}>{counts}</p>
-      </div>
-    </details>
+    <div className={css.disclosureBody}>
+      <p>{t('dataIntro')}</p>
+      <dl className={css.facts}>
+        <Fact label={t('dataWhereLabel')}>
+          <code>{t('dataWherePath')}</code>
+          <span>{t('dataWhereValue')}</span>
+        </Fact>
+        <Fact label={t('dataHowLabel')}>{t('dataHowValue')}</Fact>
+        <Fact label={t('dataScopeLabel')}>{t('dataScopeValue')}</Fact>
+        <Fact label={t('dataWindowLabel')}>
+          {t('dataWindowValue', { weeks: String(weeks), days: String(weeks * 7) })}
+        </Fact>
+        <Fact label={t('dataExcludedLabel')}>{t('dataExcludedValue')}</Fact>
+        <Fact label={t('dataFlowLabel')}>{t('dataFlow')}</Fact>
+      </dl>
+      <p className={css.pricingHint}>{counts}</p>
+    </div>
   )
 }

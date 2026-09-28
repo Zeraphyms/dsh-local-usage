@@ -27,6 +27,7 @@ import { en, zh, type UsageInsightsLocaleKey } from './locales.ts'
 import { STYLE_ID, styles } from './styles.ts'
 import { normalizeReport } from './wire-report.ts'
 import type { WireReport } from './wire-report.ts'
+import type { UsagePricingResult, UsagePricingUpdate } from '../types.ts'
 
 export type { UsagePanelInjected, UsagePanelProps } from './UsagePanel.tsx'
 export type { UsageInsightsLocaleKey } from './locales.ts'
@@ -46,6 +47,9 @@ export const PANEL_ID = 'usage' as MainPanelId
 
 /** Host route this panel reads its report from. */
 export const REPORT_PATH = '/api/dsh-local-usage/report'
+
+/** Host route this panel writes its per-route rate table to. */
+export const PRICING_PATH = '/api/dsh-local-usage/pricing'
 
 /** Services required by the sidebar and main-slot registrations. */
 export const inject = ['slots', 'locale']
@@ -98,6 +102,21 @@ export function apply(ctx: ClientContext): void {
         throw new Error(`usage report failed: HTTP ${String(response.status)}`)
       }
       return normalizeReport(await response.json() as WireReport)
+    },
+    // A write, not a report: the Host persists the table and answers with what
+    // is now in effect, and the panel re-reads the report for the new prices.
+    saveRates: async (update: UsagePricingUpdate) => {
+      const response = await fetch(new URL(PRICING_PATH, window.location.origin), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(update),
+      })
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '')
+        throw new Error(`HTTP ${String(response.status)}${detail.length === 0 ? '' : `: ${detail.slice(0, 200)}`}`)
+      }
+      return await response.json() as UsagePricingResult
     },
   })
 

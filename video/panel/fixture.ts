@@ -17,7 +17,9 @@ import type {
   UsageModelRow,
   UsagePriceRow,
   UsageProjectRow,
+  UsageRate,
   UsageReliability,
+  UsageRouteRate,
   UsageTokens,
 } from '../../src/types.ts'
 
@@ -57,9 +59,40 @@ interface Record {
   readonly project: string
   readonly route: string
   readonly tokens: UsageTokens
-  readonly cost: number
+  /** Whether the call fell inside a peak window, which the rate is scaled by. */
+  readonly peak: boolean
   readonly calls: number
   readonly sessions: number
+}
+
+/**
+ * Rates the capture harness has edited, keyed by exact route.
+ *
+ * The fixture re-prices on every read rather than baking cost into the corpus,
+ * so an edit made in the panel's rate editor is visible in the very next render —
+ * the same shape the Host has.
+ */
+const OVERRIDES = new Map<string, UsageRate>()
+
+/** Replace the harness's edited rates. */
+export function setOverrides(routes: Map<string, UsageRate>): void {
+  OVERRIDES.clear()
+  for (const [route, rate] of routes) OVERRIDES.set(route, rate)
+}
+
+/** Every rate the harness currently has overridden, for the save round trip. */
+export function readOverrides(): Record<string, UsageRate> {
+  return Object.fromEntries(OVERRIDES)
+}
+
+/** The rate one route is billed at: an edit, else the card that claims it. */
+function rateFor(route: string): UsageRate {
+  return OVERRIDES.get(route) ?? (route === PRO_ROUTE ? PRO : FLASH)
+}
+
+/** What one record cost at the rates in effect. */
+function costFor(record: Record): number {
+  return costOf(record.tokens, rateFor(record.route), record.peak)
 }
 
 /** Local calendar day key, matching the Host fold's own key. */
@@ -128,7 +161,7 @@ function buildRecords(): Record[] {
         project,
         route,
         tokens,
-        cost: costOf(tokens, route === PRO_ROUTE ? PRO : FLASH, peak),
+        peak,
         calls,
         sessions: 1 + Math.floor(draw() * 3),
       })
@@ -147,10 +180,22 @@ function costedOf(records: readonly Record[]): UsageCosted {
     totals.outputTokens += record.tokens.outputTokens
     totals.cacheReadTokens += record.tokens.cacheReadTokens
     totals.cacheWriteTokens += record.tokens.cacheWriteTokens
-    totals.cost += record.cost
+    totals.cost += costFor(record)
     totals.calls += record.calls
   }
   return totals
+}
+
+/** Total tokens of one record set. */
+function tokensOfRecords(records: readonly Record[]): number {
+  let total = 0
+  for (const record of records) {
+    total += record.tokens.uncachedInputTokens
+      + record.tokens.outputTokens
+      + record.tokens.cacheReadTokens
+      + record.tokens.cacheWriteTokens
+  }
+  return total
 }
 
 /** Distinct sessions behind a record set: one seat per (day, project, session ordinal). */
@@ -234,6 +279,24 @@ export function makeReport(from?: number, to?: number): UsageInsightsReport {
     { match: 'v4-pro', ...PRO },
     { match: 'flash', ...FLASH },
   ]
+  /** Route names carry the rule that claims them, as the real fold reports it. */
+  const ROUTE_RULES: readonly { readonly route: string; readonly rate: UsageRate; readonly rule: string }[] = [
+    { route: FLASH_ROUTE, rate: FLASH, rule: 'flash' },
+    { route: PRO_ROUTE, rate: PRO, rule: 'v4-pro' },
+  ]
+  const routeRates: UsageRouteRate[] = ROUTE_RULES
+    .map(entry => {
+      const bucket = byRoute.get(entry.route)
+      const overridden = OVERRIDES.has(entry.route)
+      return {
+        route: entry.route,
+        rate: rateFor(entry.route),
+        source: overridden ? 'override' as const : 'rule' as const,
+        ...overridden ? {} : { rule: entry.rule },
+        tokens: bucket === undefined ? 0 : tokensOfRecords(bucket),
+      }
+    })
+    .sort((left, right) => right.tokens - left.tokens)
 
   return {
     generatedAt: Date.now(),
@@ -254,6 +317,7 @@ export function makeReport(from?: number, to?: number): UsageInsightsReport {
     cached: false,
     peakMultiplier: 2,
     prices,
+    routeRates,
     fallbackPrice: { match: '', ...FLASH },
     peakWindows: ['09:00-12:00', '14:00-18:00'],
     peakWeekdaysOnly: true,

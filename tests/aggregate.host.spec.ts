@@ -14,6 +14,7 @@ const OPTIONS: PricingOptions = {
   currency: 'CNY',
   rules: [{ match: 'flash', input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 }],
   fallback: { input: 2, cacheRead: 0.04, cacheWrite: 2, output: 8 },
+  overrides: new Map(),
   peakWindows: [{ start: 9 * 60, end: 12 * 60 }],
   peakWeekdaysOnly: true,
   peakMultiplier: 2,
@@ -265,5 +266,75 @@ describe('project rows', () => {
     expect(oneDay.projects[0]?.path).toBe(whole.projects[0]?.path)
     expect(oneDay.projects[0]?.cost).toBeCloseTo(4, 10)
     expect(oneDay.projects[0]!.cost).toBeLessThan(whole.projects[0]!.cost)
+  })
+})
+
+describe('route rates', () => {
+  /** The same options with one route overridden, and one rule genuinely matched. */
+  const OVERRIDDEN: PricingOptions = {
+    ...OPTIONS,
+    overrides: new Map([['agg/glm-5.3-flash', { input: 3, cacheRead: 0.3, cacheWrite: 3, output: 9 }]]),
+  }
+
+  it('publishes the source of every rate in effect', () => {
+    const report = buildReport([
+      session('a', [
+        [OFF_PEAK, 'x/flash', tokens(1)],
+        [OFF_PEAK, 'agg/glm-5.3-flash', tokens(1)],
+        [OFF_PEAK, 'input/gpt-5.6-sol', tokens(1)],
+      ]),
+    ], OVERRIDDEN, META)
+
+    const byRoute = new Map(report.routeRates.map(row => [row.route, row]))
+    expect(byRoute.get('x/flash')).toMatchObject({
+      source: 'rule',
+      rule: 'flash',
+      rate: { input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 },
+    })
+    expect(byRoute.get('agg/glm-5.3-flash')).toMatchObject({ source: 'override', rate: { output: 9 } })
+    expect(byRoute.get('input/gpt-5.6-sol')).toMatchObject({ source: 'fallback' })
+    expect(byRoute.get('agg/glm-5.3-flash')?.rule).toBeUndefined()
+  })
+
+  it('publishes the off-peak rate even when every sample of the route was peak', () => {
+    const report = buildReport([
+      session('a', [[PEAK, 'x/flash', tokens(1_000_000)]]),
+    ], OPTIONS, META)
+
+    // The sample was priced at 2x, and the table still states the base rate the
+    // editor edits and the multiplier is applied to.
+    expect(report.totals.cost).toBeCloseTo(2, 10)
+    expect(report.routeRates[0]?.rate).toEqual({ input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 })
+  })
+
+  it('bills an overridden route at its override, not at the rule that would claim it', () => {
+    const report = buildReport([
+      session('a', [[OFF_PEAK, 'agg/glm-5.3-flash', tokens(1_000_000)]]),
+    ], OVERRIDDEN, META)
+
+    expect(report.totals.cost).toBeCloseTo(3, 10)
+    expect(report.models[0]?.priced).toBe(true)
+    expect(report.unpricedRoutes).toEqual([])
+  })
+
+  it('still names the routes nothing claims, and counts their tokens', () => {
+    const report = buildReport([
+      session('a', [[OFF_PEAK, 'input/gpt-5.6-sol', tokens(1_000_000)]]),
+    ], OVERRIDDEN, META)
+
+    expect(report.unpricedRoutes).toEqual(['input/gpt-5.6-sol'])
+    expect(report.unpricedTokens).toBe(1_000_000)
+  })
+
+  it('orders the table by token volume, so the costly routes are read first', () => {
+    const report = buildReport([
+      session('a', [
+        [OFF_PEAK, 'x/flash', tokens(10)],
+        [OFF_PEAK, 'input/gpt-5.6-sol', tokens(5_000)],
+      ]),
+    ], OPTIONS, META)
+
+    expect(report.routeRates.map(row => row.route)).toEqual(['input/gpt-5.6-sol', 'x/flash'])
+    expect(report.routeRates.map(row => row.tokens)).toEqual([5_000, 10])
   })
 })
