@@ -3,9 +3,9 @@
  *
  * The calendar says when a profile spent; the summary says how much. Neither
  * answers *which project*, which is the question a day's figures raise the moment
- * they are read. This list answers it over the same window as the summary above
- * it — the range selector switches both, so the two can never describe different
- * periods.
+ * they are read. This list closes the page under the calendar, answering it over
+ * the same window as the summary above: the range selector switches both, so the
+ * two can never describe different periods.
  *
  * Ten rows by default, because a profile with forty directories has a long tail
  * nobody reads, and the tail stays one click away rather than being dropped.

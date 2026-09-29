@@ -477,20 +477,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     )
                     : <p className={css.status} role="status">{t('loading')}</p>}
 
-                {summaryState.status === 'ready'
-                  ? (
-                    <ProjectRanking
-                      report={summaryState.report}
-                      rangeLabel={rangeLabel}
-                      limit={DEFAULT_RANKING_LIMIT}
-                      t={t}
-                      formatCost={money}
-                      formatTokens={tokens}
-                      formatInteger={integer}
-                    />
-                  )
-                  : null}
-
                 <CalendarHeatmap
                   from={gridFrom}
                   to={gridTo}
@@ -504,6 +490,25 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   onSelectDay={setSelectedDay}
                   {...returnDay === undefined ? {} : { focusDayOnMount: returnDay }}
                 />
+
+                {/* The ranking closes the page under the calendar: the calendar
+                 * answers *when* the spend happened, this list answers *which
+                 * project* — the question a day's figures raise the moment they
+                 * are read. It follows the same range as the tiles above, so the
+                 * two can never describe different periods. */}
+                {summaryState.status === 'ready'
+                  ? (
+                    <ProjectRanking
+                      report={summaryState.report}
+                      rangeLabel={rangeLabel}
+                      limit={DEFAULT_RANKING_LIMIT}
+                      t={t}
+                      formatCost={money}
+                      formatTokens={tokens}
+                      formatInteger={integer}
+                    />
+                  )
+                  : null}
 
                 <footer className={css.notes}>
                   <ReliabilityNotes

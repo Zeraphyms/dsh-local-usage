@@ -117,7 +117,7 @@ export const zh = {
   pricingInvalid: '费率必须是不小于 0 的数字',
   pricingSaveFailed: '保存失败：{message}',
   pricingTooltip: '费率与计费方式',
-  // The project ranking below the summary.
+  // The project ranking below the calendar.
   rankingTitle: '项目 Token 消耗',
   rankingScope: '{range} · 共 {count} 个项目',
   rankingColumnRank: '排名',

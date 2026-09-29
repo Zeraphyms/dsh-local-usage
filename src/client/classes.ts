@@ -81,7 +81,7 @@ export const css = {
   projectTable: 'dlu-projectTable',
   range: 'dlu-range',
   ranges: 'dlu-ranges',
-  // The project ranking below the summary.
+  // The project ranking below the calendar.
   rank: 'dlu-rank',
   rankBar: 'dlu-rankBar',
   rankBarFill: 'dlu-rankBarFill',

@@ -65,13 +65,13 @@ The range selector chooses the lens: **Today**, **Last 7 days**, **This month**,
 
 Beside the hero figure sits a row of tiles carrying total tokens, the input, output, and cache buckets, the cache hit rate, the billed call count, and the number of contributing sessions. They share one line with the hero rather than taking a block of their own, so the figures read as the page's header instead of as its content. The day page states the same tiles for its one day, so a day whose caching broke is visible from the page that exists to explain it.
 
-Below them, **Tokens by project** ranks the working directories the selected range's tokens went to: rank, project, a bar, tokens, cost and sessions, ten rows at a time, with the rest one click away. The bar is a share of the *leader* rather than of the total, so the ranking stays readable when one project dominates. This list follows the range selector — switching to **Last 7 days** re-ranks the same week the tiles above are reporting.
-
 The header's right corner carries two icons beside **Recount**: the rate table, and where the figures come from. Both are consulted rather than read through, so they open on hover and pin on click, and neither takes a block out of the column.
 
 The calendar is the stable frame: it is Sunday-first with a one-glyph weekday gutter — `日 一 二 三 四 五 六` in Chinese, `S M T W T F S` in English, from the dictionary rather than from a hard-coded set — spans a rolling 52 weeks ending with the current one, and does not change when the range does. Cells are fixed squares whose edge is measured from the panel: while a year of columns fits at the minimum edge they grow to fill it, and below that the grid keeps the minimum edge and drops its oldest weeks, so it never scrolls sideways however narrow the panel gets — including with the sidebar expanded. Cells carry no border; intensity is the only mark on them, and hovering one opens a card with that day's cost, total tokens, input, output, and cache-read tokens, and call count. The card's figures are exact — every digit, grouped the reader's way — because a rounded count is the one thing a drill-down cannot answer.
 
 Shading is a quantile ramp over the window's active days — median, then 75th and 90th percentiles — so the scale adapts to how the profile actually spends rather than assuming a distribution.
+
+Under the calendar, **Tokens by project** ranks the working directories the selected range's tokens went to: rank, project, a bar, tokens, cost and sessions, ten rows at a time, with the rest one click away. The bar is a share of the *leader* rather than of the total, so the ranking stays readable when one project dominates. This list follows the range selector — switching to **Last 7 days** re-ranks the same week the tiles above are reporting.
 
 ### The day page
 

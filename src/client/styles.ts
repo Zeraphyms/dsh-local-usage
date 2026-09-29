@@ -121,7 +121,7 @@ export const styles = String.raw`
 /* ── Summary: one hero figure, then supporting tiles ───────────────────── */
 
 /* The figures are the header of the page, not the page: the hero and its tiles
- * share one row so the ranking below them starts high on the screen. */
+ * share one row so the calendar below them starts high on the screen. */
 .dlu-summary {
   display: grid;
   grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
