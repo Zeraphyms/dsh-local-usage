@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  formatCost, formatDay, formatInteger, formatRate, formatTokens,
+  figureRoom, formatCost, formatDay, formatInteger, formatRate, formatTokens,
 } from '../src/client/format.ts'
 
 describe('formatCost', () => {
@@ -77,6 +77,34 @@ describe('formatRate', () => {
     expect(formatRate(0.02, 'en')).toBe('0.02')
     expect(formatRate(1, 'en')).toBe('1')
     expect(formatRate(0, 'en')).toBe('0')
+  })
+})
+
+describe('figureRoom', () => {
+  it('gives an everyday total the headline size', () => {
+    expect(figureRoom('¥8.26')).toBe('normal')
+    expect(figureRoom('¥184.53')).toBe('normal')
+    // Four decimals for a sub-cent day: long for a money figure, still short.
+    expect(figureRoom('¥0.0001')).toBe('normal')
+  })
+
+  it('steps a figure down as it grows, in the order the figures grow', () => {
+    // The same year of use in three shapes: the yen symbol, a seven-figure
+    // total, then a currency whose code is spelled out because no ISO symbol was
+    // configured. Each is longer than the last and is set a step smaller.
+    expect(figureRoom('¥12,345.67')).toBe('normal')
+    expect(figureRoom('¥1,234,567.89')).toBe('long')
+    expect(figureRoom('CNY 1,234,567.89')).toBe('overflowing')
+  })
+
+  it('is decided by the rendered text, so the same figure always lands in the same bucket', () => {
+    // The bucket may not depend on anything the layout does, or the type size
+    // would be a response to its own rendering.
+    expect(figureRoom('¥1,234.56')).toBe(figureRoom('¥1,234.56'))
+    // The boundary, stated: six figures and the mark still read at full size,
+    // and the seventh is what steps it down.
+    expect(figureRoom('¥999,999.99')).toBe('normal')
+    expect(figureRoom('¥1,000,000.00')).toBe('long')
   })
 })
 

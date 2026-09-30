@@ -21,6 +21,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
 import { apply, DEFAULT_CONFIG, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from '../src/index.ts'
+import type { UsageInsightsConfig } from '../src/index.ts'
 
 // Every test mounts the plugin, which hydrates the rate table from `DSH_HOME`.
 // Pointing that at a fresh directory keeps the suite off the developer's real
@@ -91,8 +92,15 @@ interface MountOptions {
   readonly revisions?: Readonly<Record<string, string>>
   /** Session ids whose events are live in this process. */
   readonly live?: readonly string[]
-  /** When true, the corpus listing itself fails. */
-  readonly failListing?: boolean
+  /** How many of the first corpus listings reject, so a transient failure can be told from a permanent one. */
+  readonly failListings?: number
+  /**
+   * Holds every batch projection open until it resolves, so a test can let a
+   * background fold and a request race for the same corpus on purpose.
+   */
+  readonly gate?: Promise<void>
+  /** Configuration overrides; the warm-up is off unless a test asks for it. */
+  readonly config?: Partial<UsageInsightsConfig>
 }
 
 interface Mounted {
@@ -118,16 +126,21 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
   const invalidated: ((session: { id: string }) => void)[] = []
   const routes = new Map<string, { fetch: (request: Request) => Promise<Response> }>()
   const live = new Set(options.live ?? [])
+  let listingsLeft = options.failListings ?? 0
 
   const engine: Record<string, unknown> = {
-    listSessions: () => (options.failListing === true
-      ? Promise.reject(new Error('listing failed'))
-      : Promise.resolve([...logs.keys()].map(id => record(
+    listSessions: () => {
+      if (listingsLeft > 0) {
+        listingsLeft -= 1
+        return Promise.reject(new Error('listing failed'))
+      }
+      return Promise.resolve([...logs.keys()].map(id => record(
         id,
         logs.get(id)?.seeded === true,
         logs.get(id)?.cwd,
         live.has(id),
-      )))),
+      )))
+    },
     readSession: (id: string) => {
       exactReads.push(id)
       const entry = logs.get(id)
@@ -140,9 +153,10 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
     },
   }
   if (offersBatch) {
-    engine.projectMany = (ids: readonly string[], project: (source: unknown) => unknown) => {
+    engine.projectMany = async (ids: readonly string[], project: (source: unknown) => unknown) => {
       batches.push([...ids])
-      return Promise.resolve(ids.map((id) => {
+      if (options.gate !== undefined) await options.gate
+      return ids.map((id) => {
         const entry = logs.get(id)
         if (entry === undefined || entry.broken === true) {
           return { sessionId: id, status: 'rejected' as const, reason: new Error('unreadable') }
@@ -154,7 +168,7 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
           events: entry.events,
         })
         return { sessionId: id, status: 'fulfilled' as const, value }
-      }))
+      })
     }
   }
 
@@ -175,7 +189,13 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
     effect: (callback: () => unknown) => { callback() },
   } as unknown as Context
 
-  apply(ctx, DEFAULT_CONFIG)
+  apply(ctx, {
+    ...DEFAULT_CONFIG,
+    // Off unless a test asks for it: the mount is per-test, and a fold scheduled
+    // by one test would run against a torn-down host in the next.
+    warmup: false,
+    ...options.config,
+  })
 
   const route = routes.get(REPORT_PATH)
   const pricing = routes.get(PRICING_PATH)
@@ -442,6 +462,71 @@ describe('assembleReport: the durable fold cache', () => {
   })
 })
 
+describe('the background fold', () => {
+  /** Let a scheduled fold start and its microtasks settle. */
+  const settle = async (): Promise<void> => { await new Promise(resolve => { setTimeout(resolve, 0) }) }
+
+  it('folds the corpus at activation, so the first request reads no log', async () => {
+    const logs = new Map<string, FakeLog>([
+      ['a', { events: log(0, DAY_ONE, 2) }],
+      ['b', { events: log(0, DAY_ONE, 3) }],
+    ])
+    const mounted = mount(logs, true, { config: { warmup: true, warmupDelayMs: 0 } })
+    await settle()
+
+    // The fold happened before anyone asked for a report.
+    expect(mounted.batches).toEqual([['a', 'b']])
+
+    const value = await report(mounted)
+    expect(value.totals).toMatchObject({ calls: 5 })
+    // And the request itself opened nothing.
+    expect(mounted.batches).toEqual([['a', 'b']])
+    expect(value.cached).toBe(true)
+  })
+
+  it('lets a request arriving mid-fold wait for it rather than read again', async () => {
+    let release = (): void => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 2) }]])
+    const mounted = mount(logs, true, { config: { warmup: true, warmupDelayMs: 0 }, gate })
+    await settle()
+
+    // The background fold is parked inside the projection.
+    expect(mounted.batches).toEqual([['a']])
+
+    const asked = report(mounted)
+    await settle()
+    // The request did not start a second read of the same corpus.
+    expect(mounted.batches).toEqual([['a']])
+
+    release()
+    const value = await asked
+    expect(mounted.batches).toEqual([['a']])
+    expect(value.totals).toMatchObject({ calls: 2 })
+  })
+
+  it('reads nothing until asked when the warm-up is off', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 2) }]])
+    const mounted = mount(logs, true)
+    await settle()
+
+    expect(mounted.batches).toEqual([])
+    await report(mounted)
+    expect(mounted.batches).toEqual([['a']])
+  })
+
+  it('costs the reader nothing when the background fold fails', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 2) }]])
+    const mounted = mount(logs, true, { config: { warmup: true, warmupDelayMs: 0 }, failListings: 1 })
+    await settle()
+
+    // The failed fold left no cache behind, so the request reads the corpus
+    // itself rather than inheriting the failure.
+    const value = await report(mounted)
+    expect(value.totals).toMatchObject({ calls: 2 })
+  })
+})
+
 describe('the progress route', () => {
   it('reports nothing in flight before any read', async () => {
     const mounted = mount(new Map(), true)
@@ -475,7 +560,7 @@ describe('the progress route', () => {
   })
 
   it('settles when the read fails, so a poller is never left waiting', async () => {
-    const mounted = mount(new Map(), true, { failListing: true })
+    const mounted = mount(new Map(), true, { failListings: 1 })
 
     const failed = await mounted.route.fetch(new Request(new URL(REPORT_PATH, 'http://localhost')))
     expect(failed.status).toBe(500)

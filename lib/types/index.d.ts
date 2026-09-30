@@ -62,6 +62,19 @@ export interface UsageInsightsConfig {
     peakWeekdaysOnly: boolean;
     /** Factor applied to every rate inside a peak window. */
     peakMultiplier: number;
+    /**
+     * Whether to fold the corpus in the background once the process is up.
+     *
+     * The first read after an install decodes every session log there is, and the
+     * reader pays for it while looking at a loading frame. Doing that read at
+     * activation moves the cost to a moment nobody is waiting on, so the first
+     * request the panel makes is a re-price over folds already in hand. A
+     * deployment with a very large corpus, or one that would rather read nothing
+     * until it is asked, can turn it off and pay the read on first open instead.
+     */
+    warmup: boolean;
+    /** How long after activation the background fold starts, in milliseconds. */
+    warmupDelayMs: number;
 }
 /**
  * Shipped defaults: DeepSeek's published off-peak CNY prices. A route served

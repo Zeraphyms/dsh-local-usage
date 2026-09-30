@@ -78,6 +78,22 @@ export declare function formatPercent(value: number, locale: string): string;
  */
 export declare function formatRate(value: number, locale: string): string;
 /**
+ * How much room one rendered figure needs, as a bucket rather than a width.
+ *
+ * The strip's layout is not allowed to depend on the data — a bigger total must
+ * not push a tile onto another row and move the calendar under the reader — so
+ * the figure adapts instead: a seven-figure total is set a step smaller, which
+ * keeps every digit and keeps the block the same height.
+ *
+ * The measure is the rendered string's length rather than a measurement of the
+ * laid-out element: it is the same answer before and after paint, so nothing
+ * reflows in response to its own rendering.
+ *
+ * @param text - the figure as it will be rendered.
+ * @returns the size bucket its length calls for.
+ */
+export declare function figureRoom(text: string): 'normal' | 'long' | 'overflowing';
+/**
  * Render one day key as a date the reader's language writes.
  *
  * The wire carries days as `YYYY-MM-DD` because that is a sortable key, not

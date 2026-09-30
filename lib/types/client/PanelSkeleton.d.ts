@@ -24,7 +24,13 @@ import { type ReactNode } from 'react';
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
 import type { UsageInsightsProgress } from '../types.ts';
 /**
- * The hero figure's frame: a label line over a value line.
+ * The hero figure's frame: a label line, the value line, and the line the peak
+ * note occupies when there is one.
+ *
+ * The third line is drawn because the real hero almost always has one — the
+ * shipped rate card carries a peak multiplier — and a frame that omits it is a
+ * frame the panel settles out of when the figures land.
+ *
  * @returns the hero's placeholder.
  */
 export declare function HeroSkeleton(): ReactNode;

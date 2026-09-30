@@ -101,6 +101,19 @@ export interface UsageInsightsConfig {
   peakWeekdaysOnly: boolean
   /** Factor applied to every rate inside a peak window. */
   peakMultiplier: number
+  /**
+   * Whether to fold the corpus in the background once the process is up.
+   *
+   * The first read after an install decodes every session log there is, and the
+   * reader pays for it while looking at a loading frame. Doing that read at
+   * activation moves the cost to a moment nobody is waiting on, so the first
+   * request the panel makes is a re-price over folds already in hand. A
+   * deployment with a very large corpus, or one that would rather read nothing
+   * until it is asked, can turn it off and pay the read on first open instead.
+   */
+  warmup: boolean
+  /** How long after activation the background fold starts, in milliseconds. */
+  warmupDelayMs: number
 }
 
 /** The published off-peak DeepSeek-V4.1-Flash card, in CNY per one million tokens. */
@@ -122,6 +135,10 @@ export const DEFAULT_CONFIG: UsageInsightsConfig = {
   peakWindows: ['09:00-12:00', '14:00-18:00'],
   peakWeekdaysOnly: true,
   peakMultiplier: 2,
+  warmup: true,
+  // Long enough that the fold does not compete with the rest of the boot, short
+  // enough that it is usually done before the reader opens the panel.
+  warmupDelayMs: 4_000,
 }
 
 /** One cached session fold: the samples, the reliability counters, and the identity facts. */
@@ -245,6 +262,8 @@ function resolveConfig(config: UsageInsightsConfig): UsageInsightsConfig {
     peakWindows: config.peakWindows ?? DEFAULT_CONFIG.peakWindows,
     peakWeekdaysOnly: config.peakWeekdaysOnly ?? DEFAULT_CONFIG.peakWeekdaysOnly,
     peakMultiplier: config.peakMultiplier ?? DEFAULT_CONFIG.peakMultiplier,
+    warmup: config.warmup ?? DEFAULT_CONFIG.warmup,
+    warmupDelayMs: config.warmupDelayMs ?? DEFAULT_CONFIG.warmupDelayMs,
   }
 }
 
@@ -566,9 +585,16 @@ async function handleReport(
   config: UsageInsightsConfig,
   rates: RateStore,
   request: Request,
+  background: () => Promise<void> | undefined,
 ): Promise<Response> {
   const url = new URL(request.url)
   try {
+    // A background fold already reading this corpus is the same work this
+    // request needs, so the request waits for it rather than decoding every log
+    // a second time: two reads in flight together would each see an empty cache
+    // and each walk the whole corpus.
+    const pending = background()
+    if (pending !== undefined) await pending
     const report = await assembleReport(ctx, cache, folds, progress, config, rates, {
       refresh: url.searchParams.get('refresh') === '1',
       from: numberParam(url.searchParams, 'from'),
@@ -689,18 +715,51 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
   // One read's state, published to the panel through its own route. The panel
   // serializes its reads, so one object is the whole truth about what is running.
   const progress = createProgressTracker()
+  // The one corpus read in flight, shared by the background fold and whatever
+  // request arrives while it runs. See `warm` below and `handleReport`.
+  let warming: Promise<void> | undefined
+  /**
+   * Fold the whole corpus now, in the background, so the first request the panel
+   * makes is a re-price instead of a cold read.
+   *
+   * The window is unbounded on purpose: the fold cache keeps every sample a
+   * session ever recorded regardless of the window asked for, so priming it once
+   * that way answers every window the panel can select. A deployment that is
+   * warm already pays only the corpus listing.
+   */
+  const warm = (): void => {
+    if (warming !== undefined) return
+    warming = assembleReport(ctx, cache, folds, progress, resolved, rates, {
+      refresh: false,
+      from: undefined,
+      to: undefined,
+    }).then(
+      () => undefined,
+      (error: unknown) => {
+        // A background fold that fails costs the reader the wait it was meant to
+        // save and nothing else: the request that follows reads the logs itself.
+        ctx.logger.warn(`dsh-local-usage: background fold failed: ${describe(error)}`)
+      },
+    ).finally(() => { warming = undefined })
+  }
   // A session's samples stop being valid the moment it records another event.
   // The durable entry is left alone: it is keyed by the log's revision, so the
   // append that invalidates the memory copy also invalidates that entry.
   ctx.on('session/event', (session) => {
     cache.delete(session.id)
   })
+  if (resolved.warmup) {
+    ctx.effect(() => {
+      const timer = setTimeout(warm, resolved.warmupDelayMs)
+      return () => { clearTimeout(timer) }
+    }, 'dsh-local-usage: background fold')
+  }
   ctx.effect(
     () => connectionOf(ctx).fetch.register({
       path: REPORT_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => handleReport(ctx, cache, folds, progress, resolved, rates, request),
+      fetch: request => handleReport(ctx, cache, folds, progress, resolved, rates, request, () => warming),
     }),
     'dsh-local-usage: report route',
   )

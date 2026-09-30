@@ -20,6 +20,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageInsightsReport, UsageTokens } from '../types.ts'
+import { figureRoom } from './format.ts'
 import { projectName } from './paths.ts'
 import { cacheHitRate } from './cache-rate.ts'
 import { HeroSkeleton, ProjectsSkeleton, TilesSkeleton } from './PanelSkeleton.tsx'
@@ -101,7 +102,9 @@ export function DayDetail({
           : (
             <div className={css.hero}>
               <span className={css.heroLabel}>{t('totalCost')}</span>
-              <span className={css.heroValue}>{formatCost(report.totals.cost)}</span>
+              <span className={css.heroValue} data-room={figureRoom(formatCost(report.totals.cost))}>
+                {formatCost(report.totals.cost)}
+              </span>
               {report.peakMultiplier <= 1
                 ? null
                 : <span className={css.heroDetail}>{t('peakNote', { multiplier: String(report.peakMultiplier) })}</span>}

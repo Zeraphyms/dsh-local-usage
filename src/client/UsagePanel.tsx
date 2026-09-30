@@ -52,7 +52,7 @@ import type { SummaryState } from './summary-state.ts'
 import { Tile } from './Tile.tsx'
 import { dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
 import { tokensOf } from './tokens.ts'
-import { formatCost, formatDay, formatInteger, formatPercent, formatTokens } from './format.ts'
+import { figureRoom, formatCost, formatDay, formatInteger, formatPercent, formatTokens } from './format.ts'
 import type { UsageInsightsLocaleKey } from './locales.ts'
 import { css } from './classes.ts'
 
@@ -628,6 +628,10 @@ function SummaryStrip({ report, animate, stale, onEntranceEnd, t, money, tokens,
   // One share for the whole strip rather than one clock per figure: eight
   // independent count-ups would read as eight things arriving, not one.
   const share = useEntrance(animate, onEntranceEnd)
+  // Bucketed from the figure the entrance lands on, never from the value part-way
+  // through it: a type size that changed as the digits grew would be a wobble of
+  // its own, in the one place this panel is trying not to have one.
+  const cost = money(totals.cost)
   return (
     <section
       className={css.summary}
@@ -637,7 +641,9 @@ function SummaryStrip({ report, animate, stale, onEntranceEnd, t, money, tokens,
     >
       <div className={css.hero}>
         <span className={css.heroLabel}>{t('totalCost')}</span>
-        <span className={css.heroValue}>{money(totals.cost * share)}</span>
+        <span className={css.heroValue} data-room={figureRoom(cost)}>
+          {money(totals.cost * share)}
+        </span>
         {report.peakMultiplier <= 1
           ? null
           : <span className={css.heroDetail}>{t('peakNote', { multiplier: String(report.peakMultiplier) })}</span>}

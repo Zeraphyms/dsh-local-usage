@@ -19,13 +19,15 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { UsagePanel } from '../src/client/UsagePanel.tsx'
 import type { UsagePanelProps } from '../src/client/UsagePanel.tsx'
+import { DayDetail } from '../src/client/DayDetail.tsx'
 import { Popover } from '../src/client/Popover.tsx'
 import { RateEditor } from '../src/client/RateEditor.tsx'
-import type { UsageRouteRate } from '../src/types.ts'
+import type { UsageInsightsReport, UsageRouteRate } from '../src/types.ts'
 
 /** A translate function that names its key, so markup can be searched for one. */
 const t = ((key: string, params?: Record<string, string>): string =>
@@ -92,6 +94,70 @@ describe('a popover with data behind it', () => {
     expect(markup).toContain('data-disabled="false"')
     // Mounted while closed, so a pinned panel keeps half-typed fields.
     expect(markup).toContain('body')
+  })
+})
+
+describe('a day whose total is large', () => {
+  /** The day page renders its hero from a report, so it can be asked for any figure. */
+  const dayBase = {
+    day: '2026-09-28',
+    t,
+    formatTokens: String,
+    formatInteger: String,
+    formatPercent: String,
+    formatDay: String,
+    weekdayOf: String,
+    onRetry: () => {},
+    onBack: () => {},
+  }
+
+  /** A day report carrying one total. */
+  function dayReport(cost: number): UsageInsightsReport {
+    return {
+      totals: { cost, uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 1 },
+      projects: [],
+      peakMultiplier: 2,
+    } as unknown as UsageInsightsReport
+  }
+
+  it('sets an everyday total at the headline size', () => {
+    const markup = renderToStaticMarkup(createElement(DayDetail, {
+      ...dayBase,
+      formatCost: (value: number) => `¥${value.toFixed(2)}`,
+      report: dayReport(12.5),
+      failed: false,
+    }))
+
+    expect(markup).toContain('data-room="normal"')
+  })
+
+  it('steps a large total down rather than letting it widen the strip', () => {
+    const markup = renderToStaticMarkup(createElement(DayDetail, {
+      ...dayBase,
+      // The formatter is the panel's; this supplies the shape a total takes in a
+      // currency with no symbol configured, which is the longest one reachable.
+      formatCost: (value: number) => `CNY ${value.toLocaleString('en')}`,
+      report: dayReport(1_234_567.89),
+      failed: false,
+    }))
+
+    expect(markup).toContain('data-room="overflowing"')
+  })
+})
+
+describe('the stylesheet keeps the layout a function of the panel, not of the data', () => {
+  const css = readFileSync('src/client/styles.ts', 'utf8')
+
+  it('measures the panel so its contents can be laid out by its width', () => {
+    expect(css).toContain('container-type: inline-size')
+  })
+
+  it('gives the tiles a column count of their own, never one the figures decide', () => {
+    // The bug this guards: with an auto-fitting grid, a wider total in the hero
+    // left the tiles less room and pushed one onto another row, which changed
+    // the strip's height and moved the calendar below it.
+    expect(css).not.toContain('repeat(auto-fit, minmax(96px, 1fr))')
+    expect(css).toContain('repeat(7, minmax(0, 1fr))')
   })
 })
 

@@ -26,7 +26,12 @@ export const styles = String.raw`
  * Centring comes from 'align-items: center' plus a per-child width, never from
  * 'margin-inline: auto' — that turns a flex child into a fit-content box, so a
  * grid wider than the panel would pin it to its own overflow and the width
- * measurement behind the calendar would never settle. */
+ * measurement behind the calendar would never settle.
+ *
+ * It is also the panel's query container, which is how the rules below keep the
+ * layout a function of its width rather than of the figures inside it. Nothing
+ * positions against it: the popovers anchor to their own host, and the calendar
+ * card is portalled to the document. */
 .dlu-panel {
   display: flex;
   flex-direction: column;
@@ -38,6 +43,7 @@ export const styles = String.raw`
   overflow: auto;
   padding: 26px clamp(24px, 4vw, 48px) 48px;
   background: var(--dsw-alias-bg-base);
+  container-type: inline-size;
 }
 
 .dlu-panel > * {
@@ -146,13 +152,35 @@ export const styles = String.raw`
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* The headline figure: exact to the last digit, and never broken across lines —
+ * a money amount split over two lines is unreadable, and it changes the height
+ * of the block the whole page hangs off.
+ *
+ * A total that outgrows the type is set a step smaller rather than allowed to
+ * push the tiles aside. The height is pinned to the largest step, so which step
+ * a figure lands in cannot change how tall the strip is: the reader switching
+ * from a day to a year sees the digits change, not the page move. */
 .dlu-heroValue {
+  display: block;
+  min-block-size: 30px;
   font-size: 27px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.08;
   letter-spacing: -0.02em;
+  white-space: nowrap;
   color: var(--dsw-alias-label-primary);
+}
+
+.dlu-heroValue[data-room='long'] {
+  font-size: 21px;
+  line-height: 30px;
+}
+
+.dlu-heroValue[data-room='overflowing'] {
+  font-size: 16.5px;
+  line-height: 30px;
+  letter-spacing: -0.01em;
 }
 
 .dlu-heroDetail {
@@ -185,10 +213,39 @@ export const styles = String.raw`
   opacity: 0.45;
 }
 
+/* Seven tiles, in a column count the panel's width decides and nothing else.
+ *
+ * This is the rule that keeps a big figure from moving the page. The hero's
+ * track is sized by its own content, so a seven-figure total beside these tiles
+ * leaves them less room — and with an auto-fitting grid that narrower room is
+ * what decides how many rows they take, which is a change in the strip's height
+ * caused by the data. Pinning the count to the container makes the row count a
+ * property of the panel, and the figures inside a tile adapt instead.
+ *
+ * 'minmax(0, 1fr)' rather than a pixel floor, for the same reason: a floor is
+ * what turns a narrow panel into a row that overflows it. */
 .dlu-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+@container (min-width: 440px) {
+  .dlu-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 640px) {
+  .dlu-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 920px) {
+  .dlu-tiles {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
 }
 
 .dlu-tile {
@@ -202,23 +259,36 @@ export const styles = String.raw`
   border-radius: 10px;
 }
 
+/* One figure per line, clipped rather than wrapped if it ever outgrows its tile:
+ * the tokens in here are already at a compact scale, so a value that cannot fit
+ * is a case worth losing a digit of rather than a reason to move the page. The
+ * exact figure is one hover or one drill-down away. */
 .dlu-tileValue {
+  overflow: hidden;
   font-size: 14.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--dsw-alias-label-primary);
 }
 
 .dlu-tileLabel {
+  overflow: hidden;
   font-size: 11px;
   line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--dsw-alias-label-tertiary);
 }
 
 .dlu-tileDetail {
+  overflow: hidden;
   font-size: 10.5px;
   line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--dsw-alias-label-caption);
 }
 
@@ -289,6 +359,9 @@ export const styles = String.raw`
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  /* One line, like every other figure: this one sits in a caption beside the
+   * window label, and a wrapped total would change the figure's height. */
+  white-space: nowrap;
   color: var(--dsw-alias-label-secondary);
 }
 
@@ -520,8 +593,11 @@ export const styles = String.raw`
 }
 
 /* Two classes deep so this outranks the header rule above, which sets a
- * text-align of its own. */
+ * text-align of its own. One line per figure: a large amount widens its column
+ * and lets the directory name column absorb it, rather than folding the row. */
 .dlu-projectTable .dlu-numeric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   text-align: right;
 }
 
@@ -735,6 +811,14 @@ export const styles = String.raw`
 /* A placeholder for a figure: the height and rhythm of the line it stands in
  * for, and nothing else. Ghosts of the *frame* are drawn as the frame, so this
  * is only ever a stand-in for a number or a word. */
+/* A placeholder for a figure: the height and rhythm of the line it stands in
+ * for, and nothing else.
+ *
+ * Each ghost is the height of the *line box* it replaces, with the difference
+ * carried as a block margin rather than as a taller bar: a text line is mostly
+ * leading, and a placeholder drawn at the line's full height would read as a
+ * filled block. Matching the box is what keeps the frame from settling when the
+ * real line arrives — the whole point of drawing one. */
 .dlu-skelLine {
   display: block;
   block-size: 10px;
@@ -742,24 +826,38 @@ export const styles = String.raw`
   border-radius: 4px;
 }
 
+/* The hero's label: 12.5px at 1.4. */
 .dlu-skelLine[data-width='short'] {
   inline-size: 46px;
   block-size: 9px;
+  margin-block: 4.25px;
 }
 
+/* The headline figure: pinned to the same 30px block the real one reserves. */
 .dlu-skelLine[data-width='hero'] {
   inline-size: 132px;
   block-size: 24px;
-  margin-top: 3px;
+  margin-block: 3px;
 }
 
+/* The peak note under it: 11px at 1.4. */
+.dlu-skelLine[data-width='detail'] {
+  inline-size: 108px;
+  block-size: 9px;
+  margin-block: 3.2px;
+}
+
+/* A tile's value: 14.5px at 1.2. */
 .dlu-skelLine[data-width='value'] {
   inline-size: 70%;
+  margin-block: 3.7px;
 }
 
+/* A tile's label: 11px at 1.4. */
 .dlu-skelLine[data-width='label'] {
   inline-size: 48%;
   block-size: 8px;
+  margin-block: 3.7px;
 }
 
 .dlu-skelLine[data-width='total'] {
@@ -776,9 +874,19 @@ export const styles = String.raw`
   block-size: 9px;
 }
 
+/* A ranked directory's name: 12.5px. */
 .dlu-skelLine[data-width='name'] {
   inline-size: 62%;
   block-size: 9px;
+  margin-block: 3px;
+}
+
+/* Its path underneath: 10.5px, plus the 1px the real one is offset by. */
+.dlu-skelLine[data-width='path'] {
+  inline-size: 78%;
+  block-size: 8px;
+  margin-block: 2.3px;
+  margin-block-start: 3.3px;
 }
 
 .dlu-skelLine[data-width='cell'] {
@@ -916,7 +1024,11 @@ export const styles = String.raw`
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 
+/* Every right-aligned figure in a table: one line, so a large amount widens its
+ * column instead of folding the row in half. */
 .dlu-numeric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   text-align: right;
 }
 
@@ -1088,7 +1200,13 @@ export const styles = String.raw`
  * once at the top instead of beside each figure. */
 .dlu-rankRow {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) minmax(80px, 1.3fr) 86px 92px 54px;
+  /* The three figure columns are sized to what they hold rather than to a fixed
+   * pixel count: a four-figure cost in a 92px track is a wrapped number, and a
+   * wrapped number is both unreadable and a row that changed height. The name
+   * and bar tracks absorb the difference, so the row stays one line. */
+  grid-template-columns:
+    30px minmax(0, 1fr) minmax(80px, 1.3fr)
+    minmax(86px, max-content) minmax(92px, max-content) minmax(54px, max-content);
   gap: 12px;
   align-items: center;
   padding: 6px 0;
@@ -1147,6 +1265,7 @@ export const styles = String.raw`
 .dlu-rankSessions {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   color: var(--dsw-alias-label-secondary);
   text-align: right;
 }
@@ -1220,6 +1339,7 @@ export const styles = String.raw`
 
 .dlu-editorTable .dlu-numeric {
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .dlu-editorTable td {

@@ -41,7 +41,13 @@ const TILE_COUNT = 7
 const PROJECT_ROWS = 4
 
 /**
- * The hero figure's frame: a label line over a value line.
+ * The hero figure's frame: a label line, the value line, and the line the peak
+ * note occupies when there is one.
+ *
+ * The third line is drawn because the real hero almost always has one — the
+ * shipped rate card carries a peak multiplier — and a frame that omits it is a
+ * frame the panel settles out of when the figures land.
+ *
  * @returns the hero's placeholder.
  */
 export function HeroSkeleton(): ReactNode {
@@ -49,6 +55,7 @@ export function HeroSkeleton(): ReactNode {
     <div className={css.hero} aria-hidden="true">
       <span className={css.skelLine} data-width="short" />
       <span className={css.skelLine} data-width="hero" />
+      <span className={css.skelLine} data-width="detail" />
     </div>
   )
 }
@@ -299,6 +306,9 @@ export function PanelSkeleton({ progress, weeks, t }: PanelSkeletonProps): React
               <span className={css.rankPlace} />
               <span className={css.rankName}>
                 <span className={css.skelLine} data-width="name" />
+                {/* The real row carries a path under its name, and two lines is
+                    most of what gives the list its height. */}
+                <span className={css.skelLine} data-width="path" />
               </span>
               <span className={css.rankBar}>
                 <span className={css.skelBar} style={{ inlineSize: `${String(barWidth(index))}%` }} />
