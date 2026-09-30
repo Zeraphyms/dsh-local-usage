@@ -26,18 +26,29 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
   UsageDayRow,
+  UsageInsightsProgress,
   UsageInsightsReport,
   UsagePricingResult,
   UsagePricingUpdate,
 } from '../types.ts'
 import { CalendarHeatmap } from './CalendarHeatmap.tsx'
 import { cacheHitRate } from './cache-rate.ts'
+import { useEntrance } from './count-up.ts'
 import { DayDetail } from './DayDetail.tsx'
 import { DataSourceNotes } from './DataSourceNotes.tsx'
+import { PanelSkeleton, SummarySkeleton } from './PanelSkeleton.tsx'
 import { Popover, RateIcon, SourceIcon } from './Popover.tsx'
 import { PricingNotes } from './PricingNotes.tsx'
 import { DEFAULT_RANKING_LIMIT, ProjectRanking } from './ProjectRanking.tsx'
 import { ReliabilityNotes } from './ReliabilityNotes.tsx'
+import {
+  summaryFailed,
+  summaryIdle,
+  summarySettled,
+  summarySlow,
+  summaryStarted,
+} from './summary-state.ts'
+import type { SummaryState } from './summary-state.ts'
 import { Tile } from './Tile.tsx'
 import { dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
 import { tokensOf } from './tokens.ts'
@@ -48,6 +59,14 @@ import { css } from './classes.ts'
 const MS_PER_DAY = 86_400_000
 /** Weeks the calendar spans: one rolling year of columns ending with this week. */
 const WINDOW_WEEKS = 52
+/**
+ * How long a range fold may run before the strip says it is still going.
+ *
+ * A re-price folds samples already in hand and normally lands inside a frame or
+ * two. Dimming the figures for that long would be a flicker rather than a signal,
+ * so the admission waits for a wait worth admitting to.
+ */
+const STALE_VISIBLE_MS = 180
 
 /** Ranges offered, in selection order. */
 const RANGES: readonly { readonly id: string; readonly key: UsageInsightsLocaleKey }[] = [
@@ -72,8 +91,20 @@ export interface UsagePanelInjected {
    * during render is enough, and needs no subscription of its own.
    */
   locale: () => string
-  /** Assemble the report; `refresh` discards the Host's per-session fold cache. */
-  report: (refresh: boolean, from: number, to: number) => Promise<UsageInsightsReport>
+  /**
+   * Assemble the report; `refresh` discards the Host's per-session fold cache.
+   *
+   * `onProgress` is optional and only worth passing for a read that may have to
+   * open session logs: the panel hands it to the read that draws the year and
+   * leaves it off the re-prices, which are answered from folds already in hand
+   * and would otherwise flicker through phases they never really had.
+   */
+  report: (
+    refresh: boolean,
+    from: number,
+    to: number,
+    onProgress?: (progress: UsageInsightsProgress) => void,
+  ) => Promise<UsageInsightsReport>
   /** Persist one write to the per-route rate table and answer with what is in effect. */
   saveRates: (update: UsagePricingUpdate) => Promise<UsagePricingResult>
 }
@@ -187,7 +218,9 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // request after a Host restart is what reads every log — and a range change
   // must not pay for it a second time.
   const [gridState, setGridState] = useState<ReportState>({ status: 'idle' })
-  const [summaryState, setSummaryState] = useState<ReportState>({ status: 'idle' })
+  // The range's figures, which outlive the fold that replaces them: see
+  // `summary-state.ts` for why the strip is never unmounted to show a wait.
+  const [summaryState, setSummaryState] = useState<SummaryState>({ status: 'idle' })
   // Retrying the range must not read the year again, so it has its own counter.
   const [summaryRequest, setSummaryRequest] = useState(0)
   // The day page: which day is open, that day's own fold, and a retry counter.
@@ -197,6 +230,13 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // Bumped after a rate write, so every view re-prices against the new table
   // without discarding the Host's fold cache: the samples did not change.
   const [pricingRevision, setPricingRevision] = useState(0)
+  // What the Host says the read is doing, while it is doing it. Only the year's
+  // own read reports: a re-price is over before a poll could describe it.
+  const [progress, setProgress] = useState<UsageInsightsProgress | undefined>(undefined)
+  // Whether the summary strip still owes the reader its entrance. Cleared when
+  // the figures land, so a range change afterwards swaps them without replaying
+  // the count-up over numbers the reader is already comparing.
+  const [entrance, setEntrance] = useState(true)
   // The cell a return trip should land on. Kept after the day closes so leaving
   // a day page puts the reader back on the day they left, not at the top of a
   // year of cells they would have to find again.
@@ -222,7 +262,11 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     if (!active) return
     let current = true
     setGridState({ status: 'loading' })
-    void report(request > 0, gridFrom, gridTo).then(
+    // The window read is the one that may have to open every log, so it is the
+    // one that reports what it is doing.
+    void report(request > 0, gridFrom, gridTo, (value) => {
+      if (current) setProgress(value)
+    }).then(
       value => { if (current) setGridState({ status: 'ready', report: value }) },
       () => { if (current) setGridState({ status: 'error' }) },
     )
@@ -235,23 +279,26 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // exists to avoid. Once the window has been read the range is a re-price.
   useEffect(() => {
     if (!active) {
-      setSummaryState(previous => (previous.status === 'idle' ? previous : { status: 'idle' }))
+      setSummaryState(previous => (previous.status === 'idle' ? previous : summaryIdle()))
       return
     }
     if (gridState.status === 'idle' || gridState.status === 'loading') return
     // A range that is the whole window needs no second read: it is already here.
     if (rangeIsWindow && gridState.status === 'ready') {
-      setSummaryState({ status: 'ready', report: gridState.report })
+      setSummaryState(summarySettled(gridState.report, rangeId))
       return
     }
     let current = true
-    setSummaryState({ status: 'loading' })
+    // The figures already on screen stay through the fold. They keep naming the
+    // range they were folded for, which is what makes them safe to leave up.
+    setSummaryState(summaryStarted)
+    const slow = setTimeout(() => { if (current) setSummaryState(summarySlow) }, STALE_VISIBLE_MS)
     void report(false, rangeFrom, rangeTo).then(
-      value => { if (current) setSummaryState({ status: 'ready', report: value }) },
-      () => { if (current) setSummaryState({ status: 'error' }) },
+      value => { if (current) setSummaryState(summarySettled(value, rangeId)) },
+      () => { if (current) setSummaryState(summaryFailed()) },
     )
-    return () => { current = false }
-  }, [active, report, rangeFrom, rangeTo, rangeIsWindow, summaryRequest, pricingRevision, gridState])
+    return () => { current = false; clearTimeout(slow) }
+  }, [active, report, rangeFrom, rangeTo, rangeIsWindow, summaryRequest, pricingRevision, gridState, rangeId])
 
   // The day page's own fold. Cheap by construction: the samples behind it are
   // already in the Host's memory, so narrowing the window to one day re-prices
@@ -325,9 +372,13 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     setPricingRevision(value => value + 1)
   }, [saveRates])
 
-  const rangeLabel = t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')
+  const rangeLabel = (id: string): string =>
+    t(RANGES.find(candidate => candidate.id === id)?.key ?? 'rangeMonth')
 
   const gridDays = gridState.status === 'ready' ? gridState.report.days : []
+  // The year's report, which the two header panels are read from; absent until
+  // the read lands, and the only thing that gates their controls.
+  const yearReport = gridState.status === 'ready' ? gridState.report : undefined
   const peak = gridDays.reduce<UsageDayRow | undefined>(
     (best, day) => (best === undefined || day.cost > best.cost ? day : best),
     undefined,
@@ -388,23 +439,28 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   {/* Both of these are consulted rather than read through, so
                       they live beside the figures as hover panels instead of at
                       the bottom of a column the reader has to scroll. They read
-                      the year's report, so they arrive with it. */}
-                  {gridState.status !== 'ready' ? null : (
-                    <>
+                      the year's report, so they wait for it — in place, inert,
+                      like the recount button beside them. A control that removes
+                      itself for the length of a read is a control the reader
+                      reports as missing, and the loading frame around it looks
+                      enough like the finished page to be believed. */}
                   <Popover
                     id="dlu-rates"
                     label={t('pricingTitle')}
                     hint={t('pricingTooltip')}
                     icon={<RateIcon />}
                     width={700}
+                    disabled={yearReport === undefined}
                   >
-                    <PricingNotes
-                      report={gridState.report}
-                      locale={activeLocale}
-                      t={t}
-                      formatTokens={tokens}
-                      onSaveRates={saveRateTable}
-                    />
+                    {yearReport === undefined ? null : (
+                      <PricingNotes
+                        report={yearReport}
+                        locale={activeLocale}
+                        t={t}
+                        formatTokens={tokens}
+                        onSaveRates={saveRateTable}
+                      />
+                    )}
                   </Popover>
                   <Popover
                     id="dlu-source"
@@ -412,16 +468,17 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     hint={t('dataTooltip')}
                     icon={<SourceIcon />}
                     width={560}
+                    disabled={yearReport === undefined}
                   >
-                    <DataSourceNotes
-                      report={gridState.report}
-                      weeks={WINDOW_WEEKS}
-                      locale={activeLocale}
-                      t={t}
-                    />
+                    {yearReport === undefined ? null : (
+                      <DataSourceNotes
+                        report={yearReport}
+                        weeks={WINDOW_WEEKS}
+                        locale={activeLocale}
+                        t={t}
+                      />
+                    )}
                   </Popover>
-                    </>
-                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -434,9 +491,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
               </div>
             </header>
 
-            {gridState.status === 'loading' || gridState.status === 'idle'
-              ? <p className={css.status} role="status">{t('loading')}</p>
-              : null}
             {gridState.status === 'error' ? (
               <div className={css.failure}>
                 <p role="alert">{t('error')}</p>
@@ -445,6 +499,10 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                 </Button>
               </div>
             ) : null}
+
+            {gridState.status === 'loading' || gridState.status === 'idle'
+              ? <PanelSkeleton progress={progress} weeks={WINDOW_WEEKS} t={t} />
+              : null}
 
             {gridState.status === 'ready' ? (
               <>
@@ -455,6 +513,9 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   ? (
                     <SummaryStrip
                       report={summaryState.report}
+                      animate={entrance}
+                      stale={summaryState.slow}
+                      onEntranceEnd={() => { setEntrance(false) }}
                       t={t}
                       money={money}
                       tokens={tokens}
@@ -475,7 +536,10 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                         </Button>
                       </div>
                     )
-                    : <p className={css.status} role="status">{t('loading')}</p>}
+                    // The strip's own frame, not a line of text: the first fold of
+                    // a range arrives under a calendar that is already drawn, and
+                    // a placeholder of another height would settle twice.
+                    : <SummarySkeleton />}
 
                 <CalendarHeatmap
                   from={gridFrom}
@@ -494,13 +558,14 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                 {/* The ranking closes the page under the calendar: the calendar
                  * answers *when* the spend happened, this list answers *which
                  * project* — the question a day's figures raise the moment they
-                 * are read. It follows the same range as the tiles above, so the
-                 * two can never describe different periods. */}
+                 * are read. It follows the range its own report was folded for,
+                 * which is the selected one except while a switch is in flight. */}
                 {summaryState.status === 'ready'
                   ? (
                     <ProjectRanking
                       report={summaryState.report}
-                      rangeLabel={rangeLabel}
+                      rangeLabel={rangeLabel(summaryState.rangeId)}
+                      stale={summaryState.slow}
                       limit={DEFAULT_RANKING_LIMIT}
                       t={t}
                       formatCost={money}
@@ -532,9 +597,25 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   )
 }
 
-/** The selected range's figures: one hero number, then the supporting tiles. */
-function SummaryStrip({ report, t, money, tokens, integer, percent }: {
+/**
+ * The selected range's figures: one hero number, then the supporting tiles.
+ *
+ * Every figure here is scaled by one entrance share, so the strip fills in as a
+ * single thing. `animate` is false for every render after the first read, which
+ * is what makes a range switch swap the numbers rather than replay them.
+ *
+ * `stale` marks figures the reader is still looking at after the selection moved
+ * on. They stay mounted and keep their own range's meaning — the strip is only
+ * dimmed, never emptied, so a switch that takes a moment does not move the page.
+ */
+function SummaryStrip({ report, animate, stale, onEntranceEnd, t, money, tokens, integer, percent }: {
   readonly report: UsageInsightsReport
+  /** Whether these figures owe the reader their count-up entrance. */
+  readonly animate: boolean
+  /** Whether a fold for another range is under way behind these figures. */
+  readonly stale: boolean
+  /** Called once the entrance has landed, or immediately when it is refused. */
+  readonly onEntranceEnd: () => void
   readonly t: Translate
   readonly money: (value: number) => string
   readonly tokens: (value: number) => string
@@ -544,33 +625,41 @@ function SummaryStrip({ report, t, money, tokens, integer, percent }: {
   const { totals } = report
   const rangeTokens = report.days.reduce((sum, day) => sum + tokensOf(day), 0)
   const hitRate = cacheHitRate(totals)
+  // One share for the whole strip rather than one clock per figure: eight
+  // independent count-ups would read as eight things arriving, not one.
+  const share = useEntrance(animate, onEntranceEnd)
   return (
-    <section className={css.summary} aria-label={t('rangeLabel')}>
+    <section
+      className={css.summary}
+      aria-label={t('rangeLabel')}
+      aria-busy={stale}
+      data-stale={stale}
+    >
       <div className={css.hero}>
         <span className={css.heroLabel}>{t('totalCost')}</span>
-        <span className={css.heroValue}>{money(totals.cost)}</span>
+        <span className={css.heroValue}>{money(totals.cost * share)}</span>
         {report.peakMultiplier <= 1
           ? null
           : <span className={css.heroDetail}>{t('peakNote', { multiplier: String(report.peakMultiplier) })}</span>}
       </div>
       <div className={css.tiles}>
-        <Tile value={tokens(rangeTokens)} label={t('totalTokens')} />
-        <Tile value={tokens(totals.uncachedInputTokens)} label={t('inputTokens')} />
-        <Tile value={tokens(totals.outputTokens)} label={t('outputTokens')} />
+        <Tile value={tokens(rangeTokens * share)} label={t('totalTokens')} />
+        <Tile value={tokens(totals.uncachedInputTokens * share)} label={t('inputTokens')} />
+        <Tile value={tokens(totals.outputTokens * share)} label={t('outputTokens')} />
         <Tile
-          value={tokens(totals.cacheReadTokens)}
+          value={tokens(totals.cacheReadTokens * share)}
           label={t('cacheRead')}
-          detail={`${t('cacheWrite')} ${tokens(totals.cacheWriteTokens)}`}
+          detail={`${t('cacheWrite')} ${tokens(totals.cacheWriteTokens * share)}`}
         />
         {/* A window with no prompt tokens has no rate; the dash says so rather
             than printing a zero the reader would compare against real rates. */}
         <Tile
-          value={hitRate === undefined ? '—' : percent(hitRate)}
+          value={hitRate === undefined ? '—' : percent(hitRate * share)}
           label={t('cacheHitRate')}
           detail={t('cacheHitRateBasis')}
         />
-        <Tile value={integer(totals.calls)} label={t('calls')} />
-        <Tile value={integer(totals.sessions)} label={t('sessions')} />
+        <Tile value={integer(totals.calls * share)} label={t('calls')} />
+        <Tile value={integer(totals.sessions * share)} label={t('sessions')} />
       </div>
       {totals.calls === 0 ? <p className={css.empty}>{t('noUsage')}</p> : null}
     </section>

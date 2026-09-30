@@ -74,7 +74,10 @@ describe('pendingUpdate', () => {
 
   it('treats a blank field of a partly edited row as "keep the rate in effect"', () => {
     const drafts = edit('p/flash-model', 'cacheRead', '  ')
-    drafts['p/flash-model'].input = '2'
+    const row = drafts['p/flash-model']
+    expect(row).toBeDefined()
+    if (row === undefined) return
+    row.input = '2'
     expect(pendingUpdate(drafts, ROUTES)).toEqual({
       status: 'ready',
       update: { set: { 'p/flash-model': { ...FLASH, input: 2 } } },

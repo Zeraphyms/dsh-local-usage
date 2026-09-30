@@ -27,7 +27,7 @@ import { en, zh, type UsageInsightsLocaleKey } from './locales.ts'
 import { STYLE_ID, styles } from './styles.ts'
 import { normalizeReport } from './wire-report.ts'
 import type { WireReport } from './wire-report.ts'
-import type { UsagePricingResult, UsagePricingUpdate } from '../types.ts'
+import type { UsageInsightsProgress, UsagePricingResult, UsagePricingUpdate } from '../types.ts'
 
 export type { UsagePanelInjected, UsagePanelProps } from './UsagePanel.tsx'
 export type { UsageInsightsLocaleKey } from './locales.ts'
@@ -51,8 +51,53 @@ export const REPORT_PATH = '/api/dsh-local-usage/report'
 /** Host route this panel writes its per-route rate table to. */
 export const PRICING_PATH = '/api/dsh-local-usage/pricing'
 
+/** Host route this panel asks what a read in flight is doing. */
+export const PROGRESS_PATH = '/api/dsh-local-usage/progress'
+
+/**
+ * How often the panel asks the Host what it is doing.
+ *
+ * Slow enough to be invisible next to the work it describes — a cold read is
+ * seconds, and spends most of it inside the decoder — and fast enough that the
+ * count never looks stuck.
+ */
+const PROGRESS_POLL_MS = 200
+
 /** Services required by the sidebar and main-slot registrations. */
 export const inject = ['slots', 'locale']
+
+/**
+ * Follow one report request's progress until it settles.
+ *
+ * A failure here is never reported: the progress route is an extra, so a Host
+ * that predates it — or one whose answer is unreadable — costs the frame its
+ * count and nothing else. That is also what makes a freshly built Client safe
+ * against an older Host, the same way `normalizeReport` does for the report.
+ *
+ * @param onProgress - called with each state the Host reports.
+ * @returns the disposer that stops the polling.
+ */
+function followProgress(onProgress: (progress: UsageInsightsProgress) => void): () => void {
+  let live = true
+  const ask = async (): Promise<void> => {
+    try {
+      const response = await fetch(new URL(PROGRESS_PATH, window.location.origin), {
+        credentials: 'include',
+      })
+      if (!response.ok) return
+      const value = await response.json() as UsageInsightsProgress
+      if (live) onProgress(value)
+    } catch {
+      // Nothing to say: the report itself is what the reader is waiting on.
+    }
+  }
+  void ask()
+  const timer = window.setInterval(() => { void ask() }, PROGRESS_POLL_MS)
+  return () => {
+    live = false
+    window.clearInterval(timer)
+  }
+}
 
 /**
  * Inject this plugin's stylesheet once.
@@ -92,16 +137,21 @@ export function apply(ctx: ClientContext): void {
     // entry whenever the locale revision moves, so the id it reads is always
     // the one the dictionary around it was resolved from.
     locale: () => ctx.locale.getLocale().active,
-    report: async (refresh, from, to) => {
+    report: async (refresh, from, to, onProgress) => {
       const url = new URL(REPORT_PATH, window.location.origin)
       url.searchParams.set('from', String(from))
       url.searchParams.set('to', String(to))
       if (refresh) url.searchParams.set('refresh', '1')
-      const response = await fetch(url, { credentials: 'include' })
-      if (!response.ok) {
-        throw new Error(`usage report failed: HTTP ${String(response.status)}`)
+      const stop = onProgress === undefined ? undefined : followProgress(onProgress)
+      try {
+        const response = await fetch(url, { credentials: 'include' })
+        if (!response.ok) {
+          throw new Error(`usage report failed: HTTP ${String(response.status)}`)
+        }
+        return normalizeReport(await response.json() as WireReport)
+      } finally {
+        stop?.()
       }
-      return normalizeReport(await response.json() as WireReport)
     },
     // A write, not a report: the Host persists the table and answers with what
     // is now in effect, and the panel re-reads the report for the new prices.

@@ -19,10 +19,19 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
 export declare const DEFAULT_RANKING_LIMIT = 10;
 /** Props for the ranking. */
 export interface ProjectRankingProps {
-    /** The report for the range currently selected above. */
+    /** The report these rows were folded from. */
     readonly report: UsageInsightsReport;
-    /** The range's own label, stated so the list names its window. */
+    /** The range that report was folded for, stated so the list names its window. */
     readonly rangeLabel: string;
+    /**
+     * Whether a fold for another range is under way behind this list.
+     *
+     * The rows stay mounted — a list that vanished for a round trip would move
+     * everything under it — and their scope line stops naming the window the report
+     * carries, so rows the reader has already moved on from cannot be read as
+     * current.
+     */
+    readonly stale?: boolean;
     /** Rows shown while collapsed. */
     readonly limit: number;
     readonly t: PropsLocale<'usage'>['t'];
@@ -35,4 +44,4 @@ export interface ProjectRankingProps {
  * @param props - the range's report, its label, the row limit, and the formatters.
  * @returns the ranking section.
  */
-export declare function ProjectRanking({ report, rangeLabel, limit, t, formatCost, formatTokens, formatInteger, }: ProjectRankingProps): ReactNode;
+export declare function ProjectRanking({ report, rangeLabel, stale, limit, t, formatCost, formatTokens, formatInteger, }: ProjectRankingProps): ReactNode;

@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
-import { apply, DEFAULT_CONFIG, PRICING_PATH, REPORT_PATH } from '../src/index.ts'
+import { apply, DEFAULT_CONFIG, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from '../src/index.ts'
 
 // Every test mounts the plugin, which hydrates the rate table from `DSH_HOME`.
 // Pointing that at a fresh directory keeps the suite off the developer's real
@@ -61,7 +61,7 @@ function log(seqStart: number, time: number, count: number, firstTurn = 1): Sess
 }
 
 /** A `listSessions` record for one session id. */
-function record(id: string, seeded = false, cwd?: string): unknown {
+function record(id: string, seeded = false, cwd?: string, live = false): unknown {
   return {
     header: {
       version: 3,
@@ -70,7 +70,7 @@ function record(id: string, seeded = false, cwd?: string): unknown {
       isSeeded: seeded,
       ...cwd === undefined ? {} : { cwd },
     },
-    live: false,
+    live,
     persisted: true,
   }
 }
@@ -85,10 +85,22 @@ interface FakeLog {
   readonly broken?: boolean
 }
 
+/** What one mount's host has to offer beyond the engine. */
+interface MountOptions {
+  /** Stored-log change tokens, as a mounted persistence backend would list them. */
+  readonly revisions?: Readonly<Record<string, string>>
+  /** Session ids whose events are live in this process. */
+  readonly live?: readonly string[]
+  /** When true, the corpus listing itself fails. */
+  readonly failListing?: boolean
+}
+
 interface Mounted {
   readonly route: { readonly fetch: (request: Request) => Promise<Response> }
   /** The rate-table route the same activation registered. */
   readonly pricing: { readonly fetch: (request: Request) => Promise<Response> }
+  /** The progress route the same activation registered. */
+  readonly progress: { readonly fetch: (request: Request) => Promise<Response> }
   /** Session ids the exact read was asked for, in call order. */
   readonly exactReads: string[]
   /** Session ids each batch projection was asked for. */
@@ -99,15 +111,23 @@ interface Mounted {
   readonly offersBatch: boolean
 }
 
-/** Mount the plugin over a fake engine and capture the route it registers. */
-function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean): Mounted {
+/** Mount the plugin over a fake engine and capture the routes it registers. */
+function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options: MountOptions = {}): Mounted {
   const exactReads: string[] = []
   const batches: (readonly string[])[] = []
   const invalidated: ((session: { id: string }) => void)[] = []
   const routes = new Map<string, { fetch: (request: Request) => Promise<Response> }>()
+  const live = new Set(options.live ?? [])
 
   const engine: Record<string, unknown> = {
-    listSessions: () => Promise.resolve([...logs.keys()].map(id => record(id, logs.get(id)?.seeded === true, logs.get(id)?.cwd))),
+    listSessions: () => (options.failListing === true
+      ? Promise.reject(new Error('listing failed'))
+      : Promise.resolve([...logs.keys()].map(id => record(
+        id,
+        logs.get(id)?.seeded === true,
+        logs.get(id)?.cwd,
+        live.has(id),
+      )))),
     readSession: (id: string) => {
       exactReads.push(id)
       const entry = logs.get(id)
@@ -138,10 +158,19 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean): Mounte
     }
   }
 
+  const persistence = options.revisions === undefined ? undefined : {
+    list: () => Promise.resolve(Object.entries(options.revisions ?? {}).map(([id, revision]) => ({
+      header: { id },
+      revision,
+    }))),
+  }
+
   const ctx = {
     connection: { fetch: { register: (candidate: { path: string; fetch: (request: Request) => Promise<Response> }) => { routes.set(candidate.path, candidate); return () => Promise.resolve() } } },
     sessionQuery: engine,
     logger: { warn: () => {} },
+    // `ctx.get` is how an optional service is read without depending on it.
+    get: (name: string) => (name === 'sessionPersistence' ? persistence : undefined),
     on: (name: string, handler: (session: { id: string }) => void) => { if (name === 'session/event') invalidated.push(handler) },
     effect: (callback: () => unknown) => { callback() },
   } as unknown as Context
@@ -150,11 +179,14 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean): Mounte
 
   const route = routes.get(REPORT_PATH)
   const pricing = routes.get(PRICING_PATH)
+  const progressRoute = routes.get(PROGRESS_PATH)
   if (route === undefined) throw new Error('apply did not register the report route')
   if (pricing === undefined) throw new Error('apply did not register the pricing route')
+  if (progressRoute === undefined) throw new Error('apply did not register the progress route')
   return {
     route,
     pricing,
+    progress: progressRoute,
     exactReads,
     batches,
     offersBatch,
@@ -297,6 +329,162 @@ describe('assembleReport: the fold cache', () => {
     await report(mounted)
 
     expect(mounted.batches).toEqual([['a', 'b'], ['a']])
+  })
+})
+
+describe('assembleReport: the durable fold cache', () => {
+  // Instants relative to the real clock, because the cache prunes what no window
+  // can reach any more and a pinned 2026 date would age out of that horizon.
+  const RECENT = Date.now() - 2 * MS_PER_DAY
+
+  it('reuses a stored fold after a restart without opening the log', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, RECENT, 2) }]])
+    const revisions = { a: 'rev-1' }
+
+    const first = mount(logs, true, { revisions })
+    const cold = await report(first)
+    expect(cold.cached).toBe(false)
+    expect(first.batches).toEqual([['a']])
+
+    // A second process over the same harness home: nothing in memory, one
+    // revision that still matches, so no log is opened at all.
+    const second = mount(logs, true, { revisions })
+    const warm = await report(second)
+
+    expect(second.batches).toEqual([])
+    expect(second.exactReads).toEqual([])
+    expect(warm.cached).toBe(true)
+    expect(warm.totals).toMatchObject({ calls: 2, uncachedInputTokens: 200 })
+    expect(warm.scannedSessions).toBe(1)
+  })
+
+  it('re-reads the one session whose stored log changed', async () => {
+    const logs = new Map<string, FakeLog>([
+      ['a', { events: log(0, RECENT, 2) }],
+      ['b', { events: log(0, RECENT, 3) }],
+    ])
+
+    await report(mount(logs, true, { revisions: { a: 'rev-1', b: 'rev-1' } }))
+
+    const second = mount(logs, true, { revisions: { a: 'rev-1', b: 'rev-2' } })
+    const value = await report(second)
+
+    expect(second.batches).toEqual([['b']])
+    expect(value.totals).toMatchObject({ calls: 5 })
+  })
+
+  it('falls back to a full read when the log is no longer listed', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, RECENT, 2) }]])
+
+    await report(mount(logs, true, { revisions: { a: 'rev-1' } }))
+
+    const second = mount(logs, true, { revisions: {} })
+    const value = await report(second)
+
+    expect(second.batches).toEqual([['a']])
+    expect(value.totals).toMatchObject({ calls: 2 })
+  })
+
+  it('stores nothing for a live session, whose events are only in memory', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, RECENT, 2) }]])
+
+    const live = mount(logs, true, { revisions: { a: 'rev-1' }, live: ['a'] })
+    await report(live)
+    expect(live.batches).toEqual([['a']])
+
+    // The same revision, now not live: the fold was never written, because it
+    // came from events the stored log may not carry yet.
+    const restarted = mount(logs, true, { revisions: { a: 'rev-1' } })
+    await report(restarted)
+
+    expect(restarted.batches).toEqual([['a']])
+  })
+
+  it('bypasses the durable cache when a refresh is asked for', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, RECENT, 2) }]])
+    const revisions = { a: 'rev-1' }
+
+    await report(mount(logs, true, { revisions }))
+
+    const mounted = mount(logs, true, { revisions })
+    const refreshed = await report(mounted, { refresh: true })
+
+    expect(mounted.batches).toEqual([['a']])
+    expect(refreshed.cached).toBe(false)
+  })
+
+  it('replaces the stored fold a refresh read past', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, RECENT, 2) }]])
+    const revisions = { a: 'rev-1' }
+
+    await report(mount(logs, true, { revisions }))
+
+    // The refresh re-reads the log, and the entry it read past is replaced rather
+    // than left behind, so the next start is warm again.
+    const refreshing = mount(logs, true, { revisions })
+    await report(refreshing, { refresh: true })
+    expect(refreshing.batches).toEqual([['a']])
+
+    const restarted = mount(logs, true, { revisions })
+    const warm = await report(restarted)
+    expect(restarted.batches).toEqual([])
+    expect(warm.cached).toBe(true)
+  })
+
+  it('reads logs as before when no persistence backend is mounted', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, RECENT, 2) }]])
+
+    await report(mount(logs, true))
+    const second = mount(logs, true)
+    await report(second)
+
+    expect(second.batches).toEqual([['a']])
+  })
+})
+
+describe('the progress route', () => {
+  it('reports nothing in flight before any read', async () => {
+    const mounted = mount(new Map(), true)
+    const response = await mounted.progress.fetch(new Request(new URL(PROGRESS_PATH, 'http://localhost')))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ phase: 'idle', done: 0, total: 0 })
+  })
+
+  it('reports how many logs the read had to fold', async () => {
+    const logs = new Map<string, FakeLog>([
+      ['a', { events: log(0, DAY_ONE, 2) }],
+      ['b', { events: log(0, DAY_ONE, 3) }],
+      ['c', { events: log(0, DAY_ONE, 1) }],
+    ])
+    const mounted = mount(logs, true)
+
+    await report(mounted)
+
+    const value = await (await mounted.progress.fetch(
+      new Request(new URL(PROGRESS_PATH, 'http://localhost')),
+    )).json() as Record<string, unknown>
+    expect(value).toMatchObject({ phase: 'idle', done: 3, total: 3 })
+    expect(typeof value.finishedAt).toBe('number')
+
+    // A second request is answered from the fold cache, so it waits on no log.
+    await report(mounted)
+    expect(await (await mounted.progress.fetch(
+      new Request(new URL(PROGRESS_PATH, 'http://localhost')),
+    )).json()).toMatchObject({ phase: 'idle', done: 0, total: 0 })
+  })
+
+  it('settles when the read fails, so a poller is never left waiting', async () => {
+    const mounted = mount(new Map(), true, { failListing: true })
+
+    const failed = await mounted.route.fetch(new Request(new URL(REPORT_PATH, 'http://localhost')))
+    expect(failed.status).toBe(500)
+
+    const value = await (await mounted.progress.fetch(
+      new Request(new URL(PROGRESS_PATH, 'http://localhost')),
+    )).json() as Record<string, unknown>
+    expect(value.phase).toBe('idle')
+    expect(typeof value.finishedAt).toBe('number')
   })
 })
 

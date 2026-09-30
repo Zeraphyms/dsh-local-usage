@@ -37,15 +37,11 @@ import { createPortal } from 'react-dom'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageDayRow } from '../types.ts'
 import { WEEKDAY_KEYS, dayKey, heatmapColumns, midnight, monthMarkers } from './heatmap-grid.ts'
+import { CELL_GAP, LABEL_WIDTH, useResponsiveGrid } from './heatmap-measure.ts'
 import { css } from './classes.ts'
 
 const MS_PER_DAY = 86_400_000
 const WEEKDAY_ROWS = 7
-/** Narrowest cell edge; below the width that fits a year of them the grid trims weeks. */
-const MIN_CELL_SIZE = 15
-const CELL_GAP = 4
-/** Weekday-label gutter, measured in the same fixed pixels as the cells. */
-const LABEL_WIDTH = 20
 /** Tooltip clamp so a card on an edge column stays on screen. */
 const TOOLTIP_HALF_WIDTH = 150
 /** Approximate card height; below this viewport offset the card flips under the cell. */
@@ -113,42 +109,6 @@ function quantile(sorted: readonly number[], q: number): number {
   const left = sorted[base] ?? 0
   const right = sorted[Math.min(sorted.length - 1, base + 1)] ?? left
   return left + (right - left) * (position - base)
-}
-
-/** The cell edge that fills `width`, never below the minimum. */
-function cellSizeFor(width: number, columns: number): number {
-  const gaps = Math.max(0, columns - 1) * CELL_GAP
-  const available = Math.max(0, width - LABEL_WIDTH - gaps)
-  return Math.max(1, Math.floor(available / columns) || 1)
-}
-
-/** Track the widest cell edge the container can carry, and how many weeks then fit. */
-function useResponsiveGrid(totalColumns: number): {
-  containerRef: RefObject<HTMLDivElement>
-  cellSize: number
-  columns: number
-} {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [state, setState] = useState({ cellSize: MIN_CELL_SIZE, columns: totalColumns })
-
-  useEffect(() => {
-    const element = containerRef.current
-    if (element === null || totalColumns <= 0) return
-    const update = (): void => {
-      const width = element.clientWidth
-      const fitted = Math.floor((width - LABEL_WIDTH + CELL_GAP) / (MIN_CELL_SIZE + CELL_GAP))
-      const columns = Math.max(1, Math.min(totalColumns, fitted || 1))
-      setState(columns >= totalColumns
-        ? { cellSize: cellSizeFor(width, totalColumns), columns: totalColumns }
-        : { cellSize: MIN_CELL_SIZE, columns })
-    }
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(element)
-    return () => { observer.disconnect() }
-  }, [totalColumns])
-
-  return { containerRef, ...state }
 }
 
 /** Shading thresholds over the window's active days. */

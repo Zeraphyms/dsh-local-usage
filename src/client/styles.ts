@@ -161,6 +161,30 @@ export const styles = String.raw`
   color: var(--dsw-alias-label-caption);
 }
 
+/* Figures still on screen after the selection moved on.
+ *
+ * Only the figures fade, never the box: the strip keeps its exact height and the
+ * calendar below it keeps its place, which is the whole reason the previous
+ * report is left mounted instead of being replaced by a placeholder. The fade is
+ * slow enough to read as a state and not as a glitch, and it is only ever reached
+ * when the fold behind it has outlived the flicker threshold. The ranking's own
+ * header is left at full strength: it is the line that says what is happening. */
+.dlu-summary .dlu-hero,
+.dlu-summary .dlu-tiles,
+.dlu-rank .dlu-rankList,
+.dlu-rank .dlu-rankRowHead,
+.dlu-rank .dlu-rankMore {
+  transition: opacity 140ms ease-out;
+}
+
+.dlu-summary[data-stale='true'] .dlu-hero,
+.dlu-summary[data-stale='true'] .dlu-tiles,
+.dlu-rank[data-stale='true'] .dlu-rankList,
+.dlu-rank[data-stale='true'] .dlu-rankRowHead,
+.dlu-rank[data-stale='true'] .dlu-rankMore {
+  opacity: 0.45;
+}
+
 .dlu-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
@@ -656,6 +680,132 @@ export const styles = String.raw`
   color: var(--dsw-alias-label-secondary);
 }
 
+/* ── The loading frame ────────────────────────────────────────────────── */
+
+/* The read's own account of itself: one sentence, and a bar that is either a
+ * measured share of the work or a sweep standing in for a size nobody knows
+ * yet. It sits where the figures will, not floating over them. */
+.dlu-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-bottom: 2px;
+}
+
+.dlu-loadingText {
+  margin: 0;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.dlu-loadingTrack {
+  position: relative;
+  overflow: hidden;
+  block-size: 3px;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base));
+  border-radius: 2px;
+}
+
+.dlu-loadingFill {
+  block-size: 100%;
+  background: var(--dsw-alias-link);
+  border-radius: inherit;
+  /* A measured share is a figure, so it takes the panel's bar transition rather
+   * than a fresh animation: it should slide to the new count, not restart. */
+  transition: inline-size 220ms ease-out;
+}
+
+/* Unmeasured: no number to draw, so a third of the track sweeps instead. */
+.dlu-loadingTrack[data-measured='false'] .dlu-loadingFill {
+  inline-size: 33%;
+  animation: dlu-sweep 1.5s ease-in-out infinite;
+}
+
+@keyframes dlu-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(300%);
+  }
+}
+
+/* A placeholder for a figure: the height and rhythm of the line it stands in
+ * for, and nothing else. Ghosts of the *frame* are drawn as the frame, so this
+ * is only ever a stand-in for a number or a word. */
+.dlu-skelLine {
+  display: block;
+  block-size: 10px;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 9%, var(--dsw-alias-bg-base));
+  border-radius: 4px;
+}
+
+.dlu-skelLine[data-width='short'] {
+  inline-size: 46px;
+  block-size: 9px;
+}
+
+.dlu-skelLine[data-width='hero'] {
+  inline-size: 132px;
+  block-size: 24px;
+  margin-top: 3px;
+}
+
+.dlu-skelLine[data-width='value'] {
+  inline-size: 70%;
+}
+
+.dlu-skelLine[data-width='label'] {
+  inline-size: 48%;
+  block-size: 8px;
+}
+
+.dlu-skelLine[data-width='total'] {
+  inline-size: 72px;
+}
+
+.dlu-skelLine[data-width='heading'] {
+  inline-size: 112px;
+  block-size: 12px;
+}
+
+.dlu-skelLine[data-width='scope'] {
+  inline-size: 148px;
+  block-size: 9px;
+}
+
+.dlu-skelLine[data-width='name'] {
+  inline-size: 62%;
+  block-size: 9px;
+}
+
+.dlu-skelLine[data-width='cell'] {
+  inline-size: 40px;
+  block-size: 9px;
+  margin-left: auto;
+}
+
+/* The calendar's ghost cell: the size and radius of a real one, in the empty
+ * step's own colour, so the year reads as a year with nothing in it yet rather
+ * than as a different figure. */
+.dlu-cellGhost {
+  display: block;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 4%, var(--dsw-alias-bg-base));
+  border-radius: 4px;
+}
+
+/* The ranking's ghost bars: the shape of the list, which is the one thing about
+ * it that can be drawn before it arrives. Its own class rather than the real
+ * fill's, so the shipped bars keep their colour. */
+.dlu-skelBar {
+  display: block;
+  block-size: 100%;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 9%, var(--dsw-alias-bg-base));
+  border-radius: inherit;
+}
+
 .dlu-failure {
   display: flex;
   gap: 12px;
@@ -853,6 +1003,19 @@ export const styles = String.raw`
 .dlu-iconButton[aria-expanded='true'] {
   color: var(--dsw-alias-link);
   border-color: var(--dsw-alias-link);
+}
+
+/* Waiting on the report behind it: still a control, visibly not yet a live one.
+ * It keeps its box, so the header does not reflow when the read lands. */
+.dlu-iconButton[data-disabled='true'] {
+  color: var(--dsw-alias-label-caption);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.dlu-iconButton[data-disabled='true']:hover {
+  color: var(--dsw-alias-label-caption);
+  background: transparent;
 }
 
 /* Anchored to the trigger and scrollable: the rate panel carries a table and an
@@ -1191,12 +1354,26 @@ export const styles = String.raw`
 
 @media (prefers-reduced-motion: reduce) {
   .dlu-cell,
-  .dlu-range {
+  .dlu-range,
+  .dlu-loadingFill,
+  .dlu-summary .dlu-hero,
+  .dlu-summary .dlu-tiles,
+  .dlu-rank .dlu-rankList,
+  .dlu-rank .dlu-rankRowHead,
+  .dlu-rank .dlu-rankMore {
     transition: none;
   }
 
   .dlu-cell:hover {
     transform: none;
+  }
+
+  /* A sweep that cannot be read as motion is not a progress bar; a still, dimmed
+   * track says the same thing without moving. */
+  .dlu-loadingTrack[data-measured='false'] .dlu-loadingFill {
+    inline-size: 100%;
+    opacity: 0.35;
+    animation: none;
   }
 }
 `

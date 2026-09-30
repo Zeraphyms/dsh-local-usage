@@ -26,19 +26,28 @@ export interface PopoverProps {
   readonly icon: ReactNode
   /** Panel width in CSS pixels. */
   readonly width?: number
+  /**
+   * Whether the trigger is waiting on the data behind its panel.
+   *
+   * It stays in the header, keeps its size, and answers neither hover nor click.
+   * The alternative — not rendering it — was the behaviour that made a control
+   * look removed for as long as the year took to read, which is exactly as long
+   * as the rest of the panel spends looking finished.
+   */
+  readonly disabled?: boolean
   readonly children: ReactNode
 }
 
 /**
  * Render one icon trigger with its panel.
- * @param props - identity, copy, icon, width and panel content.
+ * @param props - identity, copy, icon, width, availability and panel content.
  * @returns the host element.
  */
-export function Popover({ id, label, hint, icon, width = 560, children }: PopoverProps): ReactNode {
+export function Popover({ id, label, hint, icon, width = 560, disabled = false, children }: PopoverProps): ReactNode {
   const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
   const host = useRef<HTMLDivElement>(null)
-  const open = pinned || hovered
+  const open = !disabled && (pinned || hovered)
   const panelId = `${id}-panel`
 
   // Both dismissals are document-level because the pointer leaves the host while
@@ -69,7 +78,7 @@ export function Popover({ id, label, hint, icon, width = 560, children }: Popove
     <div
       className={css.popoverHost}
       ref={host}
-      onPointerEnter={() => { setHovered(true) }}
+      onPointerEnter={() => { if (!disabled) setHovered(true) }}
       onPointerLeave={() => { setHovered(false) }}
     >
       <button
@@ -79,8 +88,10 @@ export function Popover({ id, label, hint, icon, width = 560, children }: Popove
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={panelId}
+        aria-disabled={disabled}
+        data-disabled={disabled}
         title={hint}
-        onClick={() => { setPinned(value => !value) }}
+        onClick={() => { if (!disabled) setPinned(value => !value) }}
       >
         {icon}
       </button>

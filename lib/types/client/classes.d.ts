@@ -17,6 +17,7 @@ export declare const css: {
     readonly calendarTotal: "dlu-calendarTotal";
     readonly calendarYear: "dlu-calendarYear";
     readonly cell: "dlu-cell";
+    readonly cellGhost: "dlu-cellGhost";
     readonly cellRow: "dlu-cellRow";
     readonly cells: "dlu-cells";
     readonly controls: "dlu-controls";
@@ -55,6 +56,10 @@ export declare const css: {
     readonly legendPeak: "dlu-legendPeak";
     readonly legendScale: "dlu-legendScale";
     readonly legendSwatch: "dlu-legendSwatch";
+    readonly loading: "dlu-loading";
+    readonly loadingFill: "dlu-loadingFill";
+    readonly loadingText: "dlu-loadingText";
+    readonly loadingTrack: "dlu-loadingTrack";
     readonly monthLabel: "dlu-monthLabel";
     readonly monthRow: "dlu-monthRow";
     readonly notes: "dlu-notes";
@@ -97,6 +102,8 @@ export declare const css: {
     readonly rankTitle: "dlu-rankTitle";
     readonly rankTokens: "dlu-rankTokens";
     readonly scan: "dlu-scan";
+    readonly skelBar: "dlu-skelBar";
+    readonly skelLine: "dlu-skelLine";
     readonly status: "dlu-status";
     readonly subtitle: "dlu-subtitle";
     readonly summary: "dlu-summary";

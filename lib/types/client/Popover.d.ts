@@ -23,14 +23,23 @@ export interface PopoverProps {
     readonly icon: ReactNode;
     /** Panel width in CSS pixels. */
     readonly width?: number;
+    /**
+     * Whether the trigger is waiting on the data behind its panel.
+     *
+     * It stays in the header, keeps its size, and answers neither hover nor click.
+     * The alternative — not rendering it — was the behaviour that made a control
+     * look removed for as long as the year took to read, which is exactly as long
+     * as the rest of the panel spends looking finished.
+     */
+    readonly disabled?: boolean;
     readonly children: ReactNode;
 }
 /**
  * Render one icon trigger with its panel.
- * @param props - identity, copy, icon, width and panel content.
+ * @param props - identity, copy, icon, width, availability and panel content.
  * @returns the host element.
  */
-export declare function Popover({ id, label, hint, icon, width, children }: PopoverProps): ReactNode;
+export declare function Popover({ id, label, hint, icon, width, disabled, children }: PopoverProps): ReactNode;
 /** Rate-card glyph: a percent sign inside a card outline. */
 export declare function RateIcon(): ReactNode;
 /** Provenance glyph: a document with its folded corner. */

@@ -27,6 +27,7 @@ const PRICING: PricingOptions = {
   currency: 'CNY',
   rules: [],
   fallback: { input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 },
+  overrides: new Map(),
   peakWindows: [],
   peakWeekdaysOnly: true,
   peakMultiplier: 1,

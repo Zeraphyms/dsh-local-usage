@@ -26,10 +26,19 @@ export const DEFAULT_RANKING_LIMIT = 10
 
 /** Props for the ranking. */
 export interface ProjectRankingProps {
-  /** The report for the range currently selected above. */
+  /** The report these rows were folded from. */
   readonly report: UsageInsightsReport
-  /** The range's own label, stated so the list names its window. */
+  /** The range that report was folded for, stated so the list names its window. */
   readonly rangeLabel: string
+  /**
+   * Whether a fold for another range is under way behind this list.
+   *
+   * The rows stay mounted — a list that vanished for a round trip would move
+   * everything under it — and their scope line stops naming the window the report
+   * carries, so rows the reader has already moved on from cannot be read as
+   * current.
+   */
+  readonly stale?: boolean
   /** Rows shown while collapsed. */
   readonly limit: number
   readonly t: PropsLocale<'usage'>['t']
@@ -44,7 +53,7 @@ export interface ProjectRankingProps {
  * @returns the ranking section.
  */
 export function ProjectRanking({
-  report, rangeLabel, limit, t, formatCost, formatTokens, formatInteger,
+  report, rangeLabel, stale = false, limit, t, formatCost, formatTokens, formatInteger,
 }: ProjectRankingProps): ReactNode {
   const [expanded, setExpanded] = useState(false)
   const ranked = useMemo(() => rankProjects(report.projects), [report.projects])
@@ -52,11 +61,18 @@ export function ProjectRanking({
   const shown = expanded ? ranked : ranked.slice(0, limit)
 
   return (
-    <section className={css.rank} aria-label={t('rankingTitle')}>
+    <section
+      className={css.rank}
+      aria-label={t('rankingTitle')}
+      aria-busy={stale}
+      data-stale={stale}
+    >
       <header className={css.rankHead}>
         <h3 className={css.rankTitle}>{t('rankingTitle')}</h3>
         <p className={css.rankScope}>
-          {t('rankingScope', { range: rangeLabel, count: formatInteger(ranked.length) })}
+          {stale
+            ? t('updating')
+            : t('rankingScope', { range: rangeLabel, count: formatInteger(ranked.length) })}
         </p>
       </header>
 

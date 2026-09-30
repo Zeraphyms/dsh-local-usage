@@ -7,13 +7,11 @@
   // program cannot see both — the harness splits its own typecheck the same
   // way (`tsconfig.host.json` / `tsconfig.client.json` at its root).
   "extends": "./tsconfig.json",
+  // The halves are globbed rather than listed: a hand-kept list of files is how a
+  // new module ends up shipping unchecked, which is exactly what the split is
+  // supposed to prevent.
   "include": [
-    "src/index.ts",
-    "src/aggregate.ts",
-    "src/pricing.ts",
-    "src/types.ts",
-    "tests/aggregate.host.spec.ts",
-    "tests/pricing.host.spec.ts",
-    "tests/samples.host.spec.ts"
+    "src/*.ts",
+    "tests/*.host.spec.ts"
   ]
 }

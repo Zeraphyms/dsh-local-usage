@@ -99,8 +99,17 @@ export function localDayKey(time: number): string {
   return `${String(date.getFullYear())}-${month}-${day}`
 }
 
-/** Local midnight of one day key, or `undefined` when the key is malformed. */
-function dayKeyToTime(day: string): number | undefined {
+/**
+ * Local midnight of one day key, or `undefined` when the key is malformed.
+ *
+ * Exported because the durable fold cache dates a stored day the same way this
+ * fold does; a second parser that disagreed by a timezone would silently shift
+ * the retention horizon it is used for.
+ *
+ * @param day - a `YYYY-MM-DD` day key.
+ * @returns Unix epoch milliseconds of that local day's midnight.
+ */
+export function dayKeyToTime(day: string): number | undefined {
   const matched = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
   if (matched === null) return undefined
   const time = new Date(

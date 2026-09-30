@@ -102,7 +102,17 @@ export function RateEditor({ routes, currency, t, formatTokens, onSave }: RateEd
     return t('pricingSourceRule', { match: entry.rule ?? '' })
   }
 
-  if (routes.length === 0) return null
+  // Stated rather than omitted. The editor disappearing when a window recorded no
+  // routes is indistinguishable from the editor having been removed, and the
+  // reader is left with a rate table they can look at but not correct.
+  if (routes.length === 0) {
+    return (
+      <section className={css.editor}>
+        <h4 className={css.editorTitle}>{t('pricingEditorTitle')}</h4>
+        <p className={css.editorHint}>{t('pricingEditorEmpty')}</p>
+      </section>
+    )
+  }
 
   return (
     <section className={css.editor}>

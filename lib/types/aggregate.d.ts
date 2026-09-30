@@ -67,6 +67,17 @@ export interface ReportMeta {
  */
 export declare function localDayKey(time: number): string;
 /**
+ * Local midnight of one day key, or `undefined` when the key is malformed.
+ *
+ * Exported because the durable fold cache dates a stored day the same way this
+ * fold does; a second parser that disagreed by a timezone would silently shift
+ * the retention horizon it is used for.
+ *
+ * @param day - a `YYYY-MM-DD` day key.
+ * @returns Unix epoch milliseconds of that local day's midnight.
+ */
+export declare function dayKeyToTime(day: string): number | undefined;
+/**
  * Extract one sample per billed usage settlement.
  *
  * The fold mirrors the harness's own `tokenUsage` projection, which is what

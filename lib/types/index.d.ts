@@ -20,6 +20,14 @@ export type * from './types.ts';
 export declare const REPORT_PATH = "/api/dsh-local-usage/report";
 /** Exact route the browser half writes the per-route rate table to. */
 export declare const PRICING_PATH = "/api/dsh-local-usage/pricing";
+/**
+ * Exact route the browser half polls while a report is being assembled.
+ *
+ * A separate route rather than a streamed report: the report is one JSON
+ * document the browser parses whole, and a carrier that buffered a streamed body
+ * would lose exactly the progress it was streaming.
+ */
+export declare const PROGRESS_PATH = "/api/dsh-local-usage/progress";
 /** Plugin name the loader row addresses. */
 export declare const name = "dsh-local-usage";
 /** Services this plugin cannot work without: the carrier's route registry and the session reads. */

@@ -30,6 +30,8 @@ export declare const PANEL_ID: MainPanelId;
 export declare const REPORT_PATH = "/api/dsh-local-usage/report";
 /** Host route this panel writes its per-route rate table to. */
 export declare const PRICING_PATH = "/api/dsh-local-usage/pricing";
+/** Host route this panel asks what a read in flight is doing. */
+export declare const PROGRESS_PATH = "/api/dsh-local-usage/progress";
 /** Services required by the sidebar and main-slot registrations. */
 export declare const inject: string[];
 /**

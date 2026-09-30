@@ -20,11 +20,18 @@ import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: activates the `ctx.sessionQuery` Context declaration, and names the
 // engine the batch read is read off.
 import type { SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
+// Type-only: activates the optional `ctx.sessionPersistence` declaration, whose
+// per-log revision is what makes a stored fold reusable across a restart.
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import { foldSessionTitle } from '@deepseek-ai/dsh-session-title'
 import { buildReport, reliabilityOf, reliabilityWithin, samplesOf } from './aggregate.ts'
 import type { PricingOptions, ReliabilityDay, SessionUsageInput, UsageSample } from './aggregate.ts'
+import { createFoldCache, foldCacheFilePath } from './fold-cache.ts'
+import type { FoldCache } from './fold-cache.ts'
 import { parsePeakWindow } from './pricing.ts'
 import type { PeakWindow, PriceRate, PriceRule } from './pricing.ts'
+import { createProgressTracker } from './progress.ts'
+import type { ProgressTracker } from './progress.ts'
 import { createRateStore, pricingFilePath, readRate, resolveDshHome } from './rates.ts'
 import type { RateStore } from './rates.ts'
 import type { UsageInsightsReport, UsagePricingUpdate, UsageRate } from './types.ts'
@@ -36,6 +43,15 @@ export const REPORT_PATH = '/api/dsh-local-usage/report'
 
 /** Exact route the browser half writes the per-route rate table to. */
 export const PRICING_PATH = '/api/dsh-local-usage/pricing'
+
+/**
+ * Exact route the browser half polls while a report is being assembled.
+ *
+ * A separate route rather than a streamed report: the report is one JSON
+ * document the browser parses whole, and a carrier that buffered a streamed body
+ * would lose exactly the progress it was streaming.
+ */
+export const PROGRESS_PATH = '/api/dsh-local-usage/progress'
 
 /**
  * Session logs folded concurrently by the exact-read path.
@@ -279,11 +295,72 @@ function numberParam(params: URLSearchParams, key: string): number | undefined {
   return Number.isFinite(value) ? value : undefined
 }
 
-/** A cached session fold that is still owed a read. */
-interface MissingSession {
+/** A session log this read has to fold. */
+interface PendingSession {
   readonly id: SessionId
   /** Whether the log carries a fork-inherited prefix, which the batch read cannot skip. */
   readonly seeded: boolean
+  /**
+   * Revision of the stored log this read folds, when one is known.
+   *
+   * Present only for a fold the durable cache may keep: a live session is folded
+   * from the events in memory, so storing that fold under the revision of a log
+   * that may lag behind it would be a claim the next process would believe.
+   */
+  readonly revision?: string
+}
+
+/** A session the in-memory cache cannot answer for. */
+interface NeedySession {
+  readonly id: SessionId
+  readonly seeded: boolean
+  /** Whether the events currently live in this process are the truth for this session. */
+  readonly live: boolean
+}
+
+/** One stored session's change token, as the persistence service reports it. */
+interface StoredRevision {
+  readonly header: { readonly id: SessionId }
+  readonly revision: string
+}
+
+/**
+ * The one persistence read this plugin makes, declared structurally.
+ *
+ * The harness's own `SessionPersistence` service declares `ctx.sessionPersistence`
+ * with a much wider surface — open, create, resume — and none of it matters here.
+ * Naming only the listing keeps this package free of a runtime dependency on the
+ * backend that provides it, exactly as the route registrar is.
+ */
+interface UsageInsightsPersistence {
+  list(options?: { readonly signal?: AbortSignal }): Promise<readonly StoredRevision[]>
+}
+
+/**
+ * The change token of every stored log, or an empty map when none can be had.
+ *
+ * A backend that is absent, or a listing that fails, costs this plugin the
+ * durable cache and nothing else: every session then takes the read path it took
+ * before that cache existed, and the report is still complete.
+ *
+ * @param ctx - host context, read for the optional persistence service.
+ * @returns session id to stored-log revision.
+ */
+async function storedRevisions(ctx: Context): Promise<ReadonlyMap<string, string>> {
+  try {
+    // `ctx.get` reads a service without declaring a dependency on it, which is
+    // what keeps the durable cache optional: a deployment that mounts no
+    // persistence backend still mounts this panel.
+    const persistence = ctx.get('sessionPersistence') as UsageInsightsPersistence | undefined
+    if (persistence === undefined || typeof persistence.list !== 'function') return new Map()
+    const snapshots = await persistence.list()
+    const revisions = new Map<string, string>()
+    for (const snapshot of snapshots) revisions.set(String(snapshot.header.id), snapshot.revision)
+    return revisions
+  } catch (error: unknown) {
+    ctx.logger.warn(`dsh-local-usage: stored-log listing failed: ${describe(error)}`)
+    return new Map()
+  }
 }
 
 /**
@@ -295,100 +372,170 @@ interface MissingSession {
  * only the exact read reports, and every session when the mounted engine has no
  * batch projection at all — takes the per-session read.
  *
+ * A session neither path has to touch is the point of the durable cache: when the
+ * stored log still carries the revision a previous process folded, that fold is
+ * reused and the log is never opened.
+ *
  * @param ctx - host context carrying the session query engine.
- * @param cache - the fold cache, keyed by session id.
+ * @param cache - the in-memory fold cache, keyed by session id.
+ * @param folds - the durable fold cache, keyed by session id and log revision.
+ * @param progress - publishes how far this read has got.
  * @param config - resolved plugin configuration.
- * @param request - the window to fold and whether to discard the cache first.
+ * @param rates - the reader's rate overrides.
+ * @param request - the window to fold and whether to discard the caches first.
  * @returns the complete priced report.
  */
 async function assembleReport(
   ctx: Context,
   cache: Map<string, CachedSession>,
+  folds: FoldCache,
+  progress: ProgressTracker,
   config: UsageInsightsConfig,
   rates: RateStore,
   request: { refresh: boolean; from: number | undefined; to: number | undefined },
 ): Promise<UsageInsightsReport> {
-  if (request.refresh) cache.clear()
+  progress.begin()
+  try {
+    // A refresh means what it says: every log is read again, so the durable
+    // entries are bypassed rather than merely overwritten.
+    if (request.refresh) cache.clear()
 
-  const records = await ctx.sessionQuery.listSessions()
-  const missing: MissingSession[] = []
-  const inputs: SessionUsageInput[] = []
-  for (const record of records) {
-    const id = String(record.header.id)
-    const hit = cache.get(id)
-    if (hit !== undefined) {
-      inputs.push(sessionInputOf(id, hit, request))
-      continue
-    }
-    missing.push({ id: id as SessionId, seeded: record.header.isSeeded })
-  }
-
-  const cached = missing.length === 0
-  const batch = batchProjectionOf(ctx.sessionQuery)
-  const batchable = batch === undefined ? [] : missing.filter(entry => !entry.seeded)
-  const exact = batch === undefined ? missing : missing.filter(entry => entry.seeded)
-
-  let unreadable = 0
-
-  if (batch !== undefined && batchable.length > 0) {
-    // The projection is synchronous and must own everything it keeps. The fold
-    // satisfies that by reading primitives off the events and building fresh
-    // sample objects, so nothing here aliases the borrowed log.
-    const results = await batch(batchable.map(entry => entry.id), source => foldSession({
-      events: source.events,
-      createdAt: source.header.createdAt,
-      ...source.header.cwd === undefined ? {} : { cwd: source.header.cwd },
-      // Reached only for a log with no inherited prefix, by construction above.
-      skipBefore: 0,
-    }))
-    const byId = new Map<string, BatchOutcome<CachedSession>>()
-    for (const outcome of results) byId.set(String(outcome.sessionId), outcome)
-    for (const entry of batchable) {
-      const outcome = byId.get(entry.id)
-      if (outcome === undefined || outcome.status === 'rejected') {
-        unreadable += 1
+    const records = await ctx.sessionQuery.listSessions()
+    const inputs: SessionUsageInput[] = []
+    const needy: NeedySession[] = []
+    for (const record of records) {
+      const id = String(record.header.id)
+      const hit = cache.get(id)
+      if (hit !== undefined) {
+        inputs.push(sessionInputOf(id, hit, request))
         continue
       }
-      cache.set(entry.id, outcome.value)
-      inputs.push(sessionInputOf(entry.id, outcome.value, request))
+      needy.push({ id: id as SessionId, seeded: record.header.isSeeded, live: record.live })
     }
-  }
 
-  if (exact.length > 0) {
-    const folded = await mapBounded(exact, READ_CONCURRENCY, async (entry) => {
-      try {
-        const snapshot = await ctx.sessionQuery.readSession(entry.id)
-        return foldSession({
-          events: snapshot.events,
-          createdAt: snapshot.session.createdAt,
-          ...snapshot.session.cwd === undefined ? {} : { cwd: snapshot.session.cwd },
-          // A forked session's log begins with the parent's inherited prefix, and
-          // those turns were already billed under the parent. Only the events this
-          // session owns are its own spend.
-          skipBefore: snapshot.inheritedEventCount,
+    // Revisions turn the durable cache into a lookup: the same token means the
+    // bytes on disk are the ones that entry was folded from. They are read even
+    // for a refresh, which bypasses the lookup but still has to replace the entry
+    // it is re-reading past.
+    const asking = needy.some(entry => !entry.live)
+    const revisions = asking ? await storedRevisions(ctx) : new Map<string, string>()
+    const pending: PendingSession[] = []
+    for (const entry of needy) {
+      const revision = entry.live ? undefined : revisions.get(entry.id)
+      if (revision === undefined) {
+        pending.push({ id: entry.id, seeded: entry.seeded })
+        continue
+      }
+      const stored = request.refresh ? undefined : folds.read(entry.id, revision, request.from)
+      if (stored === undefined) {
+        pending.push({ id: entry.id, seeded: entry.seeded, revision })
+        continue
+      }
+      cache.set(entry.id, stored)
+      inputs.push(sessionInputOf(entry.id, stored, request))
+    }
+
+    // Every log that still has to be read is one step of this read's progress,
+    // so the count the panel shows is the work it is actually waiting on.
+    progress.plan(pending.length)
+
+    const cached = pending.length === 0
+    const batch = batchProjectionOf(ctx.sessionQuery)
+    const batchable = batch === undefined ? [] : pending.filter(entry => !entry.seeded)
+    const exact = batch === undefined ? pending : pending.filter(entry => entry.seeded)
+
+    let unreadable = 0
+
+    if (batch !== undefined && batchable.length > 0) {
+      // The projection is synchronous and must own everything it keeps. The fold
+      // satisfies that by reading primitives off the events and building fresh
+      // sample objects, so nothing here aliases the borrowed log.
+      const results = await batch(batchable.map(entry => entry.id), source => {
+        const fold = foldSession({
+          events: source.events,
+          createdAt: source.header.createdAt,
+          ...source.header.cwd === undefined ? {} : { cwd: source.header.cwd },
+          // Reached only for a log with no inherited prefix, by construction above.
+          skipBefore: 0,
         })
-      } catch {
-        return undefined
+        // Counted inside the projector because that is where a session's fold
+        // actually completes; the projection reports back only when all of them have.
+        progress.advance()
+        return fold
+      })
+      const byId = new Map<string, BatchOutcome<CachedSession>>()
+      for (const outcome of results) byId.set(String(outcome.sessionId), outcome)
+      for (const entry of batchable) {
+        const outcome = byId.get(entry.id)
+        if (outcome === undefined || outcome.status === 'rejected') {
+          unreadable += 1
+          continue
+        }
+        cache.set(entry.id, outcome.value)
+        if (entry.revision !== undefined) folds.write(entry.id, entry.revision, outcome.value)
+        inputs.push(sessionInputOf(entry.id, outcome.value, request))
       }
-    })
-    for (let index = 0; index < folded.length; index += 1) {
-      const value = folded[index]
-      const entry = exact[index]
-      if (value === undefined || entry === undefined) {
-        unreadable += 1
-        continue
-      }
-      cache.set(entry.id, value)
-      inputs.push(sessionInputOf(entry.id, value, request))
     }
-  }
 
-  return buildReport(inputs, pricingOptions(config, rates), {
-    generatedAt: Date.now(),
-    unreadableSessions: unreadable,
-    cached,
-  })
+    if (exact.length > 0) {
+      const folded = await mapBounded(exact, READ_CONCURRENCY, async (entry) => {
+        try {
+          const snapshot = await ctx.sessionQuery.readSession(entry.id)
+          return foldSession({
+            events: snapshot.events,
+            createdAt: snapshot.session.createdAt,
+            ...snapshot.session.cwd === undefined ? {} : { cwd: snapshot.session.cwd },
+            // A forked session's log begins with the parent's inherited prefix, and
+            // those turns were already billed under the parent. Only the events this
+            // session owns are its own spend.
+            skipBefore: snapshot.inheritedEventCount,
+          })
+        } catch {
+          return undefined
+        } finally {
+          progress.advance()
+        }
+      })
+      for (let index = 0; index < folded.length; index += 1) {
+        const value = folded[index]
+        const entry = exact[index]
+        if (value === undefined || entry === undefined) {
+          unreadable += 1
+          continue
+        }
+        cache.set(entry.id, value)
+        if (entry.revision !== undefined) folds.write(entry.id, entry.revision, value)
+        inputs.push(sessionInputOf(entry.id, value, request))
+      }
+    }
+
+    progress.pricing()
+    const report = buildReport(inputs, pricingOptions(config, rates), {
+      generatedAt: Date.now(),
+      unreadableSessions: unreadable,
+      cached,
+    })
+    // Awaited, so the read this report just paid for survives a process that
+    // dies before the next one starts. It is one write of a file the size of the
+    // samples, only ever on a read that touched a log, and the panel is already
+    // waiting on that read; a disk that refuses it costs the next cold start and
+    // never this report.
+    try {
+      await folds.flush()
+    } catch (error: unknown) {
+      ctx.logger.warn(`dsh-local-usage: fold cache write failed: ${describe(error)}`)
+    }
+    return report
+  } finally {
+    progress.finish()
+  }
 }
+
+/** One line describing an error, for a log line. */
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 
 /** Resolve the configured rate card, the reader's overrides, and the peak schedule. */
 function pricingOptions(config: UsageInsightsConfig, rates: RateStore): PricingOptions {
@@ -414,20 +561,22 @@ function pricingOptions(config: UsageInsightsConfig, rates: RateStore): PricingO
 async function handleReport(
   ctx: Context,
   cache: Map<string, CachedSession>,
+  folds: FoldCache,
+  progress: ProgressTracker,
   config: UsageInsightsConfig,
   rates: RateStore,
   request: Request,
 ): Promise<Response> {
   const url = new URL(request.url)
   try {
-    const report = await assembleReport(ctx, cache, config, rates, {
+    const report = await assembleReport(ctx, cache, folds, progress, config, rates, {
       refresh: url.searchParams.get('refresh') === '1',
       from: numberParam(url.searchParams, 'from'),
       to: numberParam(url.searchParams, 'to'),
     })
     return Response.json(report, { headers: { 'cache-control': 'no-store' } })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = describe(error)
     ctx.logger.warn(`dsh-local-usage: report failed: ${message}`)
     return Response.json({ error: message }, { status: 500, headers: { 'cache-control': 'no-store' } })
   }
@@ -534,7 +683,15 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
   // The reader's own rate corrections, hydrated once here and mirrored to disk
   // on every write.
   const rates = createRateStore(pricingFilePath(resolveDshHome()))
+  // Folds keyed by the stored log's own change token, hydrated once here so a
+  // restarted process draws the year without re-reading a log it already folded.
+  const folds = createFoldCache(foldCacheFilePath(resolveDshHome()))
+  // One read's state, published to the panel through its own route. The panel
+  // serializes its reads, so one object is the whole truth about what is running.
+  const progress = createProgressTracker()
   // A session's samples stop being valid the moment it records another event.
+  // The durable entry is left alone: it is keyed by the log's revision, so the
+  // append that invalidates the memory copy also invalidates that entry.
   ctx.on('session/event', (session) => {
     cache.delete(session.id)
   })
@@ -543,9 +700,23 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
       path: REPORT_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => handleReport(ctx, cache, resolved, rates, request),
+      fetch: request => handleReport(ctx, cache, folds, progress, resolved, rates, request),
     }),
     'dsh-local-usage: report route',
+  )
+  // Optional, so a deployment with no persistence backend still mounts: without
+  // one there are no revisions, so nothing is ever reused from disk and every
+  // session takes the read path this plugin had before the cache existed.
+  ctx.effect(
+    () => connectionOf(ctx).fetch.register({
+      path: PROGRESS_PATH,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: () => Promise.resolve(Response.json(progress.read(), {
+        headers: { 'cache-control': 'no-store' },
+      })),
+    }),
+    'dsh-local-usage: progress route',
   )
   ctx.effect(
     () => connectionOf(ctx).fetch.register({

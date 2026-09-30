@@ -7,5 +7,5 @@
   "compilerOptions": {
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/client/**/*", "src/types.ts", "tests/heatmap-grid.client.spec.ts", "tests/wire-report.client.spec.ts"]
+  "include": ["src/client/**/*", "src/types.ts", "tests/*.client.spec.ts"]
 }

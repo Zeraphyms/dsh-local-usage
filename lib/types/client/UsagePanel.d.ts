@@ -22,7 +22,7 @@
 import { type ReactNode } from 'react';
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client';
-import type { UsageInsightsReport, UsagePricingResult, UsagePricingUpdate } from '../types.ts';
+import type { UsageInsightsProgress, UsageInsightsReport, UsagePricingResult, UsagePricingUpdate } from '../types.ts';
 /** Registration-side face the panel reads its data through. */
 export interface UsagePanelInjected {
     /** Key this panel occupies in the main column, matching the sidebar entry. */
@@ -37,8 +37,15 @@ export interface UsagePanelInjected {
      * during render is enough, and needs no subscription of its own.
      */
     locale: () => string;
-    /** Assemble the report; `refresh` discards the Host's per-session fold cache. */
-    report: (refresh: boolean, from: number, to: number) => Promise<UsageInsightsReport>;
+    /**
+     * Assemble the report; `refresh` discards the Host's per-session fold cache.
+     *
+     * `onProgress` is optional and only worth passing for a read that may have to
+     * open session logs: the panel hands it to the read that draws the year and
+     * leaves it off the re-prices, which are answered from folds already in hand
+     * and would otherwise flicker through phases they never really had.
+     */
+    report: (refresh: boolean, from: number, to: number, onProgress?: (progress: UsageInsightsProgress) => void) => Promise<UsageInsightsReport>;
     /** Persist one write to the per-route rate table and answer with what is in effect. */
     saveRates: (update: UsagePricingUpdate) => Promise<UsagePricingResult>;
 }

@@ -22,6 +22,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageInsightsReport, UsageTokens } from '../types.ts'
 import { projectName } from './paths.ts'
 import { cacheHitRate } from './cache-rate.ts'
+import { HeroSkeleton, ProjectsSkeleton, TilesSkeleton } from './PanelSkeleton.tsx'
 import { Tile } from './Tile.tsx'
 import { css } from './classes.ts'
 
@@ -91,15 +92,21 @@ export function DayDetail({
           </div>
           <p className={css.subtitle}>{t('daySubtitle')}</p>
         </div>
-        {report === undefined ? null : (
-          <div className={css.hero}>
-            <span className={css.heroLabel}>{t('totalCost')}</span>
-            <span className={css.heroValue}>{formatCost(report.totals.cost)}</span>
-            {report.peakMultiplier <= 1
-              ? null
-              : <span className={css.heroDetail}>{t('peakNote', { multiplier: String(report.peakMultiplier) })}</span>}
-          </div>
-        )}
+        {report === undefined
+          // A day fold is normally a re-price and lands in a frame or two, but a
+          // session that recorded an event since the year was read has to be read
+          // again — so the frame is drawn at its real height rather than left to
+          // arrive late and push the table down.
+          ? (failed ? null : <HeroSkeleton />)
+          : (
+            <div className={css.hero}>
+              <span className={css.heroLabel}>{t('totalCost')}</span>
+              <span className={css.heroValue}>{formatCost(report.totals.cost)}</span>
+              {report.peakMultiplier <= 1
+                ? null
+                : <span className={css.heroDetail}>{t('peakNote', { multiplier: String(report.peakMultiplier) })}</span>}
+            </div>
+          )}
       </header>
 
       {report === undefined
@@ -110,7 +117,12 @@ export function DayDetail({
               <Button variant="outline" size="sm" onClick={onRetry}>{t('retry')}</Button>
             </div>
           )
-          : <p className={css.status} role="status">{t('loading')}</p>)
+          : (
+            <>
+              <TilesSkeleton />
+              <ProjectsSkeleton />
+            </>
+          ))
         : (
           <DayFigures
             report={report}

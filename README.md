@@ -1,259 +1,268 @@
 ---
-description: "Usage statistics panel for the dsh web client: historical token and money aggregates folded from every durable session log, rendered as a rolling-year spending heatmap with a range selector and a stated pricing and provenance basis."
+description: "dsh Web 客户端的用量统计面板：从全部持久会话日志折叠出的历史 token 与金额统计，以滚动一年的消费热力图呈现，并自述计价方式与数据来源。"
 kind: "package-reference"
 ---
 
 # dsh-local-usage
 
-English | [中文](README.zh.md)
+中文 | [English](README.en.md)
 
-## Summary
+## 概述
 
-**Usage statistics** answers what this machine has spent and when. The harness records exact provider token accounting per session but exposes no cross-session aggregate and no currency at all, so this package supplies both: its Host half enumerates every logical session, folds each durable log into one sample per billed settlement, attributes each sample to its billed `provider/model` route, and prices it against a configured rate card; its Client half contributes a **global panel** — a sidebar entry opening a full-width page in the main column — whose centrepiece is a calendar of the current year.
+**用量统计**回答这台机器花了多少钱、花在了什么时候。Harness 按会话记录了精确的 provider token 计量，但既不提供跨会话聚合，也完全不涉及货币，因此本包把两者都补上：Host 半边枚举全部逻辑会话，把每个持久日志折叠为「每次计费结算一个样本」，将样本归因到实际计费的 `provider/model` 路由，再按配置的价目表计价；Client 半边贡献一个**全局面板**——侧栏入口，在主列中以全宽页面打开——其核心是当年的日历。
 
-It is deliberately not a Settings page: a year of days needs the main column's width to fit without horizontal scrolling, and what a profile has spent is not a preference.
+它刻意不做成设置页：一整年的格子需要主列的宽度才不必横向滚动，而且一个 profile 花了多少钱并不是一项偏好设置。
 
-What the panel gives you, in one place:
+一个面板给出：
 
-- **A rolling-year calendar** of daily spend — 52 weeks ending with the current one, shaded by a quantile ramp over the window's active days, with a hover card per day.
-- **A page per day** — clicking any cell opens that day on its own page: its totals, and how much of them each working directory produced.
-- **Five ranges** — today, last 7 days, this month, this quarter, this year — every one of them ending today.
-- **Totals for the range** — cost, total tokens, the uncached-input, output, cache-read and cache-write buckets, the cache hit rate, billed calls, and contributing sessions.
-- **A rate card you configure** — per-model input, cache-read, cache-write and output prices, a fallback rate, and a Beijing-time peak schedule with a multiplier.
-- **A reliability statement** — under the calendar, what the window's attempts cost it: provider retries grouped by cause, tool errors as a share of tool calls, and context compactions that failed. It appears only when there is something to say.
-- **A stated basis** — the formula, the rates actually in effect, and the provenance of every figure, on the page itself rather than in documentation only.
-- **The harness's language, not a switch of its own** — every sentence comes from a dictionary and every figure is formatted for the active locale, so the Chinese panel counts in 万/亿 where the English one counts in M/B.
-- **No network egress** — the fold runs inside the dsh process over durable session logs; nothing is uploaded and no external request is made.
+- **滚动一年的日历** —— 以当前周结束的 52 周，按窗口内活跃日的分位数梯度着色，每天悬停都有明细卡片。
+- **首次读取会自我交代** —— 折叠日志期间先画出面板自己的空骨架：能说清的地方直接给出「已读会话数 / 总数」，数字落地时从 0 涨一次。
+- **折叠结果能跨重启** —— 已折叠的内容按每条日志自身的变更令牌缓存在磁盘上，因此重启 dsh 后是从一个 2.5 MiB 的文件重画这一年，而不是重新解码每一份会话日志。
+- **每天一个页面** —— 点击任意格子进入当天详情：当天总量，以及其中各工作目录分别占多少。
+- **五档区间** —— 当天、近 7 天、本月、本季度、全年，全部以今天为终点。
+- **区间总量** —— 金额、总 token、非缓存输入 / 输出 / 缓存读 / 缓存写四个桶、缓存命中率、计费调用次数、以及贡献用量的会话数。
+- **可配置的价目表** —— 按模型的输入、缓存读、缓存写、输出单价，回退费率，以及北京时间高峰时段与倍率。
+- **可靠性说明** —— 日历下方给出这个窗口为这些调用付出了什么：按原因归类的 provider 重试、工具错误占工具调用的比例、以及失败的上下文压缩。只在有内容可说时才出现。
+- **自述依据** —— 计价公式、实际生效的费率、以及每个数字的来源，写在页面本身，而不是只写在文档里。
+- **跟随 harness 的语言，不自带开关** —— 每句文案来自字典，每个数字按当前语言格式化，因此中文面板以 万/亿 计数，英文面板以 M/B 计数。
+- **不出网** —— 折叠在 dsh 进程内基于持久会话日志完成，折叠出的内容留在本机 `<DSH_HOME>/local-usage/` 下；不上传任何数据，也不发起外部请求。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Troubleshooting](#troubleshooting)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Development](#development)
+- [使用本包](#use-this-package)
+- [常见问题](#troubleshooting)
+- [理解实现](#understand-the-implementation)
+- [延伸阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与待办](#known-limitations-and-deferred-work)
+- [开发](#development)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Select **Usage** in the sidebar to open the panel. Mount `dsh-local-usage` in a Web composition that already provides the Session query engine, the session store, and the layout shell with its sidebar and main column. The panel registers its own sidebar entry and needs no configuration.
+在侧栏选择**用量统计**即可打开面板。它是全局面板，属于 profile 而非某个会话，因此在切换会话时依然可用；在已经提供 Session 查询引擎、会话存储、以及带侧栏与主列的布局外壳的 Web 组合中挂载 `dsh-local-usage` 即可，无需任何配置。
 
-Nothing else has to be wired for the two halves to meet: the Host half registers its own Fetch route and the browser half calls it, so this package never appears in the product's Remote assembly.
+两半之间不需要额外接线：Host 半边自行注册 Fetch 路由，浏览器半边直接调用它，因此本包不会出现在产品的 Remote 装配中。
 
-### Install
+### 安装
 
 ```sh
-dsh plugin add git@github.com:webxiaobaiyu-droid/dsh-local-usage.git   # from GitHub
-dsh plugin add /path/to/dsh-local-usage                               # from a local checkout
+dsh plugin add git@github.com:webxiaobaiyu-droid/dsh-local-usage.git   # 从 GitHub 安装
+dsh plugin add /path/to/dsh-local-usage                               # 从本地目录安装
 ```
 
-The plugin manager behind **Plugins → Add plugin** takes the same two forms.
+**插件 → 添加插件** 对话框接受同样这两种形式。
 
-This package ships its built `lib/` and its `cordis.patch.yml` in the repository, and declares no build script, so an install never runs code on your machine and never asks for the build permission a git dependency would otherwise need: what loads is exactly the committed artifact. `dsh plugin add` appends `dsh-local-usage` to the profile's bundle list, and `dsh --profile <name> --dump-config` shows the single `local-usage` row it contributes. One row mounts both halves: it loads the Host half, and because the manifest declares `dsh.client.platform: web`, that same row is what makes the browser load the panel.
+本仓库把构建好的 `lib/` 与 `cordis.patch.yml` 一并入库，且不声明任何构建脚本，因此安装时不会在你的机器上执行代码，也不需要 git 依赖通常会要求的构建授权：加载的就是已入库的产物本身。`dsh plugin add` 会把 `dsh-local-usage` 追加到该 profile 的 bundle 列表，`dsh --profile <名称> --dump-config` 可以看到它贡献的那一行 `local-usage`。一行同时挂载两半：它加载 Host 半边，而由于 manifest 声明了 `dsh.client.platform: web`，同一行也是浏览器加载面板的依据。
 
-A profile's bundle list is composed when its process boots. Installing through **Plugins → Add plugin** applies to the running process; installing from the command line while a dsh process already serves that profile needs that process restarted before the entry appears.
+一个 profile 的 bundle 列表是在进程启动时组装的：通过**插件 → 添加插件**安装会作用于正在运行的进程；而在命令行安装时，若已有 dsh 进程在该 profile 上服务，需要重启该进程，入口才会出现。
 
-### Reading the page
+### 阅读页面
 
-The panel is global, so it belongs to the profile rather than to one Session, and it stays available while you switch conversations.
+首次请求是最慢的一次，因为它必须读取并折叠这台机器上全部持久会话日志。这段等待里看到的是页面本身——空的：主数字与那排格子、按真实边长画出的整整一年格子、排行行。月份标签、星期栏与每格的边长都是关于日历而非关于用量的事实，因此如实画出；只有数字是占位。数字落地时不会有任何位移。Host 说得出要折叠多少份日志时，页面就报出这个数——「正在读取会话 12 / 65」——并给出已完成比例的进度条；说不出来时，进度条改为来回扫动：用动效代表一段没人能测量的时间。随后数字在约半秒内从 0 涨到终值，且只涨这一次；切换区间是直接换数字，而不是在读者正在比较的数值上重演一遍。
 
-The range selector chooses the lens: **Today**, **Last 7 days**, **This month**, **This quarter**, or **This year**. Every range ends with today, so "this month" means the month so far rather than a completed calendar month. **Today is the default**, because the question the panel is usually opened with is what the current session has cost so far.
+范围选择器决定观察的镜头：**当天**、**近 7 天**、**本月**、**本季度**或**全年**。每个范围都以今天结束，因此「本月」指的是本月至今，而不是一个已结束的自然月。**默认是「当天」**，因为打开这个面板时最常问的是「这一会儿花了多少」。
 
-Beside the hero figure sits a row of tiles carrying total tokens, the input, output, and cache buckets, the cache hit rate, the billed call count, and the number of contributing sessions. They share one line with the hero rather than taking a block of their own, so the figures read as the page's header instead of as its content. The day page states the same tiles for its one day, so a day whose caching broke is visible from the page that exists to explain it.
+切换范围不会让页面位移。新范围折叠期间，屏幕上已有的数字保持挂载，折叠完成后就地替换，因此摘要条高度不变、下方日历也不动；若这次折叠超过一瞬，那些数字会变淡而不是被清空，排行则改说「正在更新…」而不去标注读者已经离开的那个窗口。区间折叠是对 Host 已有样本的重新计价，因此被藏起来的等待通常只有一两帧；当天详情页同样按「即将到达的数字的高度」先画出自己的骨架。
 
-The header's right corner carries two icons beside **Recount**: the rate table, and where the figures come from. Both are consulted rather than read through, so they open on hover and pin on click, and neither takes a block out of the column.
+主数字旁边是一排承载总 token、输入、输出、缓存三个桶、缓存命中率、计费调用次数与会话数的格子。它们与主数字同处一行，而不是各自占一块，因此这些数字读起来像页面的页眉而非正文。当天页面为那一天给出同一组格子，因此某天缓存失效时，能从专门用来解释那一天的页面上直接看见。
 
-The calendar is the stable frame: it is Sunday-first with a one-glyph weekday gutter — `日 一 二 三 四 五 六` in Chinese, `S M T W T F S` in English, from the dictionary rather than from a hard-coded set — spans a rolling 52 weeks ending with the current one, and does not change when the range does. Cells are fixed squares whose edge is measured from the panel: while a year of columns fits at the minimum edge they grow to fill it, and below that the grid keeps the minimum edge and drops its oldest weeks, so it never scrolls sideways however narrow the panel gets — including with the sidebar expanded. Cells carry no border; intensity is the only mark on them, and hovering one opens a card with that day's cost, total tokens, input, output, and cache-read tokens, and call count. The card's figures are exact — every digit, grouped the reader's way — because a rounded count is the one thing a drill-down cannot answer.
+页头右下角在**重新统计**旁有两个图标：费率表，以及用量依据。两者都是查阅而非通读的东西，因此悬停即开、点击可固定，且都不再从版面上占走一块。它们从首帧起就在页头里，只是在年度报告到达前处于惰性状态——与**重新统计**本身一样：一个在读取期间把自己移走的控件，读者只会报告说这个功能没了，而它周围那圈加载骨架又足够像成品页面，容易被当成已经加载完成。
 
-Shading is a quantile ramp over the window's active days — median, then 75th and 90th percentiles — so the scale adapts to how the profile actually spends rather than assuming a distribution.
+日历是稳定的画框：以周日为首列，左侧星期栏每个格子只有一个字形——中文是 `日 一 二 三 四 五 六`，英文是 `S M T W T F S`，取自字典而不是写死的字符集；它横跨截至本周的滚动 52 周，并且不随范围变化。格子是固定大小的方块，边长由面板实测决定：当一年的列数能以最小边长放下时，格子会长大铺满宽度；再窄就保持最小边长并丢弃最旧的若干周——因此无论面板多窄（包括展开侧边栏时）都不会横向滚动，也不会被裁掉。格子不带描边，唯一的标记就是颜色深浅；悬停任意一天会弹出卡片，给出当天的花费、总 token、输入、输出、缓存命中的 token 数与调用次数，且卡片里的数字是**精确值**——完整位数，按当前语言分组——因为「只给约数」恰恰是明细卡片回答不了的那件事。
 
-Under the calendar, **Tokens by project** ranks the working directories the selected range's tokens went to: rank, project, a bar, tokens, cost and sessions, ten rows at a time, with the rest one click away. The bar is a share of the *leader* rather than of the total, so the ranking stays readable when one project dominates. This list follows the range selector — switching to **Last 7 days** re-ranks the same week the tiles above are reporting.
+色阶按窗口内活跃日的分位数分级——中位数、75 分位、90 分位——因此它会随这个 profile 的真实消费分布自适应，而不是假定某种分布。
 
-### The day page
+色阶的「无用量」档是一块看得见的中性灰格子，而不是页面底色本身——于是一个没有消费的月份读起来是「空的一个月」，而不是「什么都没有」。它是把正文墨色以低比例混进页面底色得到的，这样两个主题下都成立：没有任何一个 surface token 在两种主题下都与页面底不同，而唯一在浅色下与底不同的那个（`bg-layer-2`）解析出来正是页面底色。第一档活跃颜色靠**色相**与它区分——那一档是蓝的——在色差如此之小的一步上，色相在一瞥之间就能读出，而明度不行。
 
-Every cell is a button, so the calendar is a way in rather than only a picture of the year. Clicking one opens that day on its own page, and the keyboard reaches the same place: the grid is a single tab stop, the arrow keys walk it, `Home` and `End` jump to the ends of a week, `Enter` opens the focused day, and a screen reader gets each cell's date, cost, token count and call count as its name. The day page **replaces** the panel's contents rather than floating over it, so the calendar is never half-covered behind a card; its back control returns to the calendar and hands focus back to the cell you left from, rather than dropping you at the top of a year you would have to find it in again.
+日历下方是 **项目 Token 消耗** 排行：名次、项目、条形、token、花费与会话数，默认十行，其余一键展开。条形是相对**榜首**的比例而非占总量比例，因此某个项目一家独大时排行依然可读。这个榜单跟随范围选择器——切到**近 7 天**，重排的就是上面那排数字所报告的同一周。
 
-The page states the day's own totals and buckets, then splits them by **working directory**. A directory is what a reader means by a project: a session is created in exactly one, it is what the harness itself groups session logs by on disk, and it is the only axis in this data that answers *what* a day's tokens went to rather than *when* they went. Each row gives a directory's cost, total tokens, output tokens, call count and contributing session count, with the full path under its short name. Sessions whose headers recorded no directory are not dropped — their spend is real — and are collected into a labelled row of their own, so the rows still add up to the day's total. A day with no usage says so rather than rendering an empty table.
+### 当天详情页
 
-Opening a day is not a second read of the logs: it is the same fold narrowed to a one-day window over the samples the Host already holds, which is what lets a cell lead to a whole page instead of a drawn-out fetch.
+每个格子都是按钮，所以日历是一个入口，而不只是一年的画像。点击任意一格进入当天的独立页面，键盘也能到达同一个地方：整个网格是一个 Tab 停留点，方向键在其中行走，`Home` / `End` 跳到当前周的两端，`Enter` 打开当前聚焦的那天，而读屏软件从每个格子的可访问名称里得到日期、花费、token 数与调用次数。详情页是**替换**面板内容而非浮在其上，所以日历不会被卡片遮住一半；返回控件回到日历，并把焦点交还给你点开的那一格，而不是把你丢在一整年格子的顶部。
 
-The ramp's empty step is a visible neutral tile rather than the page background, so a quiet month reads as an empty month instead of as nothing at all. It is a low wash of the text colour mixed into the surface, which is what makes it correct in both themes: no surface token is offset from the page in both, and the one that is (`bg-layer-2`) resolves to the page background itself in the light theme. The first active step stays clearly distinct from it by *hue* — it is blue — which reads at a glance where a lightness step this small would not.
+页面先给出当天的总量与各 token 桶，再按**工作目录**拆分。一个目录就是读者心里的「项目」：一个会话只会创建在一个目录下，Harness 自身也正是在磁盘上按它分组存放会话日志，而且它是这份数据里唯一能回答「这一天的 token 花去了哪」而不是「花在了什么时候」的轴。每一行给出该目录的花费、总 token、输出 token、调用次数与贡献会话数，短名下方是完整路径。头部没有记录工作目录的会话不会被丢掉——它们的花费是真实的——而是归入一行带标签的桶，因此各行相加仍然等于当天总量。没有用量的日子会明说，而不是渲染一张空表。
 
-### Language
+打开一天不是第二次读日志：它只是把同一个折叠收窄到一天的窗口，在 Host 已经持有的样本上重算，这正是「一个格子可以通向一整页」、而不是「一次漫长等待」的原因。
 
-The panel follows the harness's own language setting; it has no switch of its own. Copy and figures are internationalized separately, because they are two different problems:
+### 语言
 
-- **Copy** is a dictionary. Every user-visible string lives in `src/client/locales.ts`, in both shipped locales, under the `usage` namespace — the panel renders no literal of its own. A `satisfies Record<UsageInsightsLocaleKey, string>` on the English dictionary makes a key present in one locale and missing from the other a compile error, and `tests/locales.client.spec.ts` closes the gap the type system cannot see, by requiring both locales to ask for the same `{name}` placeholders: the locale runtime leaves an unmatched placeholder in place, so a mismatch would render the literal text `{date}` to a reader with no error anywhere. A language pack adding a locale registers a third dictionary and needs no component change.
-- **Figures** are not copy, and are formatted in `src/client/format.ts` against the active locale: currency placement, grouping, the decimal mark, the compact scale and date order are properties of the reader's language, not of the sentence wrapped around them. The compact token scale is the clearest case — English counts in K/M/B while Chinese counts in 万/亿, so a Chinese panel reading `214.87M` was an untranslated figure rather than a stylistic one. English output is unchanged by that switch, because `Intl` compact notation resolves to the same K/M/B the hard-coded suffixes used.
+面板跟随 harness 自身的语言设置，没有自己的开关。文案与数字分开处理，因为这是两个不同的问题：
 
-Because the Host's report is language-neutral — it carries counts, rates and a day key, never a rendered string — switching language costs one re-render and re-reads nothing. A figure that cannot be formatted as configured degrades instead of failing: an unknown ISO currency code renders as `CODE 0.00`, and a well-formed locale tag no `Intl` data exists for falls back to the default locale's figures.
+- **文案**是字典。所有用户可见字符串都在 `src/client/locales.ts` 里、以 `usage` 命名空间下的两个语言各存一份——面板自己不渲染任何字面量。英文字典上的 `satisfies Record<UsageInsightsLocaleKey, string>` 使得「某种语言有、另一种没有」直接成为编译错误；而 `tests/locales.client.spec.ts` 补上类型系统看不见的那一半：要求两种语言为同一个键声明相同的 `{name}` 占位符。原因是 locale 运行时会把匹配不到的占位符原样留在文本里，键名不一致会让读者看到字面量 `{date}`，而任何地方都不会报错。语言包新增一门语言只需注册第三份字典，不需要改组件。
+- **数字**不是文案，由 `src/client/format.ts` 按当前语言格式化：货币符号位置、分组方式、小数点、紧凑数量级、以及日期的书写顺序，都属于读者的语言，而不属于包住它们的那句话。紧凑 token 数量级是最清楚的例子——英文按 K/M/B 计数，中文按 万/亿 计数，所以中文面板上显示 `214.87M` 就不是风格问题，而是没翻译。改完之后英文输出不变，因为 `Intl` 的 compact 记法解析出来正是原先写死的那套 K/M/B。
 
-### What the run cost to get there
+由于 Host 返回的报告是语言中立的——它携带计数、费率和日期键，从不携带渲染好的字符串——切换语言只需重渲染一次，不需要重读任何数据。配置有问题时数字会降级而不是让面板挂掉：无法识别的 ISO 货币码渲染为 `CODE 0.00`，而 `Intl` 没有数据的合法语言标签会退回默认语言的数字。
 
-Under the calendar, and only when the window recorded something, the panel states its reliability: attempts the provider had to be asked for again, tool calls whose result carried an error, and context compactions that ended in an error — each grouped by the code its producer issued, so a rate limit reads differently from a timeout and a stale file read differs from a failed edit. A window that recorded clean work states nothing at all rather than a spotless record nobody asked about.
+### 这些调用付出了什么
 
-It reads as an explanation of the figures above rather than a report of its own: a run fighting rate limits and failing to compact its context is the usual reason a window costs more than its token counts suggest, and the compaction line is the one to look at when cache-read tokens climb.
+日历下方（仅在窗口内确实记录了内容时）面板会写明可靠性：provider 被要求重试的次数、结果带错误的工具调用、以及以错误结束的上下文压缩——每一项都按产生者给出的代码归类，因此限流与超时读起来不同，文件过期与编辑失败也各不相同。若窗口内记录的都是干净的工作，则什么都不写，而不是给出一份没人要求的完美记录。
 
-### Configuration
+它是上方数字的解释，而不是另一份报告：一个不断撞限流、又压缩不了上下文的会话，正是「这个窗口比它的 token 数看起来更贵」的常见原因；而当缓存读 token 攀升时，压缩那一行就是该看的地方。
 
-| Field | Default | Meaning |
+### 配置
+
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `currency` | `CNY` | Currency every figure is expressed in; the plugin performs no conversion. |
-| `models` | DeepSeek V4.1 Flash and V4 Pro cards | Rate cards matched against the routed model, first match wins. |
-| `fallback` | the Flash card | Rate applied to a route no card matches. |
-| `peakWindows` | `09:00-12:00`, `14:00-18:00` | Peak windows in Beijing time; empty disables peak pricing. |
-| `peakWeekdaysOnly` | `true` | Whether weekends are always billed off-peak. |
-| `peakMultiplier` | `2` | Multiplier applied to every rate inside a peak window. |
+| `currency` | `CNY` | 所有金额的表达币种；插件不做汇率换算。 |
+| `models` | DeepSeek V4.1 Flash 与 V4 Pro 两张价目 | 按路由模型匹配的价目表，先匹配者生效。 |
+| `fallback` | Flash 价目 | 没有任何价目命中的路由所用的费率。 |
+| `peakWindows` | `09:00-12:00`、`14:00-18:00` | 北京时间的高峰时段；留空即关闭高峰计价。 |
+| `peakWeekdaysOnly` | `true` | 周末是否始终按空闲时段计价。 |
+| `peakMultiplier` | `2` | 高峰时段对每条费率施加的倍数。 |
 
-Each rate card states `input`, `cacheRead`, `cacheWrite`, and `output` in currency units per one million tokens, plus the `match` substring that claims a route. The shipped defaults are DeepSeek's published off-peak CNY prices for `deepseek-flash` and `deepseek-v4-pro`; a route served through an aggregator or a reseller must be priced by the operator, and the page names every route that fell back to the default rate instead of implying a figure it cannot support.
+每张价目给出 `input`、`cacheRead`、`cacheWrite`、`output`（币种单位／百万 token），以及认领路由的 `match` 子串。内置默认值是 DeepSeek 官方公布的 `deepseek-flash` 与 `deepseek-v4-pro` 空闲时段人民币价格；经聚合商或转售商提供的路由必须由使用者自行定价，页面会点名所有回退到默认费率的路由，而不是给出一个它无法支撑的数字。
 
-**Pricing a route exactly.** A substring rule is convenient and quietly wrong the moment a route it was never written for contains the substring — `ds123/glm-5.3-flash` is claimed by the `flash` card and billed as DeepSeek Flash. The rate panel lists every route the window recorded, with the rate it was actually priced at and a badge naming the source (a rule, the fallback rate, or your own override), and each of the four prices can be typed over. An override outranks the rules for that exact route, is saved on this machine, and is used by the very next report.
+**给单个路由定价。** 子串规则很方便，也会在一条它从没为之写过的路由恰好包含该子串时悄悄出错——`ds123/glm-5.3-flash` 会被 `flash` 价目认领，按 DeepSeek Flash 计价。费率面板会列出该窗口真实出现过的每一条路由，给出它实际生效的费率、以及来源标记（规则、回退费率、或你自己的覆盖），四个价格都可直接改写。覆盖对该确切路由优先于规则，保存在本机，并在下一次报告立即生效。
 
 ```sh
-$DSH_HOME/local-usage/pricing.json     # what the editor writes; ~/.dsh by default
+$DSH_HOME/local-usage/pricing.json     # 编辑器写入的文件；DSH_HOME 默认为 ~/.dsh
 ```
 
-The file is the only state this plugin keeps. A write goes through `POST /api/dsh-local-usage/pricing` on the same route family the panel reads its report from, is validated before it is stored, and is persisted through a temporary sibling and a rename, so an interrupted write cannot leave a half-written table behind. **Reset** on a row clears its override and returns the route to its rule.
+这个文件是**读者**写下的状态。写入走 `POST /api/dsh-local-usage/pricing`，与面板读取报告、读取进度的 `report` / `progress` 属于同一族路由；写入前逐字段校验，落盘时先写临时兄弟文件再改名，因此中断的写入不会留下半张表。某一行的**还原**会清除该覆盖，让这条路由回到它的规则。插件自己写下的持久状态只有 [Host 折叠](#host-fold) 里那份折叠缓存，里面是样本与计数，从不包含消息正文。
 
-### What the money figure is worth
+### 金额能信到什么程度
 
-Cost is this plugin's own arithmetic, not a figure read back from a provider: `tokens × configured rate` per bucket, with peak or off-peak decided from each call's own instant. The panel states the formula, the rates actually in effect, and the peak schedule in the header's rate panel, because the ways an estimate can differ from an invoice are exactly what a reader would otherwise assume were included — prepaid credit, package plans, volume discounts, granted balance, aggregator markups and reseller margins are all invisible here. Pricing a route by hand removes the estimate's largest source of error for that route; everything else on that list stays invisible either way. Treat the provider's invoice as authoritative.
+花费是本插件自己算出来的，不是从 provider 账单读回来的：各桶 `token × 配置费率`，并按每次调用自身的时刻判定高峰/空闲。面板在页头的费率面板里明确写出公式、当前生效费率和高峰时段——因为一个估算值与账单的差异来源，恰恰是读者容易默认已经包含的那些东西：预购额度、套餐包、阶梯折扣、赠送余额、聚合商加价与转售差价都不在其中。手工给路由定价会消掉该路由估算中最大的一项误差来源；清单上的其余各项，无论是否定价都依然不可见。请以 provider 账单为准。
 
-### Where the figures come from
+### 数据从哪来
 
-The panel states its own provenance in the header's provenance panel: the harness keeps no usage database, so the statistics are folded from the durable session event logs themselves — every session on the host, across all working directories, read through the session query service and replay-validated. That block also names the on-disk shape (`<DSH_HOME>/sessions/<cwd>/<session>/session.v3.jsonl.zstd`), what is left out (a fork's inherited prefix, calls still in flight, unreadable logs), the fact that nothing is uploaded and no external request is made, and the counts for the read that produced the figures on screen.
+面板在页头的用量依据面板里自述来源：Harness 没有用量数据库，因此统计折叠自会话的持久事件日志本身——本机全部会话、跨所有工作目录，经会话查询服务读取并做重放校验。该区块还给出落盘形态（`<DSH_HOME>/sessions/<工作目录>/<会话>/session.v3.jsonl.zstd`）、不计入的部分（fork 的继承前缀、尚未结算的在途调用、读不出的日志）、不上传也不发起外部请求这一事实、折叠出的样本缓存在本机 `<DSH_HOME>/local-usage/fold-cache.json`（只有样本与计数，从不包含消息正文），最后给出产生当前数字的那一次读取的计数。
 
-### What the figures mean
+### 数字的含义
 
-One sample is produced per **billed settlement**, using the same semantics as the harness's own `tokenUsage` projection: a settlement replaces the earlier sample of the same `(turn, step)` slot, `llm/retry-started` closes that slot so a retried attempt is billed separately, an identical repeat changes nothing, and a settlement that committed no surface message still counts through the usage carried in its embedded stream. The extractor therefore reproduces the persisted projection's totals exactly, which is what the package's verification checks against real logs. `uncachedInputTokens` excludes cache traffic; `cacheReadTokens` and `cacheWriteTokens` count as zero when a provider does not report them. Cost is `tokens × rate` per bucket, priced at each sample's own instant, so a peak boundary inside one day prices the samples on both sides correctly instead of averaging them. Every reliability figure is a count of durable events — `llm/retry` for a repeated attempt, a `tool/result` carrying an `error`, `compaction/start` against a `compaction/end` carrying an `error` — folded per local day and cut by the same window as the samples, which is exact for every day-bounded window the panel asks for. The **cache hit rate** is the share of every prompt token the provider served from cache — `cacheReadTokens ÷ (uncachedInputTokens + cacheReadTokens + cacheWriteTokens)` — so a token written into the cache counts as a miss rather than a hit, and a window that held no prompt tokens states no rate at all rather than a zero.
+每个**计费结算**产生一个样本，语义与 Harness 自身的 `tokenUsage` 投影一致：同一 `(turn, step)` 槽位的结算会替换先前的样本，`llm/retry-started` 关闭该槽位使重试的尝试单独计费，完全相同的重复结算不改变任何数字，而未提交可见消息的结算仍通过其内嵌 stream 携带的 usage 计入。因此提取器能精确复现持久投影的总量，这也正是本包针对真实日志所做的验证。`uncachedInputTokens` 不含缓存流量；`cacheReadTokens` 与 `cacheWriteTokens` 在 provider 未上报时计为零。花费为各桶 `token × 费率`，并按每个样本自身的时刻计价，因此一天之内跨越高峰边界时，两侧样本各自正确，而不会被平均。每一个可靠性数字都是对持久事件的计数——`llm/retry` 记一次重试，`tool/result` 带 `error` 记一次工具失败，`compaction/start` 与带 `error` 的 `compaction/end` 记一次压缩失败——按本地日折叠，并与样本用同一个窗口裁剪，这对面板所请求的每一个以天为界的窗口都是精确的。**缓存命中率**是全部输入 token 中由 provider 缓存提供的比例——`cacheReadTokens ÷ (uncachedInputTokens + cacheReadTokens + cacheWriteTokens)`——因此写入缓存的那个 token 计为未命中而非命中；若窗口内没有任何输入 token，则不给比率，而不是给一个 0。
 
 -----
 
 <a id="troubleshooting"></a>
-## Troubleshooting
+## 常见问题
 
-**The panel opens but reports it cannot read usage data.** The browser half is mounted and the Host half is not, so the route it calls does not exist. The boot output names the cause:
+**面板能打开，但显示无法读取用量数据。** 说明浏览器半边已挂载、Host 半边没有，于是它要调用的路由并不存在。启动输出会直接点名原因：
 
 ```
 dsh: warning: 1 entry did not activate
 local-usage (dsh-local-usage): Error: cannot get property "connection" without inject
 ```
 
-That message means the entry reached the Loader without its `inject` list and died on its first service read; the [Dev Note](#development) covers the one module shape that causes it, and `tests/module-shape.host.spec.ts` guards against it. To confirm a healthy install instead, ask the composed configuration for the row: `dsh --profile <name> --dump-config` prints `# == dsh-local-usage` above `- id: local-usage`.
+这条信息意味着 entry 到达 Loader 时丢掉了 `inject` 列表，并在第一次读取服务时失败；造成它的唯一一种模块形状见 [Dev Note](#development)，`tests/module-shape.host.spec.ts` 守着这条规则。要确认安装本身正常，可以问组合后的配置：`dsh --profile <名称> --dump-config` 会在 `- id: local-usage` 上方打印 `# == dsh-local-usage`。
 
-**The plugin is missing from the plugin list, or the install is refused with `declares no dsh.bundle`.** A package is only installable as a plugin layer when its manifest carries `dsh.bundle.patch` and ships the patch file it names; both are committed here, so a refusal means an older copy of this package was installed — install from this repository again.
+**插件列表里没有它，或安装被拒绝并提示 `declares no dsh.bundle`。** 只有当 manifest 声明了 `dsh.bundle.patch`、并随包提供它指向的 patch 文件时，一个包才能作为插件层安装；这两者本仓库都已入库，因此被拒绝说明装的是本包的旧副本 —— 请重新从本仓库安装。
 
-**The install fails with `ERR_PNPM_PUBLIC_HOIST_PATTERN_DIFF`.** That is the profile's own state rather than this package: its `node_modules` was created by a different pnpm version or linker setting than the one now installing. Run `pnpm install` in the profile directory, then add the plugin again.
+**安装失败并报 `ERR_PNPM_PUBLIC_HOIST_PATTERN_DIFF`。** 这是 profile 自身的状态，与本包无关：它的 `node_modules` 是由另一个 pnpm 版本或另一套 linker 设置创建的，与当前正在安装的那套不一致。在该 profile 目录里运行 `pnpm install`，然后重新添加插件即可。
 
-**The totals look lower than the provider's invoice.** Three things are excluded by design and counted in the panel's provenance block rather than silently dropped: a fork's inherited prefix, which was billed under its parent; a settlement still streaming, whose usage is not final; and any log that could not be read. Routes that matched no rate card are priced at the fallback rate and named in the warning line.
+**总量看起来低于 provider 的账单。** 有三类内容按设计排除，并且会在面板的来源区块里计数，而不是被悄悄丢掉：fork 继承的前缀（已在父会话计费）、仍在流式输出、用量尚未最终确定的结算，以及任何无法读取的日志。没有命中价目表的路由按回退费率计价，并在提示行中点名。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
-### The Host fold
+<a id="host-fold"></a>
+### Host 折叠
 
-The Host half enumerates sessions through `ctx.sessionQuery.listSessions()`, which reads no event logs, then reads the logs it has not folded yet down one of two paths: the engine's batch projection when the mounted build offers one, and the per-session exact read for a log carrying a fork-inherited prefix, whose length only that read reports. Reading is the expensive half and folding is not, so the cache stores each session's extracted samples — not a finished report — and every call re-prices them against the configuration and the reader's overrides in effect at that moment; changing a price therefore takes effect without re-reading a single log. A session's entry is dropped the moment it records another event, and a request may force a full re-read.
+Host 半通过 `ctx.sessionQuery.listSessions()` 枚举会话，该调用不读取任何事件日志；随后对尚未折叠的日志走两条读取路径之一：挂载的构建提供批量投影时走投影，而带 fork 继承前缀的日志走逐会话精确读取，因为只有那条路径会报告前缀长度。读取是昂贵的一半、折叠不是，因此缓存保存的是每个会话抽取出的样本而非成品报告，每次调用都以当时的配置与读者覆盖重新计价；于是改一个价格无需重读任何日志即可生效。会话一旦记录新事件，其缓存条目立即失效，请求也可以强制全量重读。
 
-Two routes reach that fold: `GET /api/dsh-local-usage/report` answers with a report for a window, and `POST /api/dsh-local-usage/pricing` writes the per-route override table. The write is validated field by field before it is stored, because the file it lands in is what every later report is priced with, and it is the plugin's only durable state.
+这份缓存还能跨进程存活。第二层缓存以「会话 id + 该日志自身的变更令牌」为键，写在 `<DSH_HOME>/local-usage/fold-cache.json`：令牌是持久层的 `revision`，由文件的 device、inode、大小与纳秒级时间戳构成，因此只要 revision 仍然一致，这份折叠就正是磁盘上那串字节的折叠，日志根本不会被打开。在开发者自己的语料上——65 个会话、压缩后 71 MiB、51000 个 zstd 帧、解压后 310 MiB——冷读要花约 2.3 秒做解码与折叠；而缓存文档是 2.5 MiB，读回来约 4 毫秒。revision 变了、或后端不再列出的日志，都只是一次未命中，代价仅仅是它本来要省掉的那次读取。最后活动时间早于 400 天的条目会在写入时被丢弃，因此文件规模被面板 52 周窗口够得着的范围所界定；而一个回溯得比这条水位线更远的请求，会走全新读取，而不是去用一份可能已经把它裁掉的缓存。文件里只有样本与可靠性计数——没有任何消息正文、没有任何提示词文本。缓存两个方向都是可选的：没有挂载持久化后端的部署拿不到 revision，于是什么都不会被复用，面板行为与这份缓存存在之前完全一致。
 
-A forked session's log begins with its parent's inherited prefix and those turns were already billed under the parent, so only the events at or after the snapshot's `inheritedEventCount` are folded. Session titles are folded from the complete log, inherited prefix included, because a title is a fact about the conversation rather than about its billing.
+到达这次折叠的有三条路由：`GET /api/dsh-local-usage/report` 按窗口给出报告，`GET /api/dsh-local-usage/progress` 给出正在进行的读取的进度，`POST /api/dsh-local-usage/pricing` 写入按路由的覆盖表。写入在落盘前逐字段校验，因为它落到的那个文件正是之后每一份报告的计价依据。进度单独成一条路由而不是把报告做成流式，是因为报告是浏览器整体解析的一份 JSON 文档，而缓冲了流式响应体的载体丢掉的恰恰就是正在推的进度。
 
-### The page
+fork 会话的日志以父会话的继承前缀开头，而那些 Turn 已在父会话计费，因此只折叠 `inheritedEventCount` 及其之后的事件。会话标题仍从完整日志折叠（含继承前缀），因为标题是关于对话本身的事实，而非关于计费。
 
-The browser half contributes a global panel: one `sidebar.panellist` entry sharing its id with one `main` keyed-slot occupant, so the sidebar owns the button and the frame owns the column. Because a global panel is retained rather than remounted, the panel reads `usePanelInfo` and only reads logs while it is the selected one. It reaches the Host over the one Fetch route the Host half registers, so this half holds no fold logic and no pricing — and the package needs no place in the product's Remote assembly. There is no charting library in this product and adding one is out of bounds, so the calendar is a CSS grid of cells shaded with `color-mix` over a semantic theme token.
+### 页面
 
-The day page is the panel's own second view, not a route: the panel holds the open day and fetches that day's report over the same route with a one-day window, which the Host answers by re-pricing the samples it already cached. The day's report is held in its own state so a slow fold never blanks the calendar behind it, and the per-directory rows the page renders are folded by the same function that folds the year — the only difference between the two is the window.
+浏览器半边贡献一个全局面板：一个 `sidebar.panellist` 条目与一个 `main` 键控槽占用者共享同一个 id，于是侧栏拥有按钮、框架拥有主列。由于全局面板是被保留而非重新挂载的，面板会读取 `usePanelInfo`，并且只在自己被选中时才读取日志。它只通过 Host 半边注册的那一个 Fetch 路由触达 Host，因此这半边不含任何折叠或定价逻辑，本包也不需要出现在产品的 Remote 装配中。本产品没有图表库、引入图表库也超出边界，因此日历是用 CSS grid 单元格在语义主题 token 上以 `color-mix` 着色实现的。
 
-The locale reaches the panel through the plugin's own injected face rather than a second subscription: the renderer re-derives each entry's dictionary function from the locale revision, so a language switch already re-renders the panel, and the injected `locale()` reading the service during render is therefore always the id the dictionary beside it was resolved from. Formatters are cached per `(locale, currency, digits)` and a rejected construction is cached as absent, which is what keeps a misconfigured currency code from throwing on every render.
+详情页是面板自己的第二个视图，而非一条路由：面板持有当前打开的日期，并用同一条路由以一天的窗口取回那天的报告，Host 则以「对已缓存样本重新计价」作答。那天的报告单独持有状态，因此一次较慢的折叠不会让背后的日历变空白；而页面渲染的按目录行，与折叠整年的是同一个函数——两者唯一的差别就是窗口。
+
+语言经由插件自己的 injected face 抵达面板，而不是再开一份订阅：渲染器会按 locale 版本号重新推导每个条目的字典函数，所以切换语言本身已经会让面板重渲染，注入的 `locale()` 在渲染期读取服务，读到的必然就是旁边那句文案所用的同一个 id。格式化器按 `(locale, currency, digits)` 缓存，构造失败的会以「不存在」缓存下来——这正是让配错的货币码不会每次渲染都抛异常的原因。
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 延伸阅读
 
-The subsystems below are DeepSeek Harness packages this one reads from, mirrors, or installs through. Each link points into the harness repository, because this package ships standalone and no longer sits inside that tree.
+以下子系统是本包读取、镜像或据以安装的 DeepSeek Harness 包。由于本包独立发布、已不在那棵源码树内，链接一律指向 Harness 仓库。
 
-- [Session query](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/session-query/session-query/README.md) — the cold-read engine the Host half enumerates and reads through.
-- [Token meter](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/token-meter/README.md) — the durable `tokenUsage` projection whose settlement and retry semantics this package's extractor mirrors.
-- [Session projection cache](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/session/session-projection-cache/README.md) — the durable per-session projection store, the zero-I/O alternative to reading logs.
-- [Package and install a plugin](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.md) — the bundle and profile model this package installs through.
+- [Session query](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/session-query/session-query/README.zh.md) —— Host 半边用于枚举与读取的冷读引擎。
+- [Token meter](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/token-meter/README.zh.md) —— 本包提取器所镜像的持久 `tokenUsage` 投影，及其结算与重试语义。
+- [Session projection cache](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/session/session-projection-cache/README.zh.md) —— 持久化的按会话投影存储，读取日志之外的零 I/O 方案。
+- [打包与安装插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md) —— 本包据以安装的 bundle 与 profile 模型。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the package reads durable session logs and renders a browser page; it adds no model-visible content and makes no model call.
+无。本包读取持久会话日志并渲染浏览器页面，不添加任何模型可见内容，也不发起模型调用。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；本包既不组装也不发送 provider 请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与待办
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits define what the page can report; they are current package constraints.
+这些限制界定了页面能报告什么；它们是本包当前的约束。
 
-- **Prices are configuration, not billing** — the harness records tokens and never currency, so every money figure is `tokens × configured rate`; a route with no matching card is priced at the fallback rate and named in the page's warning line rather than silently estimated.
-- **An override names one route, exactly** — the editor keys on the `provider/model` string the log recorded, so an aggregator that renames a route needs a new entry, and there is no wildcard form. The editor lists the routes the *current window* recorded; an override for a route that has stopped being used stays in `pricing.json` and comes back the next time the route appears.
-- **The rate editor is not a price list you can plan from** — it edits what this machine bills at, and it is deliberately add-free: there is no way to declare a route that has never been used, and no place to keep a provider's catalogue.
-- **Chinese public holidays are not modelled** — peak windows follow the published Beijing-time schedule for Monday through Friday, so a holiday weekday inside a window is billed at the peak rate.
-- **Two locales are shipped** — Chinese and English. A third language registered by a language pack resolves key-by-key through English, so it renders an English sentence until that pack also registers a `usage` dictionary. Copy is bilingual; the figures are not, because a locale with no `Intl` data behind it silently renders the default locale's numbers.
-- **The language is the harness's, not the panel's** — there is no per-panel language selection. A reader who wants Chinese figures on an English harness has to change the harness's language, which changes every surface rather than this one.
-- **A settlement still streaming contributes nothing** — its usage is not final and a later settlement may replace it, so the newest exchange of a running session appears only once it settles.
-- **Inherited fork prefixes are excluded by design** — a forked session reports only the spend it caused itself, so per-session figures cannot be summed to reconstruct what a parent conversation cost in total.
-- **The calendar shows one rolling window only** — a deployment that needs an arbitrary date range has no control for it yet, because the panel fixes the frame at mount.
-- **A project is a working directory, not a repository** — spend is attributed to the directory a session was created in, so two checkouts of one repository are two rows, a session stays with the directory it started in even if it moved, and the day page does not drill below the directory to individual sessions.
-- **The report still carries a per-model row the page no longer renders** — the weighted route ranking was removed from the page as a first pass, and the per-session row is carried for the day page's future use; both stay in the wire contract until a surface wants them again.
+- **价格是配置，不是账单** —— Harness 只记录 token、从不记录货币，因此每个金额都是 `token × 配置费率`；没有命中价目的路由按回退费率计价，并在页面的提示行中点名，而不是被悄悄估算。
+- **覆盖精确对应一条路由** —— 编辑器以日志记录的 `provider/model` 字符串为键，因此聚合商改一次路由名就需要新增一条，也没有通配形式。编辑器列出的是**日历已经读过的那一年**出现过的路由；某条路由不再使用后它的覆盖会留在 `pricing.json` 里，下次该路由出现时重新生效。如果一个窗口完全没有出现过路由，这一节会保留并明说，而不是让读者怀疑这个功能是否还在。
+- **费率编辑器不是一份可用于规划的价目表** —— 它编辑的是本机按什么价计费，并且刻意不能新增：无法声明一条从未使用过的路由，也没有地方保存 provider 的完整价目。
+- **未建模中国法定节假日** —— 高峰时段遵循官方公布的北京时间周一至周五时段，因此窗口内的节假日工作日会按高峰计价。
+- **只随包发布两种语言** —— 中文与英文。语言包注册的第三种语言会按键逐条回退到英文，因此在该语言包同时注册 `usage` 字典之前，它渲染出来是英文句子。文案是双语的，数字则不是——一门背后没有 `Intl` 数据的语言会静默地渲染成默认语言的数字。
+- **语言是 harness 的，不是面板的** —— 面板没有自己的语言选择。想在英文 harness 上看到中文数字的读者必须改 harness 的语言，而那会改变所有界面，不只是这一个。
+- **仍在流式输出的结算不贡献数字** —— 其用量尚未最终确定，后续结算仍可能替换它，因此运行中会话的最新一轮交换只有结算后才出现。
+- **按设计排除 fork 继承前缀** —— fork 会话只报告它自身造成的花费，因此按会话的统计不能相加来还原父对话的总花费。
+- **日历只展示一个滚动窗口** —— 面板在挂载时固定画框，因此需要任意日期区间的部署目前还没有切换控件。
+- **「项目」是工作目录，不是仓库** —— 花费归因到会话创建时所在的目录，因此同一个仓库的两份检出会算作两行，会话即使中途切换目录也仍留在它起始的那个目录下，而且详情页不会下钻到单个会话。
+- **报告仍携带页面不再渲染的按模型行** —— 加权路由排行作为第一步已从页面移除，按会话行则为详情页的后续用途保留；两者都留在 wire 契约中，直到有界面需要它们。
+- **折叠缓存拿磁盘换一次冷读，仅此而已** —— 它以日志的 revision 为键，因此「数字过期」并不是它可能的失效方式；一份写不进、读不出或读不懂的缓存，代价只是下一次启动还要付它本想省掉的那次读取。它并不能免除**第一次**读取：在一台从未折叠过任何东西的机器上，第一个会话仍要为全部语料付费，**重新统计**也一样。
+- **保留期会丢掉面板已经问不到的东西** —— 最后活动时间超过 400 天的条目会在写入时移除，因为日历只跨 52 周、没有任何区间能回溯到一年以上。完全没有记录过活动的会话无法定年，因此会被保留：它只有几百字节，而且恰恰是它省下一次读取。
 
 <a id="dev-note"></a>
 <a id="development"></a>
-## Development
+## 开发
 
-### Prerequisites
+### 前置条件
 
-Node 22 and pnpm, plus a **DeepSeek Harness source checkout**. The `@deepseek-ai/*` packages this plugin compiles and tests against are workspace packages of the harness: the release candidates on npm resolve `@deepseek-ai/dsh-type-meta`, which is not on the registry, so a checkout is the only way to obtain them.
+Node 22 与 pnpm，外加一份 **DeepSeek Harness 源码检出**。本包编译与测试所依赖的 `@deepseek-ai/*` 都是 Harness 的 workspace 包：npm 上的 rc 版本会解析 `@deepseek-ai/dsh-type-meta`，而它并未发布到 registry，因此只有源码检出才能拿到这些包。
 
 ```sh
 pnpm install
 pnpm run link:host -- --src /path/to/deepseek-harness
-# or: DSH_SRC=/path/to/deepseek-harness pnpm run link:host
+# 或者：DSH_SRC=/path/to/deepseek-harness pnpm run link:host
 ```
 
-`link:host` points this repo's `node_modules/@deepseek-ai/*` at that checkout — the harness version it linked from is printed — and its list of packages lives in `scripts/link-host-packages.mjs`. Add an entry there when a new host import appears. The links are development-only state: nothing about them is committed, and `lib/` resolves the same packages from the host process at runtime.
+`link:host` 会把本仓库的 `node_modules/@deepseek-ai/*` 指向该检出（并打印链接来源的 Harness 版本），包清单在 `scripts/link-host-packages.mjs`；新增宿主 import 时在其中补一条即可。这些链接只是开发期状态：不会被提交，而 `lib/` 在运行期从宿主进程解析同样的包。
 
-### Commands
+### 常用命令
 
-| Command | What it does |
+| 命令 | 作用 |
 |---|---|
-| `pnpm test` | the vitest suites of both halves |
-| `pnpm run typecheck` | typechecks the two halves as two programs |
-| `pnpm run build` | bundles `lib/*.js`, then emits `lib/types` |
-| `pnpm run watch` | rebuilds the bundles only, for a reload loop |
+| `pnpm test` | 运行两半的 vitest 套件 |
+| `pnpm run typecheck` | 以两个程序分别类型检查两半 |
+| `pnpm run build` | 打包 `lib/*.js`，并产出 `lib/types` |
+| `pnpm run watch` | 只重建打包产物，用于热重载循环 |
 
-There is deliberately **no `prepare` script**. `lib/` is committed, and a build script on a git dependency is exactly what forces every installer to grant the package permission to execute code at install time; dropping it is what lets an install use the committed artifact and ask for nothing. Run `pnpm run build` yourself after changing `src/` and commit the result.
+这里刻意**不提供 `prepare` 脚本**。`lib/` 已入库，而 git 依赖上的构建脚本恰恰会迫使每个安装者授予该包「在安装期执行代码」的权限；去掉它，安装才能直接使用入库产物、不索取任何权限。改动 `src/` 后请自行运行 `pnpm run build` 并提交产物。
 
-### Dev Note
+### 开发者备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>面向维护者的工作上下文 —— 点击展开</summary>
 
-The Host half and the browser half each merge the Cordis `Context` under the same keys with different services, so **one TypeScript program cannot see both**; the harness splits its own typecheck for the same reason. `tsconfig.host.json` and `tsconfig.client.json` are the two programs used by `typecheck` and by editors, and `tsconfig.host.build.json` / `tsconfig.client.build.json` are their narrow descendants that emit declarations to `lib/types` — the layout `package.json`'s `exports` points at, and the layout the harness uses for its own client packages (`rootDir: src`, `outDir: lib/types`).
+Host 半边与浏览器半边都会在相同的 key 上合并 Cordis `Context`，但服务不同，因此**同一个 TypeScript 程序无法同时看到两者**；Harness 自身也是出于同样的原因拆分类型检查。`tsconfig.host.json` 与 `tsconfig.client.json` 是 `typecheck` 与编辑器所用的两个程序，而 `tsconfig.host.build.json` / `tsconfig.client.build.json` 是它们收窄后的子集，用于把声明产出到 `lib/types` —— 这正是 `package.json` 的 `exports` 所指向的布局，也是 Harness 自身客户端包的布局（`rootDir: src`，`outDir: lib/types`）。两半各自用自己的 glob 收拢文件（`src/*.ts` 与 `tests/*.host.spec.ts`，对应 `src/client/**/*` 与 `tests/*.client.spec.ts`）而不是逐个列出：手工维护的清单正是一个新模块最终「附带发布却从未被检查」的方式，而拆分本来就是为了防止这件事。
 
-Two consequences follow:
+由此有两点需要注意：
 
-- `tsdown` bundles the JavaScript only, from the shared `tsconfig.json`. Its `dts` is off in both halves: declarations emitted there would wrap the browser bundle's module-loader banner and footer into the declaration file and break parsing, which is why the harness's own client preset disables it too.
-- Declarations exist only after `pnpm run build` (or `pnpm run build:types`), and they are committed along with the bundles because the package is distributed from git — a `lib/` built by `tsdown` alone would leave the `types` conditions in `exports` dangling.
+- `tsdown` 只打包 JavaScript，使用共享的 `tsconfig.json`。两半的 `dts` 都关闭：在那里产出的声明会把浏览器产物的 module-loader banner/footer 包进声明文件而破坏解析，Harness 自己的客户端预设也因此关闭它。
+- 声明只有在 `pnpm run build`（或 `pnpm run build:types`）之后才存在；由于本包通过 git 分发，声明与打包产物一同入库 —— 只跑 `tsdown` 会让 `exports` 里的 `types` 条件指向不存在的文件。
 
-`tsc` is invoked through the repo's own script rather than `tsc -b`: this package is out of the harness's project-reference graph, so it compiles against the checkout's built declaration files instead of its project graph.
+这里用仓库自己的脚本调用 `tsc`，而不是 `tsc -b`：本包不在 Harness 的 project reference 图内，因此它针对检出的已构建声明文件编译，而非针对该工程图。
 
-Both halves export **named members only** — never `export default apply`. A module with a default export is mounted by that default, so the plugin arrives without the module's `name` and `inject`: the fiber activates with an empty inject list, the entry dies on its first service read with `cannot get property "…" without inject`, and the panel then has no route to read from. `tests/module-shape.host.spec.ts` guards both halves against it.
+两半都**只导出具名成员**，绝不写 `export default apply`。带 default 导出的模块会以该 default 被挂载，于是插件拿不到模块的 `name` 与 `inject`：fiber 以空 inject 列表激活，entry 在第一次读取服务时即以 `cannot get property "…" without inject` 失败，面板随之没有可读取的路由。`tests/module-shape.host.spec.ts` 为两半守着这条规则。
 
 </details>
 
-**Runtime invariant:** The Host half owns one HTTP route that serves the folded report and one in-memory sample cache keyed by session id; the browser half registers one localized sidebar entry and the matching `main` panel, and reaches the Host only over that route. No companion is published, and neither half emits a Cordis event of its own.
+**Runtime invariant:** Host 半边拥有三条 HTTP 路由——折叠报告、进行中读取的进度、以及费率表写入——和两层样本缓存：一层以会话 id 为键存在内存里，一层以「会话 id + 日志 revision」为键存在磁盘上。浏览器半边注册一个本地化的侧栏条目及其对应的 `main` 面板，并且只通过这些路由访问 Host。不发布 companion，两半都不自行发出 Cordis 事件。

@@ -157,6 +157,39 @@ export interface UsageInsightsRequest {
   to?: number
 }
 
+/** Where one report assembly has got to. */
+export type UsageReadPhase =
+  /** Nothing in flight: either no read has run, or the last one settled. */
+  | 'idle'
+  /** Enumerating the stored session logs, before their count is known. */
+  | 'listing'
+  /** Folding session logs; {@link UsageInsightsProgress.done} counts them. */
+  | 'reading'
+  /** Pricing the folded samples into the report. */
+  | 'pricing'
+
+/**
+ * What the Host is doing while it assembles a report.
+ *
+ * The first read after a restart decodes every session log there is, so the
+ * panel has something honest to show instead of an empty frame: how many logs
+ * this read has folded out of how many it has to fold. A read served entirely
+ * from the Host's caches reports `total: 0` and is over before it is worth
+ * drawing.
+ */
+export interface UsageInsightsProgress {
+  /** Stage of the assembly. */
+  readonly phase: UsageReadPhase
+  /** Session logs folded so far in this read. */
+  readonly done: number
+  /** Session logs this read still has to fold; `0` while the corpus is being listed. */
+  readonly total: number
+  /** Host clock when this read began, or `0` when none has run. */
+  readonly startedAt: number
+  /** Host clock when this read settled, absent while one is running. */
+  readonly finishedAt?: number
+}
+
 /** One grouped reliability signal: a stable code and how often the window recorded it. */
 export interface UsageSignalRow {
   /**
@@ -243,7 +276,14 @@ export interface UsageInsightsReport {
   readonly unpricedRoutes: readonly string[]
   /** Token count priced at the fallback rate rather than a matched rule. */
   readonly unpricedTokens: number
-  /** Whether this report was served from the Host's in-memory fold cache. */
+  /**
+   * Whether this report was assembled without opening a session log.
+   *
+   * True when every session came from a fold the Host already had — in memory,
+   * or carried over from a previous process through its durable fold cache — so
+   * the reader knows whether the figures in front of them cost a read of the
+   * logs or a re-price of folds already taken.
+   */
   readonly cached: boolean
   /** Factor the configured rate card applies inside a peak window; `1` disables peak pricing. */
   readonly peakMultiplier: number

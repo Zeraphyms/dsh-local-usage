@@ -23,6 +23,10 @@ export declare const zh: {
     rangeYear: string;
     refresh: string;
     loading: string;
+    loadingListing: string;
+    loadingReading: string;
+    loadingPricing: string;
+    updating: string;
     error: string;
     retry: string;
     totalCost: string;
@@ -98,6 +102,7 @@ export declare const zh: {
     pricingPeakSchedule: string;
     pricingEditorTitle: string;
     pricingEditorHint: string;
+    pricingEditorEmpty: string;
     pricingRouteColumn: string;
     pricingEditInput: string;
     pricingEditCacheRead: string;
@@ -156,6 +161,10 @@ export declare const en: {
     rangeYear: string;
     refresh: string;
     loading: string;
+    loadingListing: string;
+    loadingReading: string;
+    loadingPricing: string;
+    updating: string;
     error: string;
     retry: string;
     totalCost: string;
@@ -231,6 +240,7 @@ export declare const en: {
     pricingPeakSchedule: string;
     pricingEditorTitle: string;
     pricingEditorHint: string;
+    pricingEditorEmpty: string;
     pricingRouteColumn: string;
     pricingEditInput: string;
     pricingEditCacheRead: string;

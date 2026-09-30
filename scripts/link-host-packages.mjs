@@ -42,6 +42,7 @@ const HOST_PACKAGES = {
   'cordis': 'vendor/cordis',
   'dsh-compaction': 'packages/compaction/compaction',
   'dsh-session': 'packages/core/session',
+  'dsh-session-persistence': 'packages/session/session-persistence',
   'dsh-session-query': 'packages/session-query/session-query',
   'dsh-session-title': 'packages/session/session-title',
   'dsh-llm': 'packages/llm/llm',
