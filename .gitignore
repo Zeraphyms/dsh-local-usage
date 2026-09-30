@@ -7,13 +7,10 @@ node_modules/
 # checked-in build keeps installation independent of whether the installer runs
 # dependency scripts (pnpm blocks them by default until approved).
 
-# Promo film: the pipeline and its copy are sources, everything it renders is
-# build output (hundreds of megabytes of frames) and stays out of the history.
-video/frames/
-video/probe/
-video/assets/
-video/out/
-video/film/timings.js
+# Promo film: a private production pipeline, not part of the plugin and never
+# published. It stays on the machine that renders it; everything under here —
+# pipeline sources and the hundreds of megabytes it renders alike — is local.
+video/
 
 
 # Local TTS runtime for the promo film (edge-tts); not part of the package.
