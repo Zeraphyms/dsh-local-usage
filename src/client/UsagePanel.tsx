@@ -20,7 +20,7 @@
  * @module dsh-local-usage/client/UsagePanel
  */
 
-import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -223,6 +223,72 @@ class PanelBoundary extends Component<
 }
 
 /**
+ * One report with every figure at zero.
+ *
+ * The range a reader just clicked has not been folded yet, so the panel has no
+ * figures for it — and the figures it does have belong to another range, which is
+ * a worse thing to show than nothing. Zeroing them keeps the strip's layout
+ * exactly as it was, which is why its figures are not unmounted in the first
+ * place, while stating plainly that this range's numbers are not in yet.
+ *
+ * @param report - the report of the range that was selected before this one.
+ * @returns the same report with its figures cleared.
+ */
+function zeroedOf(report: UsageInsightsReport): UsageInsightsReport {
+  return {
+    ...report,
+    totals: {
+      ...report.totals,
+      cost: 0,
+      calls: 0,
+      sessions: 0,
+      uncachedInputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    },
+    days: [],
+    models: [],
+    projects: [],
+    sessions: [],
+    unpricedRoutes: [],
+    unpricedTokens: 0,
+  }
+}
+
+/**
+ * Hold a loading state for at least `ms`, then let it go.
+ *
+ * A fold over cached samples lands in a few milliseconds, and a loading state
+ * that lives for a single frame is not a loading state: it is a flash, and a
+ * flash over a figure reads as a glitch. Showing it at once and releasing it no
+ * sooner than this is what makes a switch look like a switch.
+ *
+ * @param active - whether the underlying state is loading.
+ * @param ms - how long it must stay on screen once it has begun.
+ * @returns whether to draw the loading state.
+ */
+function useMinimumDwell(active: boolean, ms: number): boolean {
+  const [shown, setShown] = useState(active)
+  const startedAt = useRef(0)
+  useEffect(() => {
+    if (active) {
+      startedAt.current = Date.now()
+      setShown(true)
+      return
+    }
+    const remaining = ms - (Date.now() - startedAt.current)
+    if (remaining <= 0) {
+      setShown(false)
+      return
+    }
+    const timer = setTimeout(() => { setShown(false) }, remaining)
+    return () => { clearTimeout(timer) }
+  }, [active, ms])
+  return shown
+}
+
+/**
  * Render the Usage statistics panel.
  * @param props - panel runtime, dictionary, and the injected report reader.
  * @returns the panel content.
@@ -240,6 +306,14 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // The range's figures, which outlive the fold that replaces them: see
   // `summary-state.ts` for why the strip is never unmounted to show a wait.
   const [summaryState, setSummaryState] = useState<SummaryState>({ status: 'idle' })
+  // What the figure may draw. Only a report folded for the range on the selector:
+  // during a switch the previous range's series was being re-bucketed under the
+  // new range's rule — a single day's rows read as a year of months, one bucket
+  // labelled `10月` — which is a chart belonging to neither range, and the thing
+  // that made a switch look like it loaded something else first.
+  const waveSettled = summaryState.status === 'ready' && summaryState.rangeId === rangeId
+  // Held long enough to be a state rather than a flash.
+  const waveLoading = useMinimumDwell(!waveSettled, 460)
   // Retrying the range must not read the year again, so it has its own counter.
   const [summaryRequest, setSummaryRequest] = useState(0)
   // The day page: which day is open, that day's own fold, and a retry counter.
@@ -535,7 +609,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     input={{ days: [], hourly: [], range: rangeId }}
                     caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
                     loading
-                    pending={false}
                     empty={false}
                     locale={activeLocale}
                     t={t}
@@ -553,7 +626,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                 {summaryState.status === 'ready'
                   ? (
                     <SummaryStrip
-                      report={summaryState.report}
+                      report={waveSettled ? summaryState.report : zeroedOf(summaryState.report)}
                       animate={entrance}
                       stale={summaryState.slow}
                       onEntranceEnd={() => { setEntrance(false) }}
@@ -602,14 +675,13 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                  * range's water under this range's name. */}
                 <WaveChart
                   input={{
-                    days: summaryState.status === 'ready' ? summaryState.report.days : [],
-                    hourly: summaryState.status === 'ready' ? summaryState.report.hourly : [],
+                    days: waveSettled ? summaryState.report.days : [],
+                    hourly: waveSettled ? summaryState.report.hourly : [],
                     range: rangeId,
                   }}
                   caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
-                  loading={summaryState.status !== 'ready'}
-                  pending={summaryState.status === 'ready' && summaryState.pending}
-                  empty={summaryState.status === 'ready' && summaryState.report.totals.calls === 0}
+                  loading={waveLoading}
+                  empty={waveSettled && summaryState.report.totals.calls === 0}
                   locale={activeLocale}
                   t={t}
                   formatCost={money}

@@ -30,14 +30,6 @@ export interface WaveChartProps {
     readonly caption: string;
     /** Nothing to draw yet: the frame shows the tide instead of a swell. */
     readonly loading: boolean;
-    /**
-     * The swell on screen belongs to the range before this one.
-     *
-     * The panel's own convention for a fold in flight — the summary strip keeps its
-     * figures mounted and dims them rather than blinking them out — and the reason
-     * this figure does not flash a tide on every range switch.
-     */
-    readonly pending: boolean;
     /** Whether the wave has anything to draw. */
     readonly empty: boolean;
     /** Active locale id, which decides how a month bucket is named. */
@@ -51,4 +43,4 @@ export interface WaveChartProps {
  * @param props - the range's folds, its name, its state, and the formatter.
  * @returns the figure.
  */
-export declare function WaveChart({ input, caption, loading, pending, empty, locale, t, formatCost, }: WaveChartProps): ReactNode;
+export declare function WaveChart({ input, caption, loading, empty, locale, t, formatCost, }: WaveChartProps): ReactNode;

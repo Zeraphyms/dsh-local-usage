@@ -134,7 +134,6 @@ export function DayDetail({
                 input={{ days: [], hourly: [], range: 'day' }}
                 caption={t('waveHourScope')}
                 loading
-                pending={false}
                 empty={false}
                 locale={locale}
                 t={t}
@@ -203,7 +202,6 @@ function DayFigures({ report, locale, t, formatCost, formatTokens, formatInteger
         input={{ days: report.days, hourly: report.hourly, range: 'day' }}
         caption={t('waveHourScope')}
         loading={false}
-        pending={false}
         empty={totals.calls === 0}
         locale={locale}
         t={t}

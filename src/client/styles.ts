@@ -471,7 +471,7 @@ export const styles = String.raw`
  * slid by exactly one hump per cycle, so the loop has no seam. */
 .dlu-waveTide {
   fill: color-mix(in oklab, var(--dsw-alias-link) 14%, transparent);
-  animation: dlu-tide 4.2s linear infinite;
+  animation: dlu-tide 5.6s linear infinite;
 }
 
 .dlu-waveTidePath {
@@ -1901,10 +1901,6 @@ export const styles = String.raw`
 @media (prefers-reduced-motion: reduce) {
     .dlu-wavePlot {
     animation: none;
-  }
-
-  .dlu-wave[data-pending='true'] .dlu-wavePlot {
-    opacity: 1;
   }
 
   /* A tide that cannot move still has to say the wait is a wait: it holds a

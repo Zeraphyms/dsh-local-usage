@@ -56,14 +56,6 @@ export interface WaveChartProps {
   readonly caption: string
   /** Nothing to draw yet: the frame shows the tide instead of a swell. */
   readonly loading: boolean
-  /**
-   * The swell on screen belongs to the range before this one.
-   *
-   * The panel's own convention for a fold in flight — the summary strip keeps its
-   * figures mounted and dims them rather than blinking them out — and the reason
-   * this figure does not flash a tide on every range switch.
-   */
-  readonly pending: boolean
   /** Whether the wave has anything to draw. */
   readonly empty: boolean
   /** Active locale id, which decides how a month bucket is named. */
@@ -101,7 +93,7 @@ function swellPath(points: readonly { x: number; y: number }[]): string {
  * @returns the figure.
  */
 export function WaveChart({
-  input, caption, loading, pending, empty, locale, t, formatCost,
+  input, caption, loading, empty, locale, t, formatCost,
 }: WaveChartProps): ReactNode {
   const points = useMemo(
     () => waveSeries(input, locale.toLowerCase().startsWith('zh')),
@@ -143,7 +135,7 @@ export function WaveChart({
   const total = points.reduce((sum, point) => sum + point.cost, 0)
 
   return (
-    <figure className={css.wave} aria-label={t('waveTitle')} data-pending={pending}>
+    <figure className={css.wave} aria-label={t('waveTitle')}>
       <figcaption className={css.waveCaption}>
         <span className={css.waveTitle}>{t('waveTitle')}</span>
         <span className={css.waveScope}>{caption}</span>
