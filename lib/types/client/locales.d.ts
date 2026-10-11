@@ -54,6 +54,8 @@ export declare const zh: {
     causeServer: string;
     causeUnknown: string;
     calendar: string;
+    waveTitle: string;
+    wavePeak: string;
     calendarHint: string;
     calendarWindow: string;
     legendLess: string;
@@ -230,6 +232,8 @@ export declare const en: {
     causeServer: string;
     causeUnknown: string;
     calendar: string;
+    waveTitle: string;
+    wavePeak: string;
     calendarHint: string;
     calendarWindow: string;
     legendLess: string;

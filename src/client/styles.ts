@@ -340,6 +340,126 @@ export const styles = String.raw`
   font-weight: 400;
 }
 
+/* ── The range's wave ─────────────────────────────────────────────────── */
+
+/* The range's own shape, under the calendar: the calendar answers a year, this
+ * answers the window the reader selected. */
+.dlu-wave {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 20px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 16px;
+}
+
+.dlu-waveCaption {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+}
+
+.dlu-waveTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-waveScope {
+  font-size: 11.5px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-waveTotal {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* The drawing's box. Fixed height so a window with one point and a window with
+ * three hundred are the same figure, and the page does not resize as ranges
+ * change. */
+.dlu-waveFrame {
+  position: relative;
+  block-size: 132px;
+}
+
+.dlu-waveSvg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+/* The fill travels with the theme: the brand blue mixed into the page, dark at
+ * the crest and dissolving into the surface at the baseline. */
+.dlu-waveStopTop {
+  stop-color: var(--dsw-alias-link);
+  stop-opacity: 0.42;
+}
+
+.dlu-waveStopBottom {
+  stop-color: var(--dsw-alias-link);
+  stop-opacity: 0.04;
+}
+
+.dlu-waveLine {
+  fill: none;
+  stroke: var(--dsw-alias-link);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dlu-waveEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-waveAxis {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-caption);
+}
+
+.dlu-wavePeak {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* The tide: the loading state's own water. Three humps tiled across a width and
+ * slid by exactly one hump per cycle, so the loop has no seam. */
+.dlu-waveTide {
+  fill: color-mix(in oklab, var(--dsw-alias-link) 14%, transparent);
+  animation: dlu-tide 4.2s linear infinite;
+}
+
+.dlu-waveTidePath {
+  stroke: none;
+}
+
+@keyframes dlu-tide {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-333px);
+  }
+}
+
 /* ── The range's detail view ──────────────────────────────────────────── */
 
 /* A page rather than a figure: the front panel states the range, this one takes
@@ -1747,6 +1867,13 @@ export const styles = String.raw`
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* A tide that cannot move still has to say the wait is a wait: it holds a
+   * still surface at the waterline instead of sliding. */
+  .dlu-waveTide {
+    animation: none;
+    fill: color-mix(in oklab, var(--dsw-alias-link) 10%, transparent);
+  }
+
   .dlu-cell,
   .dlu-range,
   .dlu-loadingFill,

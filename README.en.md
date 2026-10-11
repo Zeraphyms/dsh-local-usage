@@ -20,7 +20,6 @@ It is deliberately not a Settings page: a year of days needs the main column's w
 What the panel gives you, in one place:
 
 - **A rolling-year calendar** of daily spend — 52 weeks ending with the current one, shaded by a quantile ramp over the window's active days, with a hover card per day.
-- **A detail page one level down** — attribution (by route, and the dearest sessions), what the bill is made of (peak premium, cache savings, averages), when it went (by day, by hour, by weekday), and a CSV export: kept off the front page rather than added to it.
 - **A first read that shows its work** — the panel's own frame, drawn empty while the logs are folded, with the count of session logs read so far where the Host can state it, and the figures counting up once when they land.
 - **Folds that survive a restart** — what has already been folded is cached on disk against each log's own change token, so relaunching dsh redraws the year from a 2.5 MiB file instead of re-decoding every session log.
 - **A page per day** — clicking any cell opens that day on its own page: its totals, and how much of them each working directory produced.
@@ -72,11 +71,6 @@ The first request of a session is the slow one, because it has to read and fold 
 
 The range selector chooses the lens: **Today**, **Last 7 days**, **This month**, **This quarter**, or **This year**. Every range ends with today, so "this month" means the month so far rather than a completed calendar month. **Today is the default**, because the question the panel is usually opened with is what the current session has cost so far.
 
-![The detail page: the comparison against the window before it, what the bill is made of, attribution by route, the window by day / hour / weekday, the dearest sessions, and a CSV export](https://raw.githubusercontent.com/webxiaobaiyu-droid/dsh-local-usage/main/docs/breakdown.en.png)
-
-*What **Breakdown** in the header opens: the comparison, the bill's composition, attribution by route, when it went, the dearest sessions, and an export.*
-
-**The detail page.** The front page answers what a range cost; the questions that raises — which model, at what hour, against what it cost before — are one level down. **Breakdown** in the header opens a page of its own: the comparison against the equal-length window before this one, what the peak schedule cost and what its multiplier added, what caching saved, the average call, session and active day, attribution by route, the shape of the window by day and by hour (Beijing time, the clock the peak schedule is stated in) and by weekday, the dearest sessions, and the range's daily figures as CSV. Like the day page it replaces the panel's contents rather than floating over them, so none of it takes a block out of the front page.
 
 Changing the range never moves the page. The figures already on screen stay mounted while the new range is folded and are then replaced in place, so the strip keeps its height and the calendar below it keeps its position; a fold that takes longer than a moment dims those figures rather than emptying them, and the ranking says *Updating…* instead of naming a window the reader has already left. A range fold is a re-price over samples the Host already holds, so the wait this hides is usually a frame or two — and the day page draws its own frame the same way, at the height of the figures about to arrive.
 
@@ -90,7 +84,7 @@ The calendar is the stable frame: it is Sunday-first with a one-glyph weekday gu
 
 Shading is a quantile ramp over the window's active days — median, then 75th and 90th percentiles — so the scale adapts to how the profile actually spends rather than assuming a distribution.
 
-Under the calendar, **Tokens by project** ranks the working directories the selected range's tokens went to: rank, project, a bar, tokens, cost and sessions, ten rows at a time, with the rest one click away. The bar is a share of the *leader* rather than of the total, so the ranking stays readable when one project dominates. This list follows the range selector — switching to **Last 7 days** re-ranks the same week the tiles above are reporting.
+Under the calendar, **Spend over time**: one blue swell drawing the shape of the selected range. Its buckets follow the window — **Today** is 24 hours (Beijing time), **Last 7 days** and **This month** are days, **This quarter** is weeks, and **This year** is months — because drawing a year as 365 hairlines, or a day as 24 bars, is the same mistake in opposite directions. While the fold runs it shows a moving tide rather than the previous range's water, so what is on the chart always belongs to the range named above it.
 
 ### The day page
 
@@ -245,7 +239,7 @@ These limits define what the page can report; they are current package constrain
 - **Inherited fork prefixes are excluded by design** — a forked session reports only the spend it caused itself, so per-session figures cannot be summed to reconstruct what a parent conversation cost in total.
 - **The calendar shows one rolling window only** — a deployment that needs an arbitrary date range has no control for it yet, because the panel fixes the frame at mount.
 - **A project is a working directory, not a repository** — spend is attributed to the directory a session was created in, so two checkouts of one repository are two rows, and a session stays with the directory it started in even if it moved. The day page opens a directory onto the sessions that ran there that day, and goes no deeper: a single request is a resolution the folded samples do not carry.
-- **The per-route and per-session rows both have a surface now** — they used to sit in the wire contract unrendered (the weighted route ranking had been taken off the page as a first pass); the detail page draws them, attributing by `models` and listing the dearest sessions from `sessions`, titles included.
+- **The report carries rows and readings no surface draws yet** — the weighted route ranking was taken off the page, the per-route and per-session rows stay in the wire contract, and `peak`, `cache` and `previous` were folded for a page that is no longer there. All of them are by-products of a fold the Host already runs, so a surface that wants them needs no new pass over the logs.
 - **The fold cache trades disk for a cold read, and only that** — it is keyed by the stored log's revision, so a stale figure is not a failure mode it has; a cache that cannot be written, read or understood costs the next start the read it was meant to save and nothing else. What it does not do is bound the *first* read: the first session on a machine that has never folded anything still pays for the whole corpus, and so does **Recount**.
 - **Retention drops what the panel can no longer ask for** — entries whose last recorded activity is more than 400 days old are removed on write, because the calendar spans 52 weeks and no range reaches past a year. A session that recorded nothing at all is undatable and is kept, since it is a couple of hundred bytes and it is exactly the entry that saves a read.
 

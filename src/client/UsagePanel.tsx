@@ -31,7 +31,6 @@ import type {
   UsagePricingResult,
   UsagePricingUpdate,
 } from '../types.ts'
-import { BreakdownPage } from './BreakdownPage.tsx'
 import { CalendarHeatmap } from './CalendarHeatmap.tsx'
 import { cacheHitRate } from './cache-rate.ts'
 import { useEntrance } from './count-up.ts'
@@ -40,7 +39,6 @@ import { DataSourceNotes } from './DataSourceNotes.tsx'
 import { PanelSkeleton, SummarySkeleton } from './PanelSkeleton.tsx'
 import { Popover, RateIcon, SourceIcon } from './Popover.tsx'
 import { PricingNotes } from './PricingNotes.tsx'
-import { DEFAULT_RANKING_LIMIT, ProjectRanking } from './ProjectRanking.tsx'
 import { ReliabilityNotes } from './ReliabilityNotes.tsx'
 import {
   summaryFailed,
@@ -51,6 +49,7 @@ import {
 } from './summary-state.ts'
 import type { SummaryState } from './summary-state.ts'
 import { Tile } from './Tile.tsx'
+import { WaveChart } from './WaveChart.tsx'
 import { dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
 import { tokensOf } from './tokens.ts'
 import { figureRoom, formatCost, formatDay, formatInteger, formatPercent, formatTokens } from './format.ts'
@@ -246,10 +245,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   const [summaryRequest, setSummaryRequest] = useState(0)
   // The day page: which day is open, that day's own fold, and a retry counter.
   const [selectedDay, setSelectedDay] = useState<string | undefined>(undefined)
-  // The range's detail view. A page rather than a panel section: the front page
-  // is already as full as it should be, and everything this page adds is
-  // something a reader goes looking for rather than something to pass on the way.
-  const [showBreakdown, setShowBreakdown] = useState(false)
   const [dayState, setDayState] = useState<DayState>({ status: 'idle' })
   const [dayRequest, setDayRequest] = useState(0)
   // Bumped after a rate write, so every view re-prices against the new table
@@ -403,9 +398,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     setPricingRevision(value => value + 1)
   }, [saveRates])
 
-  const rangeLabel = (id: string): string =>
-    t(RANGES.find(candidate => candidate.id === id)?.key ?? 'rangeMonth')
-
   const gridDays = gridState.status === 'ready' ? gridState.report.days : []
   // The year's report, which the two header panels are read from; absent until
   // the read lands, and the only thing that gates their controls.
@@ -445,20 +437,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
               setSelectedDay(undefined)
             }}
           />
-        ) : showBreakdown ? (
-          <BreakdownPage
-            report={summaryState.status === 'ready' ? summaryState.report : undefined}
-            failed={summaryState.status === 'error'}
-            rangeLabel={rangeLabel(summaryState.status === 'ready' ? summaryState.rangeId : rangeId)}
-            t={t}
-            formatCost={money}
-            formatTokens={tokens}
-            formatInteger={integer}
-            formatPercent={percent}
-            formatDay={dateText}
-            onBack={() => { setShowBreakdown(false) }}
-            onRetry={() => { setSummaryRequest(value => value + 1) }}
-          />
         ) : (
           <>
             <header className={css.header}>
@@ -481,17 +459,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   ))}
                 </div>
                 <div className={css.tools}>
-                  {/* The front page states the range; this page takes it apart.
-                      It leads the row because it is navigation, where the two
-                      beside it are reference: a reader who wants more goes here,
-                      and a reader who wants the rates does not have to pass it. */}
-                  <button
-                    type="button"
-                    className={css.breakout}
-                    onClick={() => { setShowBreakdown(true) }}
-                  >
-                    {t('breakout')}
-                  </button>
                   {/* Both of these are consulted rather than read through, so
                       they live beside the figures as hover panels instead of at
                       the bottom of a column the reader has to scroll. They read
@@ -611,25 +578,24 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   {...returnDay === undefined ? {} : { focusDayOnMount: returnDay }}
                 />
 
-                {/* The ranking closes the page under the calendar: the calendar
-                 * answers *when* the spend happened, this list answers *which
-                 * project* — the question a day's figures raise the moment they
-                 * are read. It follows the range its own report was folded for,
-                 * which is the selected one except while a switch is in flight. */}
-                {summaryState.status === 'ready'
-                  ? (
-                    <ProjectRanking
-                      report={summaryState.report}
-                      rangeLabel={rangeLabel(summaryState.rangeId)}
-                      stale={summaryState.slow}
-                      limit={DEFAULT_RANKING_LIMIT}
-                      t={t}
-                      formatCost={money}
-                      formatTokens={tokens}
-                      formatInteger={integer}
-                    />
-                  )
-                  : null}
+                {/* The range's own shape, under the calendar. It reads the summary
+                 * rather than the window, so it follows the range selector; while
+                 * that fold runs it shows the tide rather than the previous
+                 * range's water under this range's name. */}
+                <WaveChart
+                  input={{
+                    days: summaryState.status === 'ready' ? summaryState.report.days : [],
+                    hourly: summaryState.status === 'ready' ? summaryState.report.hourly : [],
+                    range: rangeId,
+                  }}
+                  caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
+                  loading={summaryState.status !== 'ready' || summaryState.pending}
+                  empty={summaryState.status === 'ready' && summaryState.report.totals.calls === 0}
+                  locale={activeLocale}
+                  t={t}
+                  formatCost={money}
+                />
+
 
                 <footer className={css.notes}>
                   <ReliabilityNotes
