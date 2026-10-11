@@ -12,7 +12,7 @@
  */
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types';
 import type { PeakWindow, PriceRate, PriceRule } from './pricing.ts';
-import type { UsageInsightsReport, UsagePreviousWindow, UsageTokens } from './types.ts';
+import type { UsageInsightsReport, UsageTokens } from './types.ts';
 /** Route label used when the log attributes a settlement to no `provider/model`. */
 export declare const UNKNOWN_ROUTE = "unknown";
 /** One billed turn's exact tokens, its instant, and the route it was billed on. */
@@ -59,13 +59,6 @@ export interface ReportMeta {
     readonly unreadableSessions: number;
     /** Whether the samples came from the Host's in-memory fold cache. */
     readonly cached: boolean;
-    /**
-     * The window before the requested one, when the caller asked to compare.
-     *
-     * Folded by the caller rather than here: it needs the same sessions over a
-     * shifted window, which only the caller holds.
-     */
-    readonly previous?: UsagePreviousWindow;
 }
 /**
  * Local calendar day of one instant, as `YYYY-MM-DD`.

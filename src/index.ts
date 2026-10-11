@@ -34,7 +34,7 @@ import { createProgressTracker } from './progress.ts'
 import type { ProgressTracker } from './progress.ts'
 import { createRateStore, pricingFilePath, readRate, resolveDshHome } from './rates.ts'
 import type { RateStore } from './rates.ts'
-import type { UsageInsightsReport, UsagePreviousWindow, UsagePricingUpdate, UsageRate } from './types.ts'
+import type { UsageInsightsReport, UsagePricingUpdate, UsageRate } from './types.ts'
 
 export type * from './types.ts'
 
@@ -411,7 +411,7 @@ async function assembleReport(
   progress: ProgressTracker,
   config: UsageInsightsConfig,
   rates: RateStore,
-  request: { refresh: boolean; compare: boolean; from: number | undefined; to: number | undefined },
+  request: { refresh: boolean; from: number | undefined; to: number | undefined },
 ): Promise<UsageInsightsReport> {
   progress.begin()
   try {
@@ -533,17 +533,13 @@ async function assembleReport(
     }
 
     progress.pricing()
+    // Every contributor in the requested window: the one place a window becomes
+    // the inputs a fold prices.
     const inputs = contributors.map(({ id, fold }) => sessionInputOf(id, fold, request))
-    const options = pricingOptions(config, rates)
-    // The window before this one, when the caller wants a comparison to draw.
-    const previous = request.compare ? previousWindow(request) : undefined
-    const report = buildReport(inputs, options, {
+    const report = buildReport(inputs, pricingOptions(config, rates), {
       generatedAt: Date.now(),
       unreadableSessions: unreadable,
       cached,
-      ...previous === undefined
-        ? {}
-        : { previous: previousTotals(contributors, previous, options, unreadable) },
     })
     // Awaited, so the read this report just paid for survives a process that
     // dies before the next one starts. It is one write of a file the size of the
@@ -567,53 +563,7 @@ interface Contributor {
   readonly fold: CachedSession
 }
 
-/**
- * The window immediately before one, of the same length.
- *
- * An equal-length window rather than a calendar one — last month, last year — so
- * that comparing a week with the week before it compares like with like, and so
- * that a window the panel can express always has a predecessor it can state.
- *
- * @param request - the requested window.
- * @returns `[from, to]`, or `undefined` for an unbounded window, which has no
- * predecessor to speak of.
- */
-function previousWindow(
-  request: { readonly from: number | undefined; readonly to: number | undefined },
-): { readonly from: number; readonly to: number } | undefined {
-  if (request.from === undefined || request.to === undefined) return undefined
-  const span = request.to - request.from + 1
-  if (span <= 0) return undefined
-  return { from: request.from - span, to: request.from - 1 }
-}
 
-/**
- * The totals of the window before the requested one.
- *
- * Only the totals: a comparison needs a figure to compare against, not a second
- * full report. The fold is a re-price over samples already held, which is what
- * makes asking for it cost a few milliseconds rather than another read.
- *
- * @param contributors - the sessions that contributed to the requested window.
- * @param window - the window to price.
- * @param options - the rate card and peak schedule, shared with the main report.
- * @param unreadableSessions - logs that could not be read, carried through so the
- * caller's failure count is stated once rather than twice.
- * @returns the window's bounds and totals.
- */
-function previousTotals(
-  contributors: readonly Contributor[],
-  window: { readonly from: number; readonly to: number },
-  options: PricingOptions,
-  unreadableSessions: number,
-): UsagePreviousWindow {
-  const report = buildReport(
-    contributors.map(({ id, fold }) => sessionInputOf(id, fold, window)),
-    options,
-    { generatedAt: Date.now(), unreadableSessions, cached: true },
-  )
-  return { from: window.from, to: window.to, totals: report.totals }
-}
 
 /** One line describing an error, for a log line. */
 function describe(error: unknown): string {
@@ -662,7 +612,6 @@ async function handleReport(
     if (pending !== undefined) await pending
     const report = await assembleReport(ctx, cache, folds, progress, config, rates, {
       refresh: url.searchParams.get('refresh') === '1',
-      compare: url.searchParams.get('compare') === '1',
       from: numberParam(url.searchParams, 'from'),
       to: numberParam(url.searchParams, 'to'),
     })
@@ -797,7 +746,6 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
     if (warming !== undefined) return
     warming = assembleReport(ctx, cache, folds, progress, resolved, rates, {
       refresh: false,
-      compare: false,
       from: undefined,
       to: undefined,
     }).then(

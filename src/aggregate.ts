@@ -27,7 +27,6 @@ import type {
   UsageDayRow,
   UsageInsightsReport,
   UsageModelRow,
-  UsagePreviousWindow,
   UsageProjectRow,
   UsageReliability,
   UsageRouteRate,
@@ -86,13 +85,6 @@ export interface ReportMeta {
   readonly unreadableSessions: number
   /** Whether the samples came from the Host's in-memory fold cache. */
   readonly cached: boolean
-  /**
-   * The window before the requested one, when the caller asked to compare.
-   *
-   * Folded by the caller rather than here: it needs the same sessions over a
-   * shifted window, which only the caller holds.
-   */
-  readonly previous?: UsagePreviousWindow
 }
 
 /**
@@ -491,11 +483,8 @@ export function buildReport(
   const sessionRows: UsageSessionRow[] = []
   const unpricedRoutes = new Set<string>()
   let unpricedTokens = 0
-  // The three folded-here figures the range page reads: what the peak schedule
-  // cost, what caching saved, and the shape of the day. All three fall out of the
-  // same walk, because pricing a sample already resolves its clock.
-  const peakSplit = { peakCost: 0, offPeakCost: 0, premium: 0, peakCalls: 0, offPeakCalls: 0 }
-  const cacheValue = { readCost: 0, inputCost: 0 }
+  // The shape of the day, which falls out of the same walk: pricing a sample
+  // already resolves the clock this buckets by.
   const hours: HourBucket[] = Array.from({ length: 24 }, () => ({ cost: 0, calls: 0, tokens: 0 }))
 
   for (const input of inputs) {
@@ -510,7 +499,7 @@ export function buildReport(
     for (const sample of input.samples) {
       // Resolved once and used twice: the peak test and the hour-of-day bucket
       // are the same clock reading, and constructing it per use would double the
-      // most frequent allocation in this fold.
+      // most frequent allocation in this walk.
       const beijing = beijingClock(sample.time)
       const peak = isPeakClock(beijing, options.peakWindows, options.peakWeekdaysOnly)
       const { rate, matched } = selectRate(
@@ -525,25 +514,7 @@ export function buildReport(
       firstSampleTime ??= sample.time
       lastSampleTime = sample.time
 
-      if (peak) {
-        peakSplit.peakCost += cost
-        peakSplit.peakCalls += 1
-        // The card prices linearly, so the multiplier's own share of a peak bill
-        // is that bill less the same bill at the base rates. Charged only where a
-        // multiplier is configured: a schedule with no premium reports none.
-        if (options.peakMultiplier !== 1) {
-          peakSplit.premium += cost - cost / options.peakMultiplier
-        }
-      } else {
-        peakSplit.offPeakCost += cost
-        peakSplit.offPeakCalls += 1
-      }
-
       const readTokens = sample.tokens.cacheReadTokens
-      if (readTokens > 0) {
-        cacheValue.readCost += readTokens * rate.cacheRead / 1_000_000
-        cacheValue.inputCost += readTokens * rate.input / 1_000_000
-      }
 
       const hour = hours[Math.floor(beijing.minutes / 60)]
       if (hour !== undefined) {
@@ -674,18 +645,11 @@ export function buildReport(
     routeRates,
     peakWindows: options.peakWindows.map(window => `${clock(window.start)}-${clock(window.end)}`),
     peakWeekdaysOnly: options.peakWeekdaysOnly,
-    peak: peakSplit,
-    cache: {
-      readCost: cacheValue.readCost,
-      inputCost: cacheValue.inputCost,
-      saved: cacheValue.inputCost - cacheValue.readCost,
-    },
     hourly: hours.map((bucket, hour) => ({
       hour,
       cost: bucket.cost,
       calls: bucket.calls,
       tokens: bucket.tokens,
     })),
-    ...meta.previous === undefined ? {} : { previous: meta.previous },
   }
 }

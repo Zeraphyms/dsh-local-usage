@@ -26,24 +26,6 @@ export type WireReport =
 const NO_RATE: UsagePriceRow = { match: '', input: 0, cacheRead: 0, cacheWrite: 0, output: 0 }
 
 /**
- * A peak split from a Host that did not fold one.
- *
- * Zero calls is the signal, not zero money: the range page drops the whole block
- * on `peakCalls === 0`, so a window with nothing in it and a Host that predates
- * the fold both say nothing rather than claiming a window was billed off-peak.
- */
-const NO_PEAK: UsageInsightsReport['peak'] = {
-  peakCost: 0,
-  offPeakCost: 0,
-  premium: 0,
-  peakCalls: 0,
-  offPeakCalls: 0,
-}
-
-/** What caching was worth, from a Host that did not fold one. */
-const NO_CACHE: UsageInsightsReport['cache'] = { readCost: 0, inputCost: 0, saved: 0 }
-
-/**
  * Fill every field the panel reads with a safe default.
  * @param value - the report as received.
  * @returns a report whose declared fields are all present.
@@ -70,13 +52,9 @@ export function normalizeReport(value: WireReport): UsageInsightsReport {
     fallbackPrice: value.fallbackPrice ?? NO_RATE,
     peakWindows: value.peakWindows ?? [],
     peakWeekdaysOnly: value.peakWeekdaysOnly ?? true,
-    // The three folds the range page reads, each defaulted so the page stays
-    // total over a report from a Host that has not learned them yet. An empty
-    // hour list is absence, which the page draws as no profile at all rather
-    // than as a day of zeroes.
-    peak: value.peak ?? NO_PEAK,
-    cache: value.cache ?? NO_CACHE,
+    // The wave's own fold, defaulted so the figure stays total over a report from
+    // a Host that has not learned it yet: an empty hour list is absence, which the
+    // wave draws as no profile rather than as a day of zeroes.
     hourly: value.hourly ?? [],
-    ...value.previous === undefined ? {} : { previous: value.previous },
   }
 }

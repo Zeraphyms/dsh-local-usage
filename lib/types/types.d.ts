@@ -136,13 +136,6 @@ export interface UsagePricingResult {
 export interface UsageInsightsRequest {
     /** Discard the per-session fold cache and re-read every log. */
     refresh?: boolean;
-    /**
-     * Price the window immediately before the requested one as well.
-     *
-     * Its totals come back as {@link UsageInsightsReport.previous}; the fold is a
-     * re-price over samples already held, so this costs no extra read.
-     */
-    compare?: boolean;
     /** Inclusive lower bound on a turn's settlement time, in Unix epoch milliseconds. */
     from?: number;
     /** Inclusive upper bound on a turn's settlement time, in Unix epoch milliseconds. */
@@ -220,47 +213,6 @@ export interface UsageReliability {
 export declare const NO_RELIABILITY: UsageReliability;
 /** Whether a window recorded anything worth stating. */
 export declare function reliabilityIsEmpty(reliability: UsageReliability): boolean;
-/**
- * What the peak schedule did to one window's bill, in that window's currency.
- *
- * The schedule is configuration, so the interesting question is not what the
- * rate is but what it cost: a reader who can see that the multiplier took a
- * measurable amount of money can decide whether to move the work.
- */
-export interface UsagePeakSplit {
-    /** Cost of the settlements billed inside a peak window. */
-    readonly peakCost: number;
-    /** Cost of the settlements billed outside one. */
-    readonly offPeakCost: number;
-    /**
-     * What the peak multiplier added on top of the base rates.
-     *
-     * The difference between what the window paid and what the same tokens would
-     * have cost at the off-peak rates. It is exact rather than estimated: a rate
-     * card prices linearly, so the multiplier's share of a peak bill is the peak
-     * bill less that bill divided by the multiplier.
-     */
-    readonly premium: number;
-    /** Settlements billed inside a peak window. */
-    readonly peakCalls: number;
-    /** Settlements billed outside one. */
-    readonly offPeakCalls: number;
-}
-/**
- * What provider caching was worth to one window, in money rather than percent.
- *
- * A hit rate is a quality figure; this is the quantity a reader can act on. Both
- * sides are priced with each sample's own route and peak state, so an override
- * or a peak window moves this the same way it moves the bill.
- */
-export interface UsageCacheValue {
-    /** Paid for the cache-read tokens, at each sample's own rate. */
-    readonly readCost: number;
-    /** What those same tokens would have cost at the input rate. */
-    readonly inputCost: number;
-    /** `inputCost - readCost`: what caching saved this window. */
-    readonly saved: number;
-}
 /** One hour of the day, folded over the window. */
 export interface UsageHourRow {
     /**
@@ -278,24 +230,6 @@ export interface UsageHourRow {
     readonly calls: number;
     /** Tokens of every bucket in this hour. */
     readonly tokens: number;
-}
-/**
- * The window immediately before the requested one, priced the same way.
- *
- * Present only when the caller asked to compare. It is the same length as the
- * requested window and ends where that window begins, so comparing a week with
- * the week before it is comparing like with like.
- */
-export interface UsagePreviousWindow {
-    /** Inclusive lower bound, in Unix epoch milliseconds. */
-    readonly from: number;
-    /** Inclusive upper bound, in Unix epoch milliseconds. */
-    readonly to: number;
-    /** The same totals the report states, for that window. */
-    readonly totals: UsageCosted & {
-        /** Distinct sessions that contributed usage. */
-        readonly sessions: number;
-    };
 }
 /** One complete aggregate over every readable session log. */
 export interface UsageInsightsReport {
@@ -352,10 +286,6 @@ export interface UsageInsightsReport {
     readonly peakWindows: readonly string[];
     /** Whether weekends are always billed off-peak. */
     readonly peakWeekdaysOnly: boolean;
-    /** What the peak schedule did to this window's bill. */
-    readonly peak: UsagePeakSplit;
-    /** What provider caching was worth to this window, in money. */
-    readonly cache: UsageCacheValue;
     /**
      * This window split by hour of the day, Beijing time.
      *
@@ -363,12 +293,4 @@ export interface UsageInsightsReport {
      * gaps dropped would draw a different shape than the day has.
      */
     readonly hourly: readonly UsageHourRow[];
-    /**
-     * The window immediately before this one, present only when the caller asked
-     * to compare.
-     *
-     * Left off a report folded for its own sake — the calendar's window, a day
-     * page — where the comparison would be wire nobody reads.
-     */
-    readonly previous?: UsagePreviousWindow;
 }
