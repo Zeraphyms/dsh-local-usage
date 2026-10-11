@@ -80,8 +80,15 @@ export const styles = String.raw`
 }
 
 .dlu-controls {
+  /* A row that can wrap: the range chips, the two reference buttons and the
+   * recount button are 576px of fixed content, which is wider than a narrow
+   * panel and used to push the whole page sideways instead of moving down. */
+  flex-wrap: wrap;
   display: flex;
-  flex-shrink: 0;
+  /* Not flex-shrink: 0: that let the row keep its 576px of fixed content and
+   * overhang a narrow panel instead of wrapping inside it. Free to shrink, the
+   * chips and the buttons move onto a second line as the panel narrows. */
+  min-inline-size: 0;
   gap: 10px;
   align-items: center;
 }
@@ -345,6 +352,11 @@ export const styles = String.raw`
 /* The range's own shape, under the calendar: the calendar answers a year, this
  * answers the window the reader selected. */
 .dlu-wave {
+  /* Border-box, like the rest of the app: with the default content-box the wave
+   * and the calendar came out 42px wider than the panel's content box once their
+   * own padding and border were added, and the panel — which scrolls — answered
+   * with a 21px horizontal scrollbar for a figure that fits. */
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -793,7 +805,11 @@ export const styles = String.raw`
 
 /* ── Calendar ─────────────────────────────────────────────────────────── */
 
+/* Border-box for the same reason as the wave below: the figure paints its own
+ * padding, and the panel must not grow a scrollbar for it. */
 .dlu-calendar {
+  box-sizing: border-box;
+
   /* One ramp for the whole figure, every step mixed into the page surface so
    * the whole scale travels with the theme.
    *
