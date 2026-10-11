@@ -437,6 +437,83 @@ export const styles = String.raw`
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Waiting: the logo's whale at the centre of the frame, breathing a column of
+ * water over its head. Drawn in CSS pixels rather than in the figure's own
+ * coordinates, which have no aspect ratio to keep. */
+.dlu-waveSpout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  justify-content: center;
+}
+
+.dlu-waveSpoutWhale {
+  fill: var(--dsw-alias-link);
+  transform-origin: 50% 62%;
+  animation: dlu-breath 3.6s ease-in-out infinite;
+}
+
+/* Anchored at the foot of the column — the whale's head — so the water climbs. */
+.dlu-waveSpoutJet {
+  fill: var(--dsw-alias-link);
+  transform-origin: 50% 100%;
+  animation: dlu-spout 3.6s ease-in-out infinite;
+}
+
+.dlu-waveSpoutDrop {
+  animation: dlu-drop 3.6s ease-in-out infinite;
+}
+
+/* The animal breathes, and the water answers: the column climbs with the breath
+ * and falls with it, so the two read as one motion rather than as a spinner
+ * beside a picture. */
+@keyframes dlu-breath {
+  0%, 100% {
+    transform: translateY(0) scale(0.99);
+  }
+
+  50% {
+    transform: translateY(-1.5px) scale(1.01);
+  }
+}
+
+@keyframes dlu-spout {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scaleY(0.34);
+  }
+
+  45% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  70% {
+    opacity: 0.85;
+    transform: scaleY(0.7);
+  }
+}
+
+@keyframes dlu-drop {
+  0%, 30% {
+    opacity: 0;
+    transform: translateY(2.4px);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  85%, 100% {
+    opacity: 0;
+    transform: translateY(-1.6px);
+  }
+}
+
 /* The axis names several points, not just the ends. Each label is placed on the
  * share of the width its point sits at, and the two ends are pulled inward so a
  * label under the first or last bucket stays inside the figure. */
@@ -465,27 +542,6 @@ export const styles = String.raw`
 
 .dlu-wavePeak {
   color: var(--dsw-alias-label-tertiary);
-}
-
-/* The tide: the loading state's own water. Three humps tiled across a width and
- * slid by exactly one hump per cycle, so the loop has no seam. */
-.dlu-waveTide {
-  fill: color-mix(in oklab, var(--dsw-alias-link) 14%, transparent);
-  animation: dlu-tide 5.6s linear infinite;
-}
-
-.dlu-waveTidePath {
-  stroke: none;
-}
-
-@keyframes dlu-tide {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-333px);
-  }
 }
 
 /* ── The range's detail view ──────────────────────────────────────────── */
@@ -1899,15 +1955,23 @@ export const styles = String.raw`
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dlu-wavePlot {
+  /* A spout that cannot move is still a spout: it holds the column up. */
+  .dlu-waveSpoutWhale,
+  .dlu-waveSpoutJet,
+  .dlu-waveSpoutDrop {
     animation: none;
   }
 
-  /* A tide that cannot move still has to say the wait is a wait: it holds a
-   * still surface at the waterline instead of sliding. */
-  .dlu-waveTide {
+  .dlu-waveSpoutJet {
+    opacity: 0.85;
+  }
+
+  .dlu-waveSpoutDrop {
+    opacity: 1;
+  }
+
+    .dlu-wavePlot {
     animation: none;
-    fill: color-mix(in oklab, var(--dsw-alias-link) 10%, transparent);
   }
 
   .dlu-cell,

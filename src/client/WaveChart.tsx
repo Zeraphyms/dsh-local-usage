@@ -16,6 +16,7 @@
  */
 
 import { useMemo, type ReactNode } from 'react'
+import { FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { wavePlot, waveSeries } from './wave.ts'
 import type { WaveInput } from './wave.ts'
@@ -162,15 +163,6 @@ export function WaveChart({
               <stop offset="100%" className={css.waveStopBottom} />
             </linearGradient>
           </defs>
-          {/* The tide: the same swell, drawn three times and slid across, which
-            * reads as water rather than as a spinner standing in for data. */}
-          {loading ? (
-            <g className={css.waveTide}>
-              {[0, 1, 2].map(index => (
-                <path key={index} className={css.waveTidePath} d={TIDE_PATH} transform={`translate(${String(index * 333)}, 0)`} />
-              ))}
-            </g>
-          ) : null}
           {empty || loading ? null : (
             <>
               {/* The named points, as points: a dot on the swell and a plumb line
@@ -204,6 +196,35 @@ export function WaveChart({
           )}
         </svg>
         {empty && !loading ? <p className={css.waveEmpty}>{t('noUsage')}</p> : null}
+        {/* Waiting, as the product's own animal: the logo's whale in the middle of
+          * the frame with a spout over its head, the column rising and falling on
+          * the beat of a breath. It is drawn here rather than inside the figure
+          * above because that SVG stretches to whatever width the panel has
+          * without keeping its own aspect, and a whale put through it comes out
+          * flat at every width but one. */}
+        {loading ? (
+          <span className={css.waveSpout} aria-hidden="true">
+            {/* The column stands on the whale's head and grows upward from it:
+              * its own origin is the bottom of its box, so the breath climbs
+              * instead of stretching both ways. Two drops clear its lip. Placed
+              * in the stack rather than at coordinates inside the logo's own
+              * path, where the blowhole is not a thing the geometry names. */}
+            <svg className={css.waveSpoutJet} viewBox="0 0 26 34" width="26" height="34" focusable="false">
+              <path d="M13 33.5 C9.6 24 9.9 14.5 13 5.6 C16.1 14.5 16.4 24 13 33.5 Z" />
+              <circle className={css.waveSpoutDrop} cx="8" cy="14" r="1.6" />
+              <circle className={css.waveSpoutDrop} cx="18.6" cy="10.5" r="1.2" />
+            </svg>
+            <svg
+              className={css.waveSpoutWhale}
+              viewBox={`0 0 ${String(FISH_LOGO_VIEWBOX.width)} ${String(FISH_LOGO_VIEWBOX.height)}`}
+              width="56"
+              height={(56 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
+              focusable="false"
+            >
+              <path d={FISH_LOGO_PATH} />
+            </svg>
+          </span>
+        ) : null}
       </div>
 
       {/* Always present: the row is 15px of the figure, and leaving it out while
@@ -231,11 +252,3 @@ export function WaveChart({
   )
 }
 
-/**
- * One period of the loading swell.
- *
- * A hand-written hump wide enough that three of them tile without a seam; it is
- * slid rather than morphed, because a shape that changes as it moves draws the
- * eye to the animation instead of to the fact that something is coming.
- */
-const TIDE_PATH = 'M 0 150 C 60 120, 110 120, 166 150 C 222 180, 272 180, 333 150 L 333 220 L 0 220 Z'

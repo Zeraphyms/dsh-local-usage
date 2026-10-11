@@ -40,6 +40,10 @@ export declare const css: {
     readonly wavePeak: "dlu-wavePeak";
     readonly waveScope: "dlu-waveScope";
     readonly waveStopBottom: "dlu-waveStopBottom";
+    readonly waveSpout: "dlu-waveSpout";
+    readonly waveSpoutDrop: "dlu-waveSpoutDrop";
+    readonly waveSpoutJet: "dlu-waveSpoutJet";
+    readonly waveSpoutWhale: "dlu-waveSpoutWhale";
     readonly waveStopTop: "dlu-waveStopTop";
     readonly waveNode: "dlu-waveNode";
     readonly wavePlot: "dlu-wavePlot";
@@ -47,8 +51,6 @@ export declare const css: {
     readonly waveTick: "dlu-waveTick";
     readonly waveTicks: "dlu-waveTicks";
     readonly waveSvg: "dlu-waveSvg";
-    readonly waveTide: "dlu-waveTide";
-    readonly waveTidePath: "dlu-waveTidePath";
     readonly waveTitle: "dlu-waveTitle";
     readonly waveTotal: "dlu-waveTotal";
     readonly calendar: "dlu-calendar";
