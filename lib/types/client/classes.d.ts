@@ -33,7 +33,6 @@ export declare const css: {
     readonly unpricedBadge: "dlu-unpricedBadge";
     readonly wave: "dlu-wave";
     readonly waveArea: "dlu-waveArea";
-    readonly waveAxis: "dlu-waveAxis";
     readonly waveCaption: "dlu-waveCaption";
     readonly waveEmpty: "dlu-waveEmpty";
     readonly waveFrame: "dlu-waveFrame";
@@ -42,7 +41,11 @@ export declare const css: {
     readonly waveScope: "dlu-waveScope";
     readonly waveStopBottom: "dlu-waveStopBottom";
     readonly waveStopTop: "dlu-waveStopTop";
+    readonly waveNode: "dlu-waveNode";
+    readonly waveRule: "dlu-waveRule";
     readonly waveSwimmer: "dlu-waveSwimmer";
+    readonly waveTick: "dlu-waveTick";
+    readonly waveTicks: "dlu-waveTicks";
     readonly waveWhale: "dlu-waveWhale";
     readonly waveWhaleEye: "dlu-waveWhaleEye";
     readonly waveSvg: "dlu-waveSvg";

@@ -493,14 +493,45 @@ export const styles = String.raw`
   }
 }
 
-.dlu-waveAxis {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  justify-content: space-between;
+/* The rules are drawn in the figure's own units but must stay hairlines: the
+ * viewBox has no aspect ratio, so a stroke that scaled with it would be a
+ * different weight at every panel width. */
+.dlu-waveRule {
+  stroke: var(--dsw-alias-border-l2);
+  stroke-width: 0.5;
+}
+
+/* The swell's own points, at the places the axis names. Filled with the figure's
+ * own blue rather than a second colour: they are the line, marked, not an
+ * annotation laid over it. */
+.dlu-waveNode {
+  fill: var(--dsw-alias-link);
+}
+
+/* The axis names several points, not just the ends. Each label is placed on the
+ * share of the width its point sits at, and the two ends are pulled inward so a
+ * label under the first or last bucket stays inside the figure. */
+.dlu-waveTicks {
+  position: relative;
+  block-size: 15px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-caption);
+}
+
+.dlu-waveTick {
+  position: absolute;
+  inset-block-start: 0;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.dlu-waveTick[data-edge='start'] {
+  transform: none;
+}
+
+.dlu-waveTick[data-edge='end'] {
+  transform: translateX(-100%);
 }
 
 .dlu-wavePeak {

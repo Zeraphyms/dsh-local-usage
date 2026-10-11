@@ -36,6 +36,15 @@ const VIEW_HEIGHT = 220
 /** Headroom kept above the swell, as a share of the height. */
 const CREST = 0.88
 
+/**
+ * How many points the axis names.
+ *
+ * Enough to place a swell in time, few enough that the labels never touch: a
+ * year reads as seven months named, a day as seven hours, and the ends are
+ * always two of them so the window's own bounds are on the axis.
+ */
+const MAX_TICKS = 7
+
 /** Props for the wave. */
 export interface WaveChartProps {
   /** The range's folds. */
@@ -99,6 +108,34 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
   // in. A reader who asked for less motion gets it at rest, still visible.
   const swimming = !loading && !empty
   const still = useMemo(() => prefersReducedMotion(), [])
+  // Evenly spaced over the series with both ends named: a fixed stride would
+  // leave the window's last bucket unlabelled whenever it did not divide.
+  const ticks = useMemo(() => {
+    const count = Math.min(MAX_TICKS, points.length)
+    if (count === 0) return []
+    const seen = new Set<number>()
+    const chosen: {
+      readonly index: number
+      readonly x: number
+      readonly y: number
+      readonly label: string
+      readonly cost: number
+    }[] = []
+    for (let tick = 0; tick < count; tick += 1) {
+      const index = count === 1 ? 0 : Math.round((tick * (points.length - 1)) / (count - 1))
+      const point = points[index]
+      if (point === undefined || seen.has(index)) continue
+      seen.add(index)
+      chosen.push({
+        index,
+        x: plot[index]?.x ?? 0,
+        y: plot[index]?.y ?? 0,
+        label: point.label,
+        cost: point.cost,
+      })
+    }
+    return chosen
+  }, [plot, points])
   const total = points.reduce((sum, point) => sum + point.cost, 0)
 
   return (
@@ -106,6 +143,9 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
       <figcaption className={css.waveCaption}>
         <span className={css.waveTitle}>{t('waveTitle')}</span>
         <span className={css.waveScope}>{caption}</span>
+        {empty || loading ? null : (
+          <span className={css.wavePeak}>{t('wavePeak', { cost: formatCost(peak) })}</span>
+        )}
         {empty || loading ? null : <span className={css.waveTotal}>{formatCost(total)}</span>}
       </figcaption>
 
@@ -137,6 +177,29 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
           ) : null}
           {empty || loading ? null : (
             <>
+              {/* The named points, as points: a dot on the swell and a plumb line
+                * down to the waterline. Not a grid across the figure — that would
+                * slice the one bold thing here into seven panels and read as a
+                * chart component's default chrome. This says which sample the
+                * label belongs to, and how high that sample reached. */}
+              {ticks.map(tick => (
+                <g key={tick.index}>
+                  <line
+                    className={css.waveRule}
+                    x1={tick.x * VIEW_WIDTH}
+                    x2={tick.x * VIEW_WIDTH}
+                    y1={(1 - tick.y * CREST) * VIEW_HEIGHT}
+                    y2={VIEW_HEIGHT}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <circle
+                    className={css.waveNode}
+                    cx={tick.x * VIEW_WIDTH}
+                    cy={(1 - tick.y * CREST) * VIEW_HEIGHT}
+                    r={2.6}
+                  />
+                </g>
+              ))}
               <path className={css.waveArea} d={area} fill="url(#dlu-wave-fill)" />
               <path className={css.waveLine} d={line} vectorEffect="non-scaling-stroke" />
             </>
@@ -166,10 +229,20 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
       </div>
 
       {empty || loading ? null : (
-        <div className={css.waveAxis}>
-          <span>{points[0]?.label ?? ''}</span>
-          <span className={css.wavePeak}>{t('wavePeak', { cost: formatCost(peak) })}</span>
-          <span>{points[points.length - 1]?.label ?? ''}</span>
+        <div className={css.waveTicks}>
+          {ticks.map(tick => (
+            // Positioned on the same share of the width the drawing uses, so a
+            // label sits under the point it names rather than near it.
+            <span
+              key={tick.index}
+              className={css.waveTick}
+              data-edge={tick.index === 0 ? 'start' : tick.index === points.length - 1 ? 'end' : undefined}
+              style={{ insetInlineStart: `${(tick.x * 100).toFixed(3)}%` }}
+              title={formatCost(tick.cost)}
+            >
+              {tick.label}
+            </span>
+          ))}
         </div>
       )}
     </figure>
