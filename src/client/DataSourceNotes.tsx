@@ -68,6 +68,16 @@ export function DataSourceNotes({ report, weeks, locale, t }: DataSourceNotesPro
         <Fact label={t('dataFlowLabel')}>{t('dataFlow')}</Fact>
       </dl>
       <p className={css.pricingHint}>{counts}</p>
+      {/* Which figures are estimates rather than arithmetic. It lives here, with
+        * the rest of the provenance, because it is a statement about the numbers
+        * rather than a number: a route no card matched is billed at the fallback
+        * rate, and a reader who cannot see that would read the total as an
+        * invoice. */}
+      {report.unpricedRoutes.length === 0 ? null : (
+        <p className={css.warning} role="note">
+          {t('unpriced', { list: report.unpricedRoutes.join(', ') })}
+        </p>
+      )}
     </div>
   )
 }

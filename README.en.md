@@ -26,7 +26,6 @@ What the panel gives you, in one place:
 - **Five ranges** — today, last 7 days, this month, this quarter, this year — every one of them ending today.
 - **Totals for the range** — cost, total tokens, the uncached-input, output, cache-read and cache-write buckets, the cache hit rate, billed calls, and contributing sessions.
 - **A rate card you configure** — per-model input, cache-read, cache-write and output prices, a fallback rate, and a Beijing-time peak schedule with a multiplier.
-- **A reliability statement** — under the calendar, what the window's attempts cost it: provider retries grouped by cause, tool errors as a share of tool calls, and context compactions that failed. It appears only when there is something to say.
 - **A stated basis** — the formula, the rates actually in effect, and the provenance of every figure, on the page itself rather than in documentation only.
 - **The harness's language, not a switch of its own** — every sentence comes from a dictionary and every figure is formatted for the active locale, so the Chinese panel counts in 万/亿 where the English one counts in M/B.
 - **No network egress** — the fold runs inside the dsh process over durable session logs, and what it folds stays on this machine under `<DSH_HOME>/local-usage/`; nothing is uploaded and no external request is made.

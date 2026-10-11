@@ -39,7 +39,6 @@ import { DataSourceNotes } from './DataSourceNotes.tsx'
 import { PanelSkeleton, SummarySkeleton } from './PanelSkeleton.tsx'
 import { Popover, RateIcon, SourceIcon } from './Popover.tsx'
 import { PricingNotes } from './PricingNotes.tsx'
-import { ReliabilityNotes } from './ReliabilityNotes.tsx'
 import {
   summaryFailed,
   summaryIdle,
@@ -597,19 +596,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                 />
 
 
-                <footer className={css.notes}>
-                  <ReliabilityNotes
-                    reliability={gridState.report.reliability}
-                    t={t}
-                    integer={integer}
-                    percent={percent}
-                  />
-                  {gridState.report.unpricedRoutes.length === 0 ? null : (
-                    <p className={css.warning} role="note">
-                      {t('unpriced', { list: gridState.report.unpricedRoutes.join(', ') })}
-                    </p>
-                  )}
-                </footer>
               </>
             ) : null}
           </>
