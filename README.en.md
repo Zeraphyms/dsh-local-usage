@@ -72,6 +72,10 @@ The first request of a session is the slow one, because it has to read and fold 
 
 The range selector chooses the lens: **Today**, **Last 7 days**, **This month**, **This quarter**, or **This year**. Every range ends with today, so "this month" means the month so far rather than a completed calendar month. **Today is the default**, because the question the panel is usually opened with is what the current session has cost so far.
 
+![The detail page: the comparison against the window before it, what the bill is made of, attribution by route, the window by day / hour / weekday, the dearest sessions, and a CSV export](https://raw.githubusercontent.com/webxiaobaiyu-droid/dsh-local-usage/main/docs/breakdown.en.png)
+
+*What **Breakdown** in the header opens: the comparison, the bill's composition, attribution by route, when it went, the dearest sessions, and an export.*
+
 **The detail page.** The front page answers what a range cost; the questions that raises — which model, at what hour, against what it cost before — are one level down. **Breakdown** in the header opens a page of its own: the comparison against the equal-length window before this one, what the peak schedule cost and what its multiplier added, what caching saved, the average call, session and active day, attribution by route, the shape of the window by day and by hour (Beijing time, the clock the peak schedule is stated in) and by weekday, the dearest sessions, and the range's daily figures as CSV. Like the day page it replaces the panel's contents rather than floating over them, so none of it takes a block out of the front page.
 
 Changing the range never moves the page. The figures already on screen stay mounted while the new range is folded and are then replaced in place, so the strip keeps its height and the calendar below it keeps its position; a fold that takes longer than a moment dims those figures rather than emptying them, and the ranking says *Updating…* instead of naming a window the reader has already left. A range fold is a re-price over samples the Host already holds, so the wait this hides is usually a frame or two — and the day page draws its own frame the same way, at the height of the figures about to arrive.
@@ -92,7 +96,7 @@ Under the calendar, **Tokens by project** ranks the working directories the sele
 
 ![One day's page: the day's totals and token buckets, then its spend, tokens and calls split by working directory](https://raw.githubusercontent.com/webxiaobaiyu-droid/dsh-local-usage/main/docs/day.en.png)
 
-*Opening any cell: that day's figures, and which working directories they were spent in.*
+*Opening any cell: that day's figures by working directory — and opening a directory shows the sessions that ran there that day.*
 
 Every cell is a button, so the calendar is a way in rather than only a picture of the year. Clicking one opens that day on its own page, and the keyboard reaches the same place: the grid is a single tab stop, the arrow keys walk it, `Home` and `End` jump to the ends of a week, `Enter` opens the focused day, and a screen reader gets each cell's date, cost, token count and call count as its name. The day page **replaces** the panel's contents rather than floating over it, so the calendar is never half-covered behind a card; its back control returns to the calendar and hands focus back to the cell you left from, rather than dropping you at the top of a year you would have to find it in again.
 

@@ -90,6 +90,7 @@ export declare const zh: {
     breakdownRouteNote: string;
     breakdownWhen: string;
     breakdownByDay: string;
+    breakdownDayNote: string;
     breakdownByHour: string;
     breakdownByWeekday: string;
     breakdownSessions: string;
@@ -265,6 +266,7 @@ export declare const en: {
     breakdownRouteNote: string;
     breakdownWhen: string;
     breakdownByDay: string;
+    breakdownDayNote: string;
     breakdownByHour: string;
     breakdownByWeekday: string;
     breakdownSessions: string;

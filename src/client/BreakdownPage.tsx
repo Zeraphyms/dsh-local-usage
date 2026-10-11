@@ -31,6 +31,15 @@ const WEEKDAY_SHORT_KEYS = [
 const SESSION_LIMIT = 8
 /** Routes the page lists; a corpus with more has a long tail nobody reads. */
 const ROUTE_LIMIT = 8
+/**
+ * Days the bar chart draws, newest kept.
+ *
+ * One row per day stops being readable long before a year of them: a
+ * twelve-month window would draw 365 rows and turn this page into a wall of
+ * hairlines. The calendar above already answers a year at a year's scale, so the
+ * chart states the recent stretch and says how much of the window it is showing.
+ */
+const DAY_BAR_LIMIT = 31
 
 /** Props for the detail view. */
 export interface BreakdownPageProps {
@@ -153,6 +162,9 @@ function BreakdownBody({
   const { totals, peak, cache, hourly, previous } = report
   const activeDays = report.days.length
   const hitRate = cacheHitRate(totals)
+  // The recent stretch, oldest first, plus the count the chart is not showing.
+  const dayRows = report.days.slice(-DAY_BAR_LIMIT)
+  const hiddenDays = report.days.length - dayRows.length
 
   return (
     <>
@@ -285,9 +297,15 @@ function BreakdownBody({
                 ? <p className={css.empty}>{t('noUsage')}</p>
                 : (
                   <>
-                    <p className={css.blockHint}>{t('breakdownByDay')}</p>
+                    <p className={css.blockHint}>{hiddenDays === 0
+                      ? t('breakdownByDay')
+                      : t('breakdownDayNote', {
+                        shown: formatInteger(dayRows.length),
+                        total: formatInteger(activeDays),
+                      })}
+                    </p>
                     <Bars
-                      rows={report.days}
+                      rows={dayRows}
                       value={row => row.cost}
                       label={row => row.day.slice(5)}
                       caption={row => formatCost(row.cost)}
