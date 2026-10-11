@@ -421,6 +421,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             day={selectedDay}
             report={dayState.status === 'ready' ? dayState.report : undefined}
             failed={dayState.status === 'error'}
+            locale={activeLocale}
             t={t}
             formatCost={money}
             formatTokens={tokens}
@@ -588,7 +589,8 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     range: rangeId,
                   }}
                   caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
-                  loading={summaryState.status !== 'ready' || summaryState.pending}
+                  loading={summaryState.status !== 'ready'}
+                  pending={summaryState.status === 'ready' && summaryState.pending}
                   empty={summaryState.status === 'ready' && summaryState.report.totals.calls === 0}
                   locale={activeLocale}
                   t={t}

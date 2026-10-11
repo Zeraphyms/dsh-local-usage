@@ -24,6 +24,7 @@ import type { UsageInsightsReport, UsageTokens } from '../types.ts'
 import { figureRoom } from './format.ts'
 import { projectName } from './paths.ts'
 import { cacheHitRate } from './cache-rate.ts'
+import { WaveChart } from './WaveChart.tsx'
 import { HeroSkeleton, ProjectsSkeleton, TilesSkeleton } from './PanelSkeleton.tsx'
 import { Tile } from './Tile.tsx'
 import { css } from './classes.ts'
@@ -36,6 +37,8 @@ export interface DayDetailProps {
   readonly report: UsageInsightsReport | undefined
   /** Whether the fold failed; the reader recovers through `onRetry`. */
   readonly failed: boolean
+  /** Active locale id, which the wave needs to name a month or an hour. */
+  readonly locale: string
   /** Panel translate function. */
   readonly t: PropsLocale<'usage'>['t']
   /** Currency formatter owned by the panel. */
@@ -67,7 +70,8 @@ function tokensOf(row: UsageTokens): number {
  * @returns the day view.
  */
 export function DayDetail({
-  day, report, failed, t, formatCost, formatTokens, formatInteger, formatPercent, formatDay, weekdayOf,
+  day, report, failed, locale, t,
+  formatCost, formatTokens, formatInteger, formatPercent, formatDay, weekdayOf,
   onRetry, onBack,
 }: DayDetailProps): ReactNode {
   const frame = useRef<HTMLElement>(null)
@@ -124,12 +128,25 @@ export function DayDetail({
           : (
             <>
               <TilesSkeleton />
+              {/* The day's shape, waiting: the same figure the folded page shows,
+                * so the page does not reflow when the fold lands. */}
+              <WaveChart
+                input={{ days: [], hourly: [], range: 'day' }}
+                caption={t('waveHourScope')}
+                loading
+                pending={false}
+                empty={false}
+                locale={locale}
+                t={t}
+                formatCost={formatCost}
+              />
               <ProjectsSkeleton />
             </>
           ))
         : (
           <DayFigures
             report={report}
+            locale={locale}
             t={t}
             formatCost={formatCost}
             formatTokens={formatTokens}
@@ -142,8 +159,9 @@ export function DayDetail({
 }
 
 /** The figures of a day whose report has arrived. */
-function DayFigures({ report, t, formatCost, formatTokens, formatInteger, formatPercent }: {
+function DayFigures({ report, locale, t, formatCost, formatTokens, formatInteger, formatPercent }: {
   readonly report: UsageInsightsReport
+  readonly locale: string
   readonly t: PropsLocale<'usage'>['t']
   readonly formatCost: (value: number) => string
   readonly formatTokens: (value: number) => string
@@ -177,6 +195,20 @@ function DayFigures({ report, t, formatCost, formatTokens, formatInteger, format
         <Tile value={formatInteger(totals.calls)} label={t('calls')} />
         <Tile value={formatInteger(projects.length)} label={t('projects')} />
       </div>
+
+      {/* The same figure the range page draws, on the same component: a day is
+        * just the window whose buckets are hours, and the fold that answers it —
+        * `hourly` — is already in this report. */}
+      <WaveChart
+        input={{ days: report.days, hourly: report.hourly, range: 'day' }}
+        caption={t('waveHourScope')}
+        loading={false}
+        pending={false}
+        empty={totals.calls === 0}
+        locale={locale}
+        t={t}
+        formatCost={formatCost}
+      />
 
       {totals.calls === 0
         ? <p className={css.empty}>{t('dayEmpty')}</p>

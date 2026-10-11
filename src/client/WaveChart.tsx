@@ -56,8 +56,16 @@ export interface WaveChartProps {
    * panel's dictionary and this figure has no other use for it.
    */
   readonly caption: string
-  /** Whether the range's fold is still running: the wave shows a tide instead. */
+  /** Nothing to draw yet: the frame shows the tide instead of a swell. */
   readonly loading: boolean
+  /**
+   * The swell on screen belongs to the range before this one.
+   *
+   * The panel's own convention for a fold in flight — the summary strip keeps its
+   * figures mounted and dims them rather than blinking them out — and the reason
+   * this figure does not flash a tide on every range switch.
+   */
+  readonly pending: boolean
   /** Whether the wave has anything to draw. */
   readonly empty: boolean
   /** Active locale id, which decides how a month bucket is named. */
@@ -94,7 +102,9 @@ function swellPath(points: readonly { x: number; y: number }[]): string {
  * @param props - the range's folds, its name, its state, and the formatter.
  * @returns the figure.
  */
-export function WaveChart({ input, caption, loading, empty, locale, t, formatCost }: WaveChartProps): ReactNode {
+export function WaveChart({
+  input, caption, loading, pending, empty, locale, t, formatCost,
+}: WaveChartProps): ReactNode {
   const points = useMemo(
     () => waveSeries(input, locale.toLowerCase().startsWith('zh')),
     [input, locale],
@@ -103,10 +113,17 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
   const line = swellPath(plot)
   const area = line === '' ? '' : `${line} L ${String(VIEW_WIDTH)} ${String(VIEW_HEIGHT)} L 0 ${String(VIEW_HEIGHT)} Z`
   const peak = points.reduce((best, point) => (point.cost > best ? point.cost : best), 0)
+  // Re-mounts the swell when the series changes, which is what replays its
+  // entrance: a curve that appears where the last one was reads as a jump,
+  // and this costs one fade instead.
+  const swellKey = `${points.length}:${points[0]?.label ?? ''}:${points[points.length - 1]?.label ?? ''}`
   // The whale is the product's own animal, and it swims only where there is water
   // to swim in: a loading frame and an empty window are not a picture it belongs
   // in. A reader who asked for less motion gets it at rest, still visible.
-  const swimming = !loading && !empty
+  // Alive across a switch: the whale is not part of the data, and unmounting it
+  // restarted its crossing from the left edge every time the range changed.
+  // That was the jump. It leaves only when the water does.
+  const swimming = !empty
   const still = useMemo(() => prefersReducedMotion(), [])
   // Evenly spaced over the series with both ends named: a fixed stride would
   // leave the window's last bucket unlabelled whenever it did not divide.
@@ -139,7 +156,7 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
   const total = points.reduce((sum, point) => sum + point.cost, 0)
 
   return (
-    <figure className={css.wave} aria-label={t('waveTitle')}>
+    <figure className={css.wave} aria-label={t('waveTitle')} data-pending={pending}>
       <figcaption className={css.waveCaption}>
         <span className={css.waveTitle}>{t('waveTitle')}</span>
         <span className={css.waveScope}>{caption}</span>
@@ -200,8 +217,10 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
                   />
                 </g>
               ))}
-              <path className={css.waveArea} d={area} fill="url(#dlu-wave-fill)" />
-              <path className={css.waveLine} d={line} vectorEffect="non-scaling-stroke" />
+              <g key={swellKey} className={css.wavePlot}>
+                <path className={css.waveArea} d={area} fill="url(#dlu-wave-fill)" />
+                <path className={css.waveLine} d={line} vectorEffect="non-scaling-stroke" />
+              </g>
             </>
           )}
         </svg>

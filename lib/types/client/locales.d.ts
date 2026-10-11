@@ -55,6 +55,7 @@ export declare const zh: {
     causeUnknown: string;
     calendar: string;
     waveTitle: string;
+    waveHourScope: string;
     wavePeak: string;
     calendarHint: string;
     calendarWindow: string;
@@ -233,6 +234,7 @@ export declare const en: {
     causeUnknown: string;
     calendar: string;
     waveTitle: string;
+    waveHourScope: string;
     wavePeak: string;
     calendarHint: string;
     calendarWindow: string;

@@ -42,6 +42,7 @@ export declare const css: {
     readonly waveStopBottom: "dlu-waveStopBottom";
     readonly waveStopTop: "dlu-waveStopTop";
     readonly waveNode: "dlu-waveNode";
+    readonly wavePlot: "dlu-wavePlot";
     readonly waveRule: "dlu-waveRule";
     readonly waveSwimmer: "dlu-waveSwimmer";
     readonly waveTick: "dlu-waveTick";

@@ -396,6 +396,11 @@ export const styles = String.raw`
  * three hundred are the same figure, and the page does not resize as ranges
  * change. */
 .dlu-waveFrame {
+  /* Its own size container, so the whale's crossing can be stated in the width it
+   * actually has. A percentage transform resolves against the element's *own*
+   * box — 108% of a 52px whale is 56px — which is how the crossing came out as a
+   * twitch near the left edge. */
+  container-type: inline-size;
   position: relative;
   block-size: 132px;
 }
@@ -446,7 +451,7 @@ export const styles = String.raw`
   inset-block-start: 34%;
   inset-inline-start: 0;
   display: block;
-  animation: dlu-swim 26s linear infinite;
+  animation: dlu-swim 34s linear infinite;
 }
 
 .dlu-waveWhale {
@@ -495,13 +500,41 @@ export const styles = String.raw`
   animation: none;
 }
 
-@keyframes dlu-swim {
+/* The swell's own entrance, replayed whenever the series changes: it rises into
+ * place instead of replacing the last one between two frames. */
+.dlu-wavePlot {
+  transform-origin: 50% 100%;
+  animation: dlu-swell 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes dlu-swell {
   from {
-    transform: translateX(-8%);
+    opacity: 0;
+    transform: translateY(6px) scaleY(0.94);
   }
 
   to {
-    transform: translateX(108%);
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+/* A fold in flight: the figure stays, stated as the range before this one, and
+ * says so by going quiet rather than by disappearing. */
+.dlu-wave[data-pending='true'] .dlu-wavePlot {
+  opacity: 0.4;
+  transition: opacity 180ms ease-out;
+}
+
+/* Across the water and out, then back in from the other side: the whale travels
+ * the figure's own width rather than its own. */
+@keyframes dlu-swim {
+  from {
+    transform: translateX(-14cqw);
+  }
+
+  to {
+    transform: translateX(104cqw);
   }
 }
 
@@ -1984,6 +2017,14 @@ export const styles = String.raw`
 @media (prefers-reduced-motion: reduce) {
   .dlu-waveSwimmer {
     animation: none;
+  }
+
+  .dlu-wavePlot {
+    animation: none;
+  }
+
+  .dlu-wave[data-pending='true'] .dlu-wavePlot {
+    opacity: 1;
   }
 
   /* A tide that cannot move still has to say the wait is a wait: it holds a

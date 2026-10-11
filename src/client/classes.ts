@@ -45,6 +45,7 @@ export const css = {
   waveStopBottom: 'dlu-waveStopBottom',
   waveStopTop: 'dlu-waveStopTop',
   waveNode: 'dlu-waveNode',
+  wavePlot: 'dlu-wavePlot',
   waveRule: 'dlu-waveRule',
   waveSwimmer: 'dlu-waveSwimmer',
   waveTick: 'dlu-waveTick',

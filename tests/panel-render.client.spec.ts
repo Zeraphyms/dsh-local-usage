@@ -116,12 +116,17 @@ describe('a day whose total is large', () => {
     return {
       totals: { cost, uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 1 },
       projects: [],
+      // The day page draws the day's own hour profile, so a fixture standing in
+      // for a report has to carry the fold a report carries.
+      days: [],
+      hourly: [],
       peakMultiplier: 2,
     } as unknown as UsageInsightsReport
   }
 
   it('sets an everyday total at the headline size', () => {
     const markup = renderToStaticMarkup(createElement(DayDetail, {
+      locale: 'en',
       ...dayBase,
       formatCost: (value: number) => `¥${value.toFixed(2)}`,
       report: dayReport(12.5),
@@ -133,6 +138,7 @@ describe('a day whose total is large', () => {
 
   it('steps a large total down rather than letting it widen the strip', () => {
     const markup = renderToStaticMarkup(createElement(DayDetail, {
+      locale: 'en',
       ...dayBase,
       // The formatter is the panel's; this supplies the shape a total takes in a
       // currency with no symbol configured, which is the longest one reachable.

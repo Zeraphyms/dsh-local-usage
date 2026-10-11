@@ -26,6 +26,8 @@ export interface DayDetailProps {
     readonly report: UsageInsightsReport | undefined;
     /** Whether the fold failed; the reader recovers through `onRetry`. */
     readonly failed: boolean;
+    /** Active locale id, which the wave needs to name a month or an hour. */
+    readonly locale: string;
     /** Panel translate function. */
     readonly t: PropsLocale<'usage'>['t'];
     /** Currency formatter owned by the panel. */
@@ -50,4 +52,4 @@ export interface DayDetailProps {
  * @param props - the day, its report or its absence, the formatters, and the controls.
  * @returns the day view.
  */
-export declare function DayDetail({ day, report, failed, t, formatCost, formatTokens, formatInteger, formatPercent, formatDay, weekdayOf, onRetry, onBack, }: DayDetailProps): ReactNode;
+export declare function DayDetail({ day, report, failed, locale, t, formatCost, formatTokens, formatInteger, formatPercent, formatDay, weekdayOf, onRetry, onBack, }: DayDetailProps): ReactNode;
