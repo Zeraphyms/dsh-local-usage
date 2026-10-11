@@ -209,10 +209,20 @@ export function WaveChart({
               * instead of stretching both ways. Two drops clear its lip. Placed
               * in the stack rather than at coordinates inside the logo's own
               * path, where the blowhole is not a thing the geometry names. */}
-            <svg className={css.waveSpoutJet} viewBox="0 0 26 34" width="21" height="27" focusable="false">
+            <svg className={css.waveSpoutJet} viewBox="-8 -16 42 50" width="32" height="38" focusable="false">
               <path d="M13 33.5 C9.6 24 9.9 14.5 13 5.6 C16.1 14.5 16.4 24 13 33.5 Z" />
-              <circle className={css.waveSpoutDrop} cx="8" cy="14" r="1.6" />
-              <circle className={css.waveSpoutDrop} cx="18.6" cy="10.5" r="1.2" />
+              {/* The break at the top: the column does not end in a point, it
+                * comes apart. Six drops over the tip, scaling away from it |
+                * they fan outward rather than rising as a block. */}
+              <g className={css.waveSpoutSpray}>
+                <circle cx="13" cy="-6.4" r="1.9" />
+                <circle cx="9.4" cy="-4.4" r="1.5" />
+                <circle cx="16.6" cy="-4.4" r="1.5" />
+                <circle cx="5.8" cy="-1.6" r="1.2" />
+                <circle cx="20.2" cy="-1.6" r="1.2" />
+                <circle cx="3.2" cy="-8.4" r="0.95" />
+                <circle cx="22.6" cy="-8.4" r="0.95" />
+              </g>
             </svg>
             <svg
               className={css.waveSpoutWhale}

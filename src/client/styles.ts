@@ -486,8 +486,12 @@ export const styles = String.raw`
   animation: dlu-spout 3.6s ease-in-out infinite;
 }
 
-.dlu-waveSpoutDrop {
-  animation: dlu-drop 3.6s ease-in-out infinite;
+/* Anchored at the column's tip, so a scale is the drops travelling outward from
+ * it. The breath, the column and the break are one event on one clock. */
+.dlu-waveSpoutSpray {
+  fill: var(--dsw-alias-link);
+  transform-origin: 13px 5.6px;
+  animation: dlu-spray 3.6s ease-out infinite;
 }
 
 /* The animal breathes, and the water answers: the column climbs with the breath
@@ -548,20 +552,27 @@ export const styles = String.raw`
   }
 }
 
-@keyframes dlu-drop {
-  0%, 30% {
+/* Outward and gone: the drops leave the tip as a crown and thin to nothing, so
+ * the column reads as breaking rather than as stopping. */
+@keyframes dlu-spray {
+  0%, 10% {
     opacity: 0;
-    transform: translateY(2.4px);
+    transform: scale(0.3);
   }
 
-  55% {
-    opacity: 1;
-    transform: translateY(0);
+  34% {
+    opacity: 0.95;
+    transform: scale(0.8);
   }
 
-  85%, 100% {
+  58% {
+    opacity: 0.45;
+    transform: scale(1.2);
+  }
+
+  82%, 100% {
     opacity: 0;
-    transform: translateY(-1.6px);
+    transform: scale(1.5);
   }
 }
 
@@ -2009,9 +2020,15 @@ export const styles = String.raw`
   /* A spout that cannot move is still a spout: it holds the column up. */
   .dlu-waveSpoutWhale,
   .dlu-waveSpoutJet,
-  .dlu-waveSpoutDrop,
+  .dlu-waveSpoutSpray,
   .dlu-waveSpoutRipple {
     animation: none;
+  }
+
+  /* Held mid-breath: a crown of drops over the column. */
+  .dlu-waveSpoutSpray {
+    opacity: 0.9;
+    transform: scale(0.95);
   }
 
   /* A still ring states the waterline; an invisible one states nothing. */
@@ -2024,7 +2041,6 @@ export const styles = String.raw`
     opacity: 0.85;
   }
 
-  .dlu-waveSpoutDrop {
     opacity: 1;
   }
 
