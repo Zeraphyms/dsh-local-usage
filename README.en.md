@@ -13,6 +13,10 @@ kind: "package-reference"
 
 It is deliberately not a Settings page: a year of days needs the main column's width to fit without horizontal scrolling, and what a profile has spent is not a preference.
 
+![The usage panel: total spend and seven token tiles, a rolling year of spending as a heatmap, tokens ranked by project, and what the window's attempts cost it](https://raw.githubusercontent.com/webxiaobaiyu-droid/dsh-local-usage/main/docs/panel.en.png)
+
+*What opening the panel looks like: the range's figures, a year of 52 weeks as one cell per day, tokens ranked by project, and what the window's attempts cost it. The corpus shown is a demo.*
+
 What the panel gives you, in one place:
 
 - **A rolling-year calendar** of daily spend — 52 weeks ending with the current one, shaded by a quantile ramp over the window's active days, with a hover card per day.
@@ -83,6 +87,10 @@ Under the calendar, **Tokens by project** ranks the working directories the sele
 
 ### The day page
 
+![One day's page: the day's totals and token buckets, then its spend, tokens and calls split by working directory](https://raw.githubusercontent.com/webxiaobaiyu-droid/dsh-local-usage/main/docs/day.en.png)
+
+*Opening any cell: that day's figures, and which working directories they were spent in.*
+
 Every cell is a button, so the calendar is a way in rather than only a picture of the year. Clicking one opens that day on its own page, and the keyboard reaches the same place: the grid is a single tab stop, the arrow keys walk it, `Home` and `End` jump to the ends of a week, `Enter` opens the focused day, and a screen reader gets each cell's date, cost, token count and call count as its name. The day page **replaces** the panel's contents rather than floating over it, so the calendar is never half-covered behind a card; its back control returns to the calendar and hands focus back to the cell you left from, rather than dropping you at the top of a year you would have to find it in again.
 
 The page states the day's own totals and buckets, then splits them by **working directory**. A directory is what a reader means by a project: a session is created in exactly one, it is what the harness itself groups session logs by on disk, and it is the only axis in this data that answers *what* a day's tokens went to rather than *when* they went. Each row gives a directory's cost, total tokens, output tokens, call count and contributing session count, with the full path under its short name. Sessions whose headers recorded no directory are not dropped — their spend is real — and are collected into a labelled row of their own, so the rows still add up to the day's total. A day with no usage says so rather than rendering an empty table.
@@ -124,6 +132,10 @@ Each rate card states `input`, `cacheRead`, `cacheWrite`, and `output` in curren
 **Warming up.** The first read after an install decodes every session log, and that wait used to land on the moment a reader opened the panel. `warmup` runs it in the background shortly after the process starts instead, so the panel's first request finds every fold already in hand and is only a re-price. The window is unbounded because the fold cache keeps every sample a session recorded regardless of the window asked for, so one pass covers every range the panel can select; a machine that is already warm pays only the corpus listing. A request that arrives while that fold is running waits for it rather than decoding the same logs a second time. Set `warmup` to false to read nothing until asked, and pay the read on first open again.
 
 **Pricing a route exactly.** A substring rule is convenient and quietly wrong the moment a route it was never written for contains the substring — `ds123/glm-5.3-flash` is claimed by the `flash` card and billed as DeepSeek Flash. The rate panel lists every route the window recorded, with the rate it was actually priced at and a badge naming the source (a rule, the fallback rate, or your own override), and each of the four prices can be typed over. An override outranks the rules for that exact route, is saved on this machine, and is used by the very next report.
+
+![The rate panel: the pricing formula, the peak schedule, the rate card in effect, and a row per route whose four prices can be typed over](https://raw.githubusercontent.com/webxiaobaiyu-droid/dsh-local-usage/main/docs/rates.en.png)
+
+*The first of the header's two icons: the formula and the rates in effect above, the per-route prices you can correct below.*
 
 ```sh
 $DSH_HOME/local-usage/pricing.json     # what the editor writes; ~/.dsh by default
