@@ -9,6 +9,31 @@
 
 /** Every class the panel's stylesheet defines. */
 export const css = {
+  // The range's detail view: its page frame, the blocks it stacks, the readings
+  // inside a block, the bars those readings are drawn as, and its tables.
+  barFill: 'dlu-barFill',
+  barLabel: 'dlu-barLabel',
+  barRow: 'dlu-barRow',
+  bars: 'dlu-bars',
+  barTrack: 'dlu-barTrack',
+  barValue: 'dlu-barValue',
+  block: 'dlu-block',
+  blockHint: 'dlu-blockHint',
+  blockTitle: 'dlu-blockTitle',
+  breakdown: 'dlu-breakdown',
+  breakout: 'dlu-breakout',
+  cellName: 'dlu-cellName',
+  reading: 'dlu-reading',
+  readingDetail: 'dlu-readingDetail',
+  readingLabel: 'dlu-readingLabel',
+  readings: 'dlu-readings',
+  readingValue: 'dlu-readingValue',
+  sessionFigures: 'dlu-sessionFigures',
+  sessionList: 'dlu-sessionList',
+  sessionName: 'dlu-sessionName',
+  sessionRow: 'dlu-sessionRow',
+  table: 'dlu-table',
+  unpricedBadge: 'dlu-unpricedBadge',
   calendar: 'dlu-calendar',
   calendarCaption: 'dlu-calendarCaption',
   calendarHeading: 'dlu-calendarHeading',
@@ -84,6 +109,9 @@ export const css = {
   projectName: 'dlu-projectName',
   projectPath: 'dlu-projectPath',
   projectTable: 'dlu-projectTable',
+  projectToggle: 'dlu-projectToggle',
+  projectToggleHint: 'dlu-projectToggleHint',
+  sessionInTable: 'dlu-sessionInTable',
   range: 'dlu-range',
   ranges: 'dlu-ranges',
   // The project ranking below the calendar.

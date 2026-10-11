@@ -217,12 +217,18 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
 /** Ask the registered route for one window. */
 async function report(
   mounted: Mounted,
-  params: { readonly from?: number; readonly to?: number; readonly refresh?: boolean } = {},
+  params: {
+    readonly from?: number
+    readonly to?: number
+    readonly refresh?: boolean
+    readonly compare?: boolean
+  } = {},
 ): Promise<Record<string, unknown>> {
   const url = new URL(REPORT_PATH, 'http://localhost')
   if (params.from !== undefined) url.searchParams.set('from', String(params.from))
   if (params.to !== undefined) url.searchParams.set('to', String(params.to))
   if (params.refresh === true) url.searchParams.set('refresh', '1')
+  if (params.compare === true) url.searchParams.set('compare', '1')
   const response = await mounted.route.fetch(new Request(url))
   expect(response.status).toBe(200)
   return await response.json() as Record<string, unknown>
@@ -624,5 +630,44 @@ describe('the pricing route', () => {
     // And nothing was written by any of them.
     const after = await report(mounted)
     expect((after.routeRates as { source: string }[])[0]?.source).toBe('fallback')
+  })
+})
+
+describe('the window before the requested one', () => {
+  const DAY_TWO = DAY_ONE + MS_PER_DAY
+
+  /** Two settlements, one on each day, so either day has a window to compare against. */
+  const logs = new Map<string, FakeLog>([
+    ['a', { events: [...log(0, DAY_ONE, 2, 1), ...log(2, DAY_TWO, 3, 3)] }],
+  ])
+
+  it('prices the equal-length window that ends where this one begins', async () => {
+    const mounted = mount(logs, true)
+    const value = await report(mounted, {
+      from: DAY_TWO,
+      to: DAY_TWO + MS_PER_DAY - 1,
+      compare: true,
+    })
+
+    // The day before: the requested one shifted back by exactly its own length.
+    expect(value.previous).toMatchObject({ from: DAY_ONE, to: DAY_TWO - 1 })
+    const previous = value.previous as { totals: { calls: number } }
+    expect(previous.totals.calls).toBe(2)
+    // And the requested window still answers for itself.
+    expect(value.totals).toMatchObject({ calls: 3 })
+  })
+
+  it('costs no extra read: the comparison is a re-price of the same folds', async () => {
+    const mounted = mount(logs, true)
+    await report(mounted, { from: DAY_TWO, to: DAY_TWO + MS_PER_DAY - 1, compare: true })
+
+    expect(mounted.batches).toEqual([['a']])
+  })
+
+  it('leaves the comparison out when it was not asked for', async () => {
+    const mounted = mount(logs, true)
+    const value = await report(mounted, { from: DAY_TWO, to: DAY_TWO + MS_PER_DAY - 1 })
+
+    expect(value.previous).toBeUndefined()
   })
 })

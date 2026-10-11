@@ -12,7 +12,7 @@
  */
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types';
 import type { PeakWindow, PriceRate, PriceRule } from './pricing.ts';
-import type { UsageInsightsReport, UsageTokens } from './types.ts';
+import type { UsageInsightsReport, UsagePreviousWindow, UsageTokens } from './types.ts';
 /** Route label used when the log attributes a settlement to no `provider/model`. */
 export declare const UNKNOWN_ROUTE = "unknown";
 /** One billed turn's exact tokens, its instant, and the route it was billed on. */
@@ -59,6 +59,13 @@ export interface ReportMeta {
     readonly unreadableSessions: number;
     /** Whether the samples came from the Host's in-memory fold cache. */
     readonly cached: boolean;
+    /**
+     * The window before the requested one, when the caller asked to compare.
+     *
+     * Folded by the caller rather than here: it needs the same sessions over a
+     * shifted window, which only the caller holds.
+     */
+    readonly previous?: UsagePreviousWindow;
 }
 /**
  * Local calendar day of one instant, as `YYYY-MM-DD`.
@@ -146,16 +153,4 @@ export declare const UNKNOWN_CAUSE = "UNKNOWN";
  * @returns the days inside the window.
  */
 export declare function reliabilityWithin(days: readonly ReliabilityDay[], from: number | undefined, to: number | undefined): ReliabilityDay[];
-/**
- * Fold every session's samples into one priced report.
- * The window is whatever the caller asked for, and every dimension is folded
- * over that same window, so narrowing it to one day yields that day's totals,
- * that day's routes and that day's projects from the samples the Host already
- * holds. That is what makes a day drill-down a re-fold rather than a re-read.
- *
- * @param inputs - per-session inputs, in any order.
- * @param options - rate card and peak schedule.
- * @param meta - host-supplied report facts.
- * @returns the complete report, day rows ascending and ranking rows by cost.
- */
 export declare function buildReport(inputs: readonly SessionUsageInput[], options: PricingOptions, meta: ReportMeta): UsageInsightsReport;

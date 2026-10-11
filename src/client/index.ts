@@ -137,11 +137,12 @@ export function apply(ctx: ClientContext): void {
     // entry whenever the locale revision moves, so the id it reads is always
     // the one the dictionary around it was resolved from.
     locale: () => ctx.locale.getLocale().active,
-    report: async (refresh, from, to, onProgress) => {
+    report: async ({ from, to, refresh, compare, onProgress }) => {
       const url = new URL(REPORT_PATH, window.location.origin)
       url.searchParams.set('from', String(from))
       url.searchParams.set('to', String(to))
-      if (refresh) url.searchParams.set('refresh', '1')
+      if (refresh === true) url.searchParams.set('refresh', '1')
+      if (compare === true) url.searchParams.set('compare', '1')
       const stop = onProgress === undefined ? undefined : followProgress(onProgress)
       try {
         const response = await fetch(url, { credentials: 'include' })

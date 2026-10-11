@@ -80,6 +80,27 @@ export function beijingClock(time: number): { weekday: number; minutes: number }
 }
 
 /**
+ * Whether a resolved Beijing clock falls inside a configured peak window.
+ *
+ * Separate from {@link isPeakTime} so a fold that needs the clock for something
+ * else — the hour-of-day split — resolves it once per sample instead of twice.
+ *
+ * @param clock - weekday and minutes after Beijing midnight.
+ * @param windows - parsed peak windows in Beijing time.
+ * @param weekdaysOnly - when true, Saturday and Sunday are never peak.
+ * @returns true when the instant is billed at the peak rate.
+ */
+export function isPeakClock(
+  clock: { readonly weekday: number; readonly minutes: number },
+  windows: readonly PeakWindow[],
+  weekdaysOnly: boolean,
+): boolean {
+  if (windows.length === 0) return false
+  if (weekdaysOnly && (clock.weekday === 0 || clock.weekday === 6)) return false
+  return windows.some(window => clock.minutes >= window.start && clock.minutes < window.end)
+}
+
+/**
  * Whether one instant falls in a configured peak window.
  * @param time - Unix epoch milliseconds.
  * @param windows - parsed peak windows in Beijing time.
@@ -92,9 +113,7 @@ export function isPeakTime(
   weekdaysOnly: boolean,
 ): boolean {
   if (windows.length === 0) return false
-  const { weekday, minutes } = beijingClock(time)
-  if (weekdaysOnly && (weekday === 0 || weekday === 6)) return false
-  return windows.some(window => minutes >= window.start && minutes < window.end)
+  return isPeakClock(beijingClock(time), windows, weekdaysOnly)
 }
 
 /** Which card claimed a route, and at what rate. */

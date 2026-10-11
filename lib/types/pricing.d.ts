@@ -59,6 +59,21 @@ export declare function beijingClock(time: number): {
     minutes: number;
 };
 /**
+ * Whether a resolved Beijing clock falls inside a configured peak window.
+ *
+ * Separate from {@link isPeakTime} so a fold that needs the clock for something
+ * else — the hour-of-day split — resolves it once per sample instead of twice.
+ *
+ * @param clock - weekday and minutes after Beijing midnight.
+ * @param windows - parsed peak windows in Beijing time.
+ * @param weekdaysOnly - when true, Saturday and Sunday are never peak.
+ * @returns true when the instant is billed at the peak rate.
+ */
+export declare function isPeakClock(clock: {
+    readonly weekday: number;
+    readonly minutes: number;
+}, windows: readonly PeakWindow[], weekdaysOnly: boolean): boolean;
+/**
  * Whether one instant falls in a configured peak window.
  * @param time - Unix epoch milliseconds.
  * @param windows - parsed peak windows in Beijing time.

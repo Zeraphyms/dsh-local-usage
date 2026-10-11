@@ -8,6 +8,29 @@
  */
 /** Every class the panel's stylesheet defines. */
 export declare const css: {
+    readonly barFill: "dlu-barFill";
+    readonly barLabel: "dlu-barLabel";
+    readonly barRow: "dlu-barRow";
+    readonly bars: "dlu-bars";
+    readonly barTrack: "dlu-barTrack";
+    readonly barValue: "dlu-barValue";
+    readonly block: "dlu-block";
+    readonly blockHint: "dlu-blockHint";
+    readonly blockTitle: "dlu-blockTitle";
+    readonly breakdown: "dlu-breakdown";
+    readonly breakout: "dlu-breakout";
+    readonly cellName: "dlu-cellName";
+    readonly reading: "dlu-reading";
+    readonly readingDetail: "dlu-readingDetail";
+    readonly readingLabel: "dlu-readingLabel";
+    readonly readings: "dlu-readings";
+    readonly readingValue: "dlu-readingValue";
+    readonly sessionFigures: "dlu-sessionFigures";
+    readonly sessionList: "dlu-sessionList";
+    readonly sessionName: "dlu-sessionName";
+    readonly sessionRow: "dlu-sessionRow";
+    readonly table: "dlu-table";
+    readonly unpricedBadge: "dlu-unpricedBadge";
     readonly calendar: "dlu-calendar";
     readonly calendarCaption: "dlu-calendarCaption";
     readonly calendarHeading: "dlu-calendarHeading";
@@ -82,6 +105,9 @@ export declare const css: {
     readonly projectName: "dlu-projectName";
     readonly projectPath: "dlu-projectPath";
     readonly projectTable: "dlu-projectTable";
+    readonly projectToggle: "dlu-projectToggle";
+    readonly projectToggleHint: "dlu-projectToggleHint";
+    readonly sessionInTable: "dlu-sessionInTable";
     readonly range: "dlu-range";
     readonly ranges: "dlu-ranges";
     readonly rank: "dlu-rank";

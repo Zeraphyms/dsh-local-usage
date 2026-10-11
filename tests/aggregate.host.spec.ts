@@ -338,3 +338,101 @@ describe('route rates', () => {
     expect(report.routeRates.map(row => row.tokens)).toEqual([5_000, 10])
   })
 })
+
+describe('buildReport: what the peak schedule cost', () => {
+  it("splits the bill and states the multiplier's own share", () => {
+    const report = buildReport([
+      session('a', [[PEAK, 'x/flash', tokens(1_000_000)], [OFF_PEAK, 'x/flash', tokens(1_000_000)]]),
+    ], OPTIONS, META)
+
+    // The flash card is 1 per million tokens, doubled inside a peak window.
+    expect(report.peak.peakCost).toBeCloseTo(2)
+    expect(report.peak.offPeakCost).toBeCloseTo(1)
+    // What the multiplier added: the peak bill less the same bill at base rates.
+    expect(report.peak.premium).toBeCloseTo(1)
+    expect(report.peak).toMatchObject({ peakCalls: 1, offPeakCalls: 1 })
+  })
+
+  it('reports no premium when no multiplier is configured', () => {
+    const report = buildReport(
+      [session('a', [[PEAK, 'x/flash', tokens(1_000_000)]])],
+      { ...OPTIONS, peakMultiplier: 1 },
+      META,
+    )
+
+    // Still billed inside the window, and therefore still counted as peak —
+    // there was simply no premium to charge.
+    expect(report.peak.peakCalls).toBe(1)
+    expect(report.peak.premium).toBe(0)
+  })
+
+  it('treats every settlement as off-peak when no window is configured', () => {
+    const report = buildReport(
+      [session('a', [[PEAK, 'x/flash', tokens(1_000_000)]])],
+      { ...OPTIONS, peakWindows: [] },
+      META,
+    )
+
+    expect(report.peak).toMatchObject({ peakCalls: 0, premium: 0 })
+    expect(report.peak.offPeakCalls).toBe(1)
+  })
+})
+
+describe('buildReport: what caching was worth', () => {
+  /** One settlement whose prompt was served entirely from the provider's cache. */
+  const cachedTokens: UsageTokens = {
+    uncachedInputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 1_000_000,
+    cacheWriteTokens: 0,
+  }
+
+  it('prices the cache reads at both rates and states the difference', () => {
+    const report = buildReport([session('a', [[OFF_PEAK, 'x/flash', cachedTokens]])], OPTIONS, META)
+
+    expect(report.cache.readCost).toBeCloseTo(0.02)
+    expect(report.cache.inputCost).toBeCloseTo(1)
+    expect(report.cache.saved).toBeCloseTo(0.98)
+  })
+
+  it('charges the peak multiplier to both sides, so a peak read saves more', () => {
+    const report = buildReport([session('a', [[PEAK, 'x/flash', cachedTokens]])], OPTIONS, META)
+
+    expect(report.cache.saved).toBeCloseTo(1.96)
+  })
+
+  it('reports no saving for a window that never read the cache', () => {
+    const report = buildReport([session('a', [[OFF_PEAK, 'x/flash', tokens(1_000)]])], OPTIONS, META)
+
+    expect(report.cache).toEqual({ readCost: 0, inputCost: 0, saved: 0 })
+  })
+})
+
+describe('buildReport: the shape of the day', () => {
+  it('always answers 24 hours, in order, with the quiet ones at zero', () => {
+    const report = buildReport([session('a', [[PEAK, 'x/flash', tokens(1_000_000)]])], OPTIONS, META)
+
+    expect(report.hourly).toHaveLength(24)
+    expect(report.hourly.map(row => row.hour)).toEqual([...Array(24).keys()])
+    expect(report.hourly[0]).toMatchObject({ cost: 0, calls: 0, tokens: 0 })
+  })
+
+  it('buckets by hour in Beijing time rather than the host machine’s zone', () => {
+    // 02:00 UTC is 10:00 in Beijing, whatever the machine running this believes.
+    const report = buildReport([session('a', [[PEAK, 'x/flash', tokens(1_000_000)]])], OPTIONS, META)
+
+    expect(report.hourly[10]?.calls).toBe(1)
+    expect(report.hourly[10]?.cost).toBeCloseTo(2)
+    expect(report.hourly[10]?.tokens).toBe(1_000_000)
+  })
+
+  it('accumulates several settlements into the hour they share', () => {
+    const report = buildReport([
+      session('a', [[PEAK, 'x/flash', tokens(1_000_000)]]),
+      session('b', [[PEAK + 60_000, 'x/flash', tokens(2_000_000)]]),
+    ], OPTIONS, META)
+
+    expect(report.hourly[10]).toMatchObject({ calls: 2, tokens: 3_000_000 })
+    expect(report.hourly.reduce((sum, row) => sum + row.calls, 0)).toBe(2)
+  })
+})

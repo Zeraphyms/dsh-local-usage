@@ -298,6 +298,280 @@ export const styles = String.raw`
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* A directory that opens onto its own sessions: the whole cell is the control,
+ * so the hit target is the row a reader is already pointing at. */
+.dlu-projectToggle {
+  display: block;
+  inline-size: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.dlu-projectToggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 2px;
+}
+
+.dlu-projectToggleHint {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+  color: var(--dsw-alias-label-caption);
+}
+
+/* One session of an opened directory, indented under it and set a step quieter
+ * than the directory it belongs to. */
+.dlu-sessionInTable th,
+.dlu-sessionInTable td {
+  padding-block: 5px;
+  font-size: 11.5px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-sessionInTable .dlu-sessionName {
+  display: block;
+  padding-left: 16px;
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+/* ── The range's detail view ──────────────────────────────────────────── */
+
+/* A page rather than a figure: the front panel states the range, this one takes
+ * it apart. It reuses the day page's frame and tables so the two read as the same
+ * surface, and adds only what its own blocks need. */
+.dlu-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* The front page's way in, set as a text control: an icon would have to be
+ * learned, and this is navigation rather than a tool. */
+.dlu-breakout {
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  background: transparent;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 9px;
+  transition: background-color 120ms ease-out;
+}
+
+.dlu-breakout:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dlu-breakout:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 1px;
+}
+
+.dlu-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.dlu-blockTitle {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-blockHint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Readings wrap rather than count: unlike the front page's strip, whose height
+ * a figure must not be able to change, this grid has room to reflow and a
+ * reading that needs two lines may have them. */
+.dlu-readings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.dlu-reading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 11px;
+  background: var(--dsw-alias-bg-layer-1);
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+}
+
+.dlu-readingLabel {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-readingValue {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-readingDetail {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-caption);
+  /* A caption may wrap: an address or a share plus a count is worth two lines
+   * where a figure is not. */
+  overflow-wrap: anywhere;
+}
+
+/* Bars: the label and the value are fixed so the track is the only thing whose
+ * length carries meaning, and a long label cannot shorten the chart. */
+.dlu-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dlu-barRow {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 84px;
+  gap: 10px;
+  align-items: center;
+  font-size: 11.5px;
+}
+
+.dlu-barLabel {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-barTrack {
+  block-size: 8px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 8%, transparent);
+  border-radius: 999px;
+}
+
+.dlu-barFill {
+  display: block;
+  block-size: 100%;
+  background: var(--dsw-alias-link);
+  border-radius: inherit;
+}
+
+.dlu-barValue {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* The detail view's tables: the day page's table, named for this page so a
+ * change to one does not silently restyle the other. */
+.dlu-table {
+  inline-size: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.dlu-table th {
+  padding: 0 0 6px;
+  font-weight: 400;
+  color: var(--dsw-alias-label-caption);
+  text-align: left;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.dlu-table td {
+  padding: 7px 0;
+  color: var(--dsw-alias-label-secondary);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.dlu-table th.dlu-cellName {
+  padding-right: 20px;
+  font-weight: 500;
+  vertical-align: top;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-table .dlu-numeric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* A route no configured card claimed: it is priced at the fallback rate, and
+ * the badge is what stops that figure reading as a matched price. */
+.dlu-unpricedBadge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--dsw-alias-label-caption);
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+}
+
+.dlu-sessionList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dlu-sessionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.dlu-sessionName {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-sessionFigures {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+}
+
 /* ── Calendar ─────────────────────────────────────────────────────────── */
 
 .dlu-calendar {

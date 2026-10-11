@@ -24,6 +24,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { UsagePanel } from '../src/client/UsagePanel.tsx'
 import type { UsagePanelProps } from '../src/client/UsagePanel.tsx'
+import { BreakdownPage } from '../src/client/BreakdownPage.tsx'
 import { DayDetail } from '../src/client/DayDetail.tsx'
 import { Popover } from '../src/client/Popover.tsx'
 import { RateEditor } from '../src/client/RateEditor.tsx'
@@ -186,5 +187,122 @@ describe('the rate editor', () => {
     expect(markup).not.toContain('pricingEditorEmpty')
     expect(markup).toContain('p/m')
     expect(markup).toContain('q/m')
+  })
+})
+
+describe('the range detail view', () => {
+  /** A report with one of everything the page draws. */
+  function fullReport(): UsageInsightsReport {
+    return {
+      generatedAt: 0,
+      currency: 'CNY',
+      totals: {
+        cost: 12, uncachedInputTokens: 100, outputTokens: 10, cacheReadTokens: 5,
+        cacheWriteTokens: 1, calls: 4, sessions: 2,
+      },
+      days: [
+        { day: '2026-09-21', cost: 12, calls: 4, sessions: 2, uncachedInputTokens: 100, outputTokens: 10, cacheReadTokens: 5, cacheWriteTokens: 1 },
+      ],
+      models: [
+        { route: 'demo/flash', priced: true, cost: 12, calls: 4, uncachedInputTokens: 100, outputTokens: 10, cacheReadTokens: 5, cacheWriteTokens: 1 },
+      ],
+      projects: [],
+      sessions: [
+        { sessionId: 's1', title: 'a conversation', cwd: '/Users/demo/work/atlas-web', cost: 12, calls: 4, updatedAt: 0, createdAt: 0, uncachedInputTokens: 100, outputTokens: 10, cacheReadTokens: 5, cacheWriteTokens: 1 },
+      ],
+      scannedSessions: 1,
+      unreadableSessions: 0,
+      reliability: { retries: 0, retryCauses: [], toolCalls: 0, toolErrors: 0, toolErrorCodes: [], compactions: 0, compactionFailures: 0 },
+      unpricedRoutes: [],
+      unpricedTokens: 0,
+      cached: true,
+      peakMultiplier: 2,
+      prices: [],
+      fallbackPrice: { match: '', input: 1, cacheRead: 0, cacheWrite: 1, output: 4 },
+      routeRates: [],
+      peakWindows: ['09:00-12:00'],
+      peakWeekdaysOnly: true,
+      peak: { peakCost: 8, offPeakCost: 4, premium: 4, peakCalls: 3, offPeakCalls: 1 },
+      cache: { readCost: 0.1, inputCost: 5, saved: 4.9 },
+      hourly: Array.from({ length: 24 }, (_, hour) => ({ hour, cost: hour === 10 ? 12 : 0, calls: hour === 10 ? 4 : 0, tokens: 0 })),
+      previous: {
+        from: 0,
+        to: 0,
+        totals: { cost: 6, uncachedInputTokens: 50, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 2, sessions: 1 },
+      },
+    } as unknown as UsageInsightsReport
+  }
+
+  const base = {
+    rangeLabel: 'This year',
+    failed: false,
+    t,
+    formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
+    formatTokens: String,
+    formatInteger: String,
+    formatPercent: (value: number) => `${(value * 100).toFixed(2)}%`,
+    formatDay: String,
+    onBack: () => {},
+    onRetry: () => {},
+  }
+
+  it('keeps its frame, and a way out, before the report arrives', () => {
+    // A page that exists to be left: if the fold is slow, the reader must not be
+    // trapped on a page with no back control.
+    const markup = renderToStaticMarkup(createElement(BreakdownPage, {
+      ...base,
+      report: undefined,
+      failed: false,
+    }))
+
+    expect(markup).toContain('dlu-breakdown')
+    expect(markup).toContain('back')
+    expect(markup).toContain('role="status"')
+  })
+
+  it('states a failed fold without dropping the frame', () => {
+    const markup = renderToStaticMarkup(createElement(BreakdownPage, {
+      ...base,
+      report: undefined,
+      failed: true,
+    }))
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain('dlu-breakdown')
+  })
+
+  it('draws the attribution, the composition and the timing from the folds', () => {
+    const markup = renderToStaticMarkup(createElement(BreakdownPage, { ...base, report: fullReport() }))
+
+    // By route, with the route it was billed on.
+    expect(markup).toContain('demo/flash')
+    // What the peak schedule cost, and what caching was worth, in money.
+    expect(markup).toContain('CNY 8.00')
+    expect(markup).toContain('CNY 4.00')
+    expect(markup).toContain('CNY 4.90')
+    // The session list, by its folded title.
+    expect(markup).toContain('a conversation')
+    // The comparison against the window before it.
+    expect(markup).toContain('CNY 6.00')
+    // An export the reader can take away.
+    expect(markup).toContain('breakdownExportAction')
+  })
+
+  it('says the comparison is missing rather than comparing against nothing', () => {
+    const report = { ...fullReport() } as Record<string, unknown>
+    delete report.previous
+    const markup = renderToStaticMarkup(createElement(BreakdownPage, {
+      ...base,
+      report: report as unknown as UsageInsightsReport,
+    }))
+
+    expect(markup).toContain('breakdownCompareUnavailable')
+  })
+
+  it('draws no hour profile when the Host folded none', () => {
+    const report = { ...fullReport(), hourly: [] }
+    const markup = renderToStaticMarkup(createElement(BreakdownPage, { ...base, report }))
+
+    expect(markup).not.toContain('breakdownByHour')
   })
 })

@@ -37,17 +37,41 @@ export interface UsagePanelInjected {
      * during render is enough, and needs no subscription of its own.
      */
     locale: () => string;
-    /**
-     * Assemble the report; `refresh` discards the Host's per-session fold cache.
-     *
-     * `onProgress` is optional and only worth passing for a read that may have to
-     * open session logs: the panel hands it to the read that draws the year and
-     * leaves it off the re-prices, which are answered from folds already in hand
-     * and would otherwise flicker through phases they never really had.
-     */
-    report: (refresh: boolean, from: number, to: number, onProgress?: (progress: UsageInsightsProgress) => void) => Promise<UsageInsightsReport>;
+    /** Assemble one report for one window. */
+    report: (request: UsagePanelReportRequest) => Promise<UsageInsightsReport>;
     /** Persist one write to the per-route rate table and answer with what is in effect. */
     saveRates: (update: UsagePricingUpdate) => Promise<UsagePricingResult>;
+}
+/**
+ * One report the panel asks its Host for.
+ *
+ * An object rather than a positional list because the request keeps gaining
+ * optional parts — a refresh, a comparison, a progress sink — and a fourth and
+ * fifth positional argument is a call site nobody can read.
+ */
+export interface UsagePanelReportRequest {
+    /** Inclusive lower bound of the window, in Unix epoch milliseconds. */
+    readonly from: number;
+    /** Inclusive upper bound of the window, in Unix epoch milliseconds. */
+    readonly to: number;
+    /** Discard the Host's folds and read every log again. */
+    readonly refresh?: boolean;
+    /**
+     * Price the window before this one as well, for the detail view's comparison.
+     *
+     * Optional and only worth asking for where something reads it: it is another
+     * fold of every sample, and the front page shows no comparison at all.
+     */
+    readonly compare?: boolean;
+    /**
+     * Called with each progress state while the read runs.
+     *
+     * Only worth passing for a read that may have to open session logs: the panel
+     * hands it to the read that draws the year and leaves it off the re-prices,
+     * which are answered from folds already in hand and would otherwise flicker
+     * through phases they never really had.
+     */
+    readonly onProgress?: (progress: UsageInsightsProgress) => void;
 }
 /** Full component props assembled by the main slot renderer. */
 export type UsagePanelProps = PropsRuntime<'main'> & PropsLocale<'usage'> & InjectFace<UsagePanelInjected>;

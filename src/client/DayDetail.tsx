@@ -16,9 +16,10 @@
  * @module dsh-local-usage/client/DayDetail
  */
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import { UNKNOWN_PROJECT } from '../types.ts'
 import type { UsageInsightsReport, UsageTokens } from '../types.ts'
 import { figureRoom } from './format.ts'
 import { projectName } from './paths.ts'
@@ -151,6 +152,9 @@ function DayFigures({ report, t, formatCost, formatTokens, formatInteger, format
 }): ReactNode {
   const { totals, projects } = report
   const hitRate = cacheHitRate(totals)
+  // Which directory is open. One at a time: the question a reader has is about
+  // one directory, and a page of every session on the day is the table again.
+  const [open, setOpen] = useState<string | undefined>(undefined)
 
   return (
     <>
@@ -195,20 +199,53 @@ function DayFigures({ report, t, formatCost, formatTokens, formatInteger, format
                   // A row is either a directory or the bucket of sessions whose
                   // header named none; only the first has a name to shorten.
                   const name = projectName(row.path)
+                  const expanded = open === row.path
+                  // A session belongs to the bucket when its header named no
+                  // directory, which is what the bucket row stands for.
+                  const mine = report.sessions.filter(session => (
+                    row.path === UNKNOWN_PROJECT ? session.cwd === undefined : session.cwd === row.path
+                  ))
                   return (
-                    <tr key={row.path}>
-                      <th scope="row" className={css.projectCell}>
-                        <span className={css.projectName} title={name === undefined ? undefined : row.path}>
-                          {name ?? t('projectUnknown')}
-                        </span>
-                        {name === undefined ? null : <code className={css.projectPath}>{row.path}</code>}
-                      </th>
-                      <td className={css.numeric}>{formatCost(row.cost)}</td>
-                      <td className={css.numeric}>{formatInteger(tokensOf(row))}</td>
-                      <td className={css.numeric}>{formatInteger(row.outputTokens)}</td>
-                      <td className={css.numeric}>{formatInteger(row.calls)}</td>
-                      <td className={css.numeric}>{formatInteger(row.sessions)}</td>
-                    </tr>
+                    <Fragment key={row.path}>
+                      <tr>
+                        <th scope="row" className={css.projectCell}>
+                          <button
+                            type="button"
+                            className={css.projectToggle}
+                            aria-expanded={expanded}
+                            onClick={() => { setOpen(expanded ? undefined : row.path) }}
+                          >
+                            <span className={css.projectName} title={name === undefined ? undefined : row.path}>
+                              {name ?? t('projectUnknown')}
+                            </span>
+                            {name === undefined ? null : <code className={css.projectPath}>{row.path}</code>}
+                            <span className={css.projectToggleHint}>
+                              {t('daySessionsIn', { count: formatInteger(mine.length) })}
+                            </span>
+                          </button>
+                        </th>
+                        <td className={css.numeric}>{formatCost(row.cost)}</td>
+                        <td className={css.numeric}>{formatInteger(tokensOf(row))}</td>
+                        <td className={css.numeric}>{formatInteger(row.outputTokens)}</td>
+                        <td className={css.numeric}>{formatInteger(row.calls)}</td>
+                        <td className={css.numeric}>{formatInteger(row.sessions)}</td>
+                      </tr>
+                      {/* The sessions of that directory, in the table's own
+                          columns: a list of its own would be a second layout to
+                          keep aligned with the first. */}
+                      {expanded ? mine.map(session => (
+                        <tr key={session.sessionId} className={css.sessionInTable}>
+                          <th scope="row" className={css.projectCell}>
+                            <span className={css.sessionName}>{session.title ?? t('sessionUntitled')}</span>
+                          </th>
+                          <td className={css.numeric}>{formatCost(session.cost)}</td>
+                          <td className={css.numeric}>{formatInteger(tokensOf(session))}</td>
+                          <td className={css.numeric}>{formatInteger(session.outputTokens)}</td>
+                          <td className={css.numeric}>{formatInteger(session.calls)}</td>
+                          <td className={css.numeric} />
+                        </tr>
+                      )) : null}
+                    </Fragment>
                   )
                 })}
               </tbody>

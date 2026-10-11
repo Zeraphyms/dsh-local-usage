@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-llm-retry/types'
 // reliability fold counts, so context that could not be compacted is reported.
 import type {} from '@deepseek-ai/dsh-compaction/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
-import { costOf, isPeakTime, selectRate } from './pricing.ts'
+import { beijingClock, costOf, isPeakClock, selectRate } from './pricing.ts'
 import type { PeakWindow, PriceRate, PriceRule } from './pricing.ts'
 import { UNKNOWN_PROJECT } from './types.ts'
 import type {
@@ -27,6 +27,7 @@ import type {
   UsageDayRow,
   UsageInsightsReport,
   UsageModelRow,
+  UsagePreviousWindow,
   UsageProjectRow,
   UsageReliability,
   UsageRouteRate,
@@ -85,6 +86,13 @@ export interface ReportMeta {
   readonly unreadableSessions: number
   /** Whether the samples came from the Host's in-memory fold cache. */
   readonly cached: boolean
+  /**
+   * The window before the requested one, when the caller asked to compare.
+   *
+   * Folded by the caller rather than here: it needs the same sessions over a
+   * shifted window, which only the caller holds.
+   */
+  readonly previous?: UsagePreviousWindow
 }
 
 /**
@@ -458,6 +466,19 @@ function costedOf(bucket: Bucket): UsageCosted {
  * @param meta - host-supplied report facts.
  * @returns the complete report, day rows ascending and ranking rows by cost.
  */
+/**
+ * Money, calls and tokens accumulated for one hour of the day.
+ *
+ * Deliberately not a {@link Bucket}: an hour never needs the set of contributing
+ * sessions, and carrying one would cost 24 sets per report for a figure nothing
+ * reads.
+ */
+interface HourBucket {
+  cost: number
+  calls: number
+  tokens: number
+}
+
 export function buildReport(
   inputs: readonly SessionUsageInput[],
   options: PricingOptions,
@@ -470,6 +491,12 @@ export function buildReport(
   const sessionRows: UsageSessionRow[] = []
   const unpricedRoutes = new Set<string>()
   let unpricedTokens = 0
+  // The three folded-here figures the range page reads: what the peak schedule
+  // cost, what caching saved, and the shape of the day. All three fall out of the
+  // same walk, because pricing a sample already resolves its clock.
+  const peakSplit = { peakCost: 0, offPeakCost: 0, premium: 0, peakCalls: 0, offPeakCalls: 0 }
+  const cacheValue = { readCost: 0, inputCost: 0 }
+  const hours: HourBucket[] = Array.from({ length: 24 }, () => ({ cost: 0, calls: 0, tokens: 0 }))
 
   for (const input of inputs) {
     const sessionBucket = emptyBucket()
@@ -481,7 +508,11 @@ export function buildReport(
     let firstSampleTime: number | undefined
     let lastSampleTime: number | undefined
     for (const sample of input.samples) {
-      const peak = isPeakTime(sample.time, options.peakWindows, options.peakWeekdaysOnly)
+      // Resolved once and used twice: the peak test and the hour-of-day bucket
+      // are the same clock reading, and constructing it per use would double the
+      // most frequent allocation in this fold.
+      const beijing = beijingClock(sample.time)
+      const peak = isPeakClock(beijing, options.peakWindows, options.peakWeekdaysOnly)
       const { rate, matched } = selectRate(
         options.rules,
         options.fallback,
@@ -493,6 +524,34 @@ export function buildReport(
       const cost = costOf(sample.tokens, rate)
       firstSampleTime ??= sample.time
       lastSampleTime = sample.time
+
+      if (peak) {
+        peakSplit.peakCost += cost
+        peakSplit.peakCalls += 1
+        // The card prices linearly, so the multiplier's own share of a peak bill
+        // is that bill less the same bill at the base rates. Charged only where a
+        // multiplier is configured: a schedule with no premium reports none.
+        if (options.peakMultiplier !== 1) {
+          peakSplit.premium += cost - cost / options.peakMultiplier
+        }
+      } else {
+        peakSplit.offPeakCost += cost
+        peakSplit.offPeakCalls += 1
+      }
+
+      const readTokens = sample.tokens.cacheReadTokens
+      if (readTokens > 0) {
+        cacheValue.readCost += readTokens * rate.cacheRead / 1_000_000
+        cacheValue.inputCost += readTokens * rate.input / 1_000_000
+      }
+
+      const hour = hours[Math.floor(beijing.minutes / 60)]
+      if (hour !== undefined) {
+        hour.cost += cost
+        hour.calls += 1
+        hour.tokens += sample.tokens.uncachedInputTokens + sample.tokens.outputTokens
+          + readTokens + sample.tokens.cacheWriteTokens
+      }
 
       const day = localDayKey(sample.time)
       let dayBucket = byDay.get(day)
@@ -615,5 +674,18 @@ export function buildReport(
     routeRates,
     peakWindows: options.peakWindows.map(window => `${clock(window.start)}-${clock(window.end)}`),
     peakWeekdaysOnly: options.peakWeekdaysOnly,
+    peak: peakSplit,
+    cache: {
+      readCost: cacheValue.readCost,
+      inputCost: cacheValue.inputCost,
+      saved: cacheValue.inputCost - cacheValue.readCost,
+    },
+    hourly: hours.map((bucket, hour) => ({
+      hour,
+      cost: bucket.cost,
+      calls: bucket.calls,
+      tokens: bucket.tokens,
+    })),
+    ...meta.previous === undefined ? {} : { previous: meta.previous },
   }
 }

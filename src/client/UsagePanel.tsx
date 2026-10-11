@@ -31,6 +31,7 @@ import type {
   UsagePricingResult,
   UsagePricingUpdate,
 } from '../types.ts'
+import { BreakdownPage } from './BreakdownPage.tsx'
 import { CalendarHeatmap } from './CalendarHeatmap.tsx'
 import { cacheHitRate } from './cache-rate.ts'
 import { useEntrance } from './count-up.ts'
@@ -91,22 +92,42 @@ export interface UsagePanelInjected {
    * during render is enough, and needs no subscription of its own.
    */
   locale: () => string
-  /**
-   * Assemble the report; `refresh` discards the Host's per-session fold cache.
-   *
-   * `onProgress` is optional and only worth passing for a read that may have to
-   * open session logs: the panel hands it to the read that draws the year and
-   * leaves it off the re-prices, which are answered from folds already in hand
-   * and would otherwise flicker through phases they never really had.
-   */
-  report: (
-    refresh: boolean,
-    from: number,
-    to: number,
-    onProgress?: (progress: UsageInsightsProgress) => void,
-  ) => Promise<UsageInsightsReport>
+  /** Assemble one report for one window. */
+  report: (request: UsagePanelReportRequest) => Promise<UsageInsightsReport>
   /** Persist one write to the per-route rate table and answer with what is in effect. */
   saveRates: (update: UsagePricingUpdate) => Promise<UsagePricingResult>
+}
+
+/**
+ * One report the panel asks its Host for.
+ *
+ * An object rather than a positional list because the request keeps gaining
+ * optional parts — a refresh, a comparison, a progress sink — and a fourth and
+ * fifth positional argument is a call site nobody can read.
+ */
+export interface UsagePanelReportRequest {
+  /** Inclusive lower bound of the window, in Unix epoch milliseconds. */
+  readonly from: number
+  /** Inclusive upper bound of the window, in Unix epoch milliseconds. */
+  readonly to: number
+  /** Discard the Host's folds and read every log again. */
+  readonly refresh?: boolean
+  /**
+   * Price the window before this one as well, for the detail view's comparison.
+   *
+   * Optional and only worth asking for where something reads it: it is another
+   * fold of every sample, and the front page shows no comparison at all.
+   */
+  readonly compare?: boolean
+  /**
+   * Called with each progress state while the read runs.
+   *
+   * Only worth passing for a read that may have to open session logs: the panel
+   * hands it to the read that draws the year and leaves it off the re-prices,
+   * which are answered from folds already in hand and would otherwise flicker
+   * through phases they never really had.
+   */
+  readonly onProgress?: (progress: UsageInsightsProgress) => void
 }
 
 /** Full component props assembled by the main slot renderer. */
@@ -225,6 +246,10 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   const [summaryRequest, setSummaryRequest] = useState(0)
   // The day page: which day is open, that day's own fold, and a retry counter.
   const [selectedDay, setSelectedDay] = useState<string | undefined>(undefined)
+  // The range's detail view. A page rather than a panel section: the front page
+  // is already as full as it should be, and everything this page adds is
+  // something a reader goes looking for rather than something to pass on the way.
+  const [showBreakdown, setShowBreakdown] = useState(false)
   const [dayState, setDayState] = useState<DayState>({ status: 'idle' })
   const [dayRequest, setDayRequest] = useState(0)
   // Bumped after a rate write, so every view re-prices against the new table
@@ -264,8 +289,11 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     setGridState({ status: 'loading' })
     // The window read is the one that may have to open every log, so it is the
     // one that reports what it is doing.
-    void report(request > 0, gridFrom, gridTo, (value) => {
-      if (current) setProgress(value)
+    void report({
+      refresh: request > 0,
+      from: gridFrom,
+      to: gridTo,
+      onProgress: (value) => { if (current) setProgress(value) },
     }).then(
       value => { if (current) setGridState({ status: 'ready', report: value }) },
       () => { if (current) setGridState({ status: 'error' }) },
@@ -293,7 +321,10 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     // range they were folded for, which is what makes them safe to leave up.
     setSummaryState(summaryStarted)
     const slow = setTimeout(() => { if (current) setSummaryState(summarySlow) }, STALE_VISIBLE_MS)
-    void report(false, rangeFrom, rangeTo).then(
+    // Compared, because the detail view reads the window before this one; the
+    // front page ignores it, and the fold it costs is a re-price of samples
+    // already in hand.
+    void report({ from: rangeFrom, to: rangeTo, compare: true }).then(
       value => { if (current) setSummaryState(summarySettled(value, rangeId)) },
       () => { if (current) setSummaryState(summaryFailed()) },
     )
@@ -319,7 +350,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     }
     let current = true
     setDayState({ status: 'loading' })
-    void report(false, start, start + MS_PER_DAY - 1).then(
+    void report({ from: start, to: start + MS_PER_DAY - 1 }).then(
       value => { if (current) setDayState({ status: 'ready', report: value }) },
       () => { if (current) setDayState({ status: 'error' }) },
     )
@@ -414,6 +445,20 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
               setSelectedDay(undefined)
             }}
           />
+        ) : showBreakdown ? (
+          <BreakdownPage
+            report={summaryState.status === 'ready' ? summaryState.report : undefined}
+            failed={summaryState.status === 'error'}
+            rangeLabel={rangeLabel(summaryState.status === 'ready' ? summaryState.rangeId : rangeId)}
+            t={t}
+            formatCost={money}
+            formatTokens={tokens}
+            formatInteger={integer}
+            formatPercent={percent}
+            formatDay={dateText}
+            onBack={() => { setShowBreakdown(false) }}
+            onRetry={() => { setSummaryRequest(value => value + 1) }}
+          />
         ) : (
           <>
             <header className={css.header}>
@@ -436,6 +481,17 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   ))}
                 </div>
                 <div className={css.tools}>
+                  {/* The front page states the range; this page takes it apart.
+                      It leads the row because it is navigation, where the two
+                      beside it are reference: a reader who wants more goes here,
+                      and a reader who wants the rates does not have to pass it. */}
+                  <button
+                    type="button"
+                    className={css.breakout}
+                    onClick={() => { setShowBreakdown(true) }}
+                  >
+                    {t('breakout')}
+                  </button>
                   {/* Both of these are consulted rather than read through, so
                       they live beside the figures as hover panels instead of at
                       the bottom of a column the reader has to scroll. They read
