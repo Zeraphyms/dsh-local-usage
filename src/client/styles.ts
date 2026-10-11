@@ -453,7 +453,30 @@ export const styles = String.raw`
 .dlu-waveSpoutWhale {
   fill: var(--dsw-alias-link);
   transform-origin: 50% 62%;
-  animation: dlu-breath 3.6s ease-in-out infinite;
+  /* Two motions at two speeds: it rises on the breath and rolls slowly, which is
+   * what floating looks like. One oscillation alone reads as a pulsing icon. */
+  animation:
+    dlu-breath 3.6s ease-in-out infinite,
+    dlu-float 6.4s ease-in-out infinite;
+}
+
+.dlu-waveSpoutWater {
+  /* Up against the belly: a waterline an animal is not touching reads as a
+   * second object rather than as the water it is in. */
+  margin-block-start: -5px;
+}
+
+.dlu-waveSpoutRipple {
+  fill: none;
+  stroke: var(--dsw-alias-link);
+  stroke-width: 0.9;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: dlu-ripple 3.4s ease-out infinite;
+}
+
+.dlu-waveSpoutRipple[data-lag='true'] {
+  animation-delay: -1.7s;
 }
 
 /* Anchored at the foot of the column — the whale's head — so the water climbs. */
@@ -494,6 +517,34 @@ export const styles = String.raw`
   70% {
     opacity: 0.85;
     transform: scaleY(0.7);
+  }
+}
+
+/* A slow roll about its own middle, as if the water were moving under it. */
+@keyframes dlu-float {
+  0%, 100% {
+    rotate: -1.4deg;
+  }
+
+  50% {
+    rotate: 1.4deg;
+  }
+}
+
+/* A ring leaving the body: it widens as it goes and thins to nothing. */
+@keyframes dlu-ripple {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.42);
+  }
+
+  70% {
+    opacity: 0.16;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
   }
 }
 
@@ -1958,8 +2009,15 @@ export const styles = String.raw`
   /* A spout that cannot move is still a spout: it holds the column up. */
   .dlu-waveSpoutWhale,
   .dlu-waveSpoutJet,
-  .dlu-waveSpoutDrop {
+  .dlu-waveSpoutDrop,
+  .dlu-waveSpoutRipple {
     animation: none;
+  }
+
+  /* A still ring states the waterline; an invisible one states nothing. */
+  .dlu-waveSpoutRipple {
+    opacity: 0.3;
+    transform: scale(0.8);
   }
 
   .dlu-waveSpoutJet {

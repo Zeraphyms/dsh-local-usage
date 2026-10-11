@@ -46,6 +46,8 @@ export const css = {
   waveSpout: 'dlu-waveSpout',
   waveSpoutDrop: 'dlu-waveSpoutDrop',
   waveSpoutJet: 'dlu-waveSpoutJet',
+  waveSpoutRipple: 'dlu-waveSpoutRipple',
+  waveSpoutWater: 'dlu-waveSpoutWater',
   waveSpoutWhale: 'dlu-waveSpoutWhale',
   waveStopTop: 'dlu-waveStopTop',
   waveNode: 'dlu-waveNode',

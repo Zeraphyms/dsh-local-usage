@@ -43,6 +43,8 @@ export declare const css: {
     readonly waveSpout: "dlu-waveSpout";
     readonly waveSpoutDrop: "dlu-waveSpoutDrop";
     readonly waveSpoutJet: "dlu-waveSpoutJet";
+    readonly waveSpoutRipple: "dlu-waveSpoutRipple";
+    readonly waveSpoutWater: "dlu-waveSpoutWater";
     readonly waveSpoutWhale: "dlu-waveSpoutWhale";
     readonly waveStopTop: "dlu-waveStopTop";
     readonly waveNode: "dlu-waveNode";

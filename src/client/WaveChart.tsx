@@ -209,7 +209,7 @@ export function WaveChart({
               * instead of stretching both ways. Two drops clear its lip. Placed
               * in the stack rather than at coordinates inside the logo's own
               * path, where the blowhole is not a thing the geometry names. */}
-            <svg className={css.waveSpoutJet} viewBox="0 0 26 34" width="26" height="34" focusable="false">
+            <svg className={css.waveSpoutJet} viewBox="0 0 26 34" width="21" height="27" focusable="false">
               <path d="M13 33.5 C9.6 24 9.9 14.5 13 5.6 C16.1 14.5 16.4 24 13 33.5 Z" />
               <circle className={css.waveSpoutDrop} cx="8" cy="14" r="1.6" />
               <circle className={css.waveSpoutDrop} cx="18.6" cy="10.5" r="1.2" />
@@ -217,11 +217,18 @@ export function WaveChart({
             <svg
               className={css.waveSpoutWhale}
               viewBox={`0 0 ${String(FISH_LOGO_VIEWBOX.width)} ${String(FISH_LOGO_VIEWBOX.height)}`}
-              width="56"
-              height={(56 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
+              width="42"
+              height={(42 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
               focusable="false"
             >
               <path d={FISH_LOGO_PATH} />
+            </svg>
+            {/* The water it floats on: two rings widening away from the body, one
+              * behind the other, which is what makes the animal look held up
+              * rather than pasted on. */}
+            <svg className={css.waveSpoutWater} viewBox="0 0 84 14" width="84" height="14" focusable="false">
+              <ellipse className={css.waveSpoutRipple} cx="42" cy="7" rx="17" ry="3.4" />
+              <ellipse className={css.waveSpoutRipple} cx="42" cy="7" rx="17" ry="3.4" data-lag="true" />
             </svg>
           </span>
         ) : null}
