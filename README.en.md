@@ -84,7 +84,7 @@ The calendar is the stable frame: it is Sunday-first with a one-glyph weekday gu
 
 Shading is a quantile ramp over the window's active days — median, then 75th and 90th percentiles — so the scale adapts to how the profile actually spends rather than assuming a distribution.
 
-Under the calendar, **Spend over time**: one blue swell drawing the shape of the selected range. Its buckets follow the window — **Today** is 24 hours (Beijing time), **Last 7 days** and **This month** are days, **This quarter** is weeks, and **This year** is months — because drawing a year as 365 hairlines, or a day as 24 bars, is the same mistake in opposite directions. While the fold runs it shows a moving tide rather than the previous range's water, so what is on the chart always belongs to the range named above it.
+Under the calendar, **Spend over time**: one blue swell drawing the shape of the selected range. Its buckets follow the window — **Today** is 24 hours (Beijing time), **Last 7 days** and **This month** are days, **This quarter** is weeks, and **This year** is months — because drawing a year as 365 hairlines, or a day as 24 bars, is the same mistake in opposite directions. While the fold runs it shows a moving tide rather than the previous range's water, so what is on the chart always belongs to the range named above it. A small whale swims in that water, drawn from the logo's own path (`FISH_LOGO_PATH`) because it is already this curve; under reduced motion it holds still in the water rather than leaving.
 
 ### The day page
 

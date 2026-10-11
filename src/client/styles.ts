@@ -425,6 +425,74 @@ export const styles = String.raw`
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* The whale, on its own layer: it crosses the water at a walking pace, which is
+ * slow enough to read the chart past it and fast enough to notice it is alive.
+ * It is decoration with a job — the brand's own animal, and a second hand for
+ * "this figure is water". */
+.dlu-waveSwimmer {
+  position: absolute;
+  inset-block-start: 34%;
+  inset-inline-start: 0;
+  display: block;
+  animation: dlu-swim 26s linear infinite;
+}
+
+.dlu-waveWhale {
+  fill: var(--dsw-alias-link);
+}
+
+/* The whole animal bobs on the swell; the tail swings on its own, shorter cycle,
+ * because a body that only slides across reads as a sticker being pushed. */
+.dlu-waveSwimmer svg {
+  animation: dlu-bob 3.4s ease-in-out infinite;
+}
+
+.dlu-waveSwimmer svg > path:nth-child(2) {
+  transform-origin: 6px 12px;
+  animation: dlu-tail 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes dlu-bob {
+  0%, 100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+
+  50% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+}
+
+@keyframes dlu-tail {
+  from {
+    transform: rotate(-12deg);
+  }
+
+  to {
+    transform: rotate(12deg);
+  }
+}
+
+.dlu-waveWhaleEye {
+  fill: var(--dsw-alias-bg-base);
+}
+
+/* A still whale for a reader who asked for less motion: no crossing, no bob, no
+ * tail — the figure simply has one in it. */
+.dlu-waveSwimmer[data-still='true'] {
+  inset-inline-start: 12%;
+  animation: none;
+}
+
+@keyframes dlu-swim {
+  from {
+    transform: translateX(-8%);
+  }
+
+  to {
+    transform: translateX(108%);
+  }
+}
+
 .dlu-waveAxis {
   display: flex;
   gap: 12px;
@@ -1867,6 +1935,10 @@ export const styles = String.raw`
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .dlu-waveSwimmer {
+    animation: none;
+  }
+
   /* A tide that cannot move still has to say the wait is a wait: it holds a
    * still surface at the waterline instead of sliding. */
   .dlu-waveTide {

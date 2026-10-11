@@ -16,7 +16,9 @@
  */
 
 import { useMemo, type ReactNode } from 'react'
+import { FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import { prefersReducedMotion } from './count-up.ts'
 import { wavePlot, waveSeries } from './wave.ts'
 import type { WaveInput } from './wave.ts'
 import { css } from './classes.ts'
@@ -92,6 +94,11 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
   const line = swellPath(plot)
   const area = line === '' ? '' : `${line} L ${String(VIEW_WIDTH)} ${String(VIEW_HEIGHT)} L 0 ${String(VIEW_HEIGHT)} Z`
   const peak = points.reduce((best, point) => (point.cost > best ? point.cost : best), 0)
+  // The whale is the product's own animal, and it swims only where there is water
+  // to swim in: a loading frame and an empty window are not a picture it belongs
+  // in. A reader who asked for less motion gets it at rest, still visible.
+  const swimming = !loading && !empty
+  const still = useMemo(() => prefersReducedMotion(), [])
   const total = points.reduce((sum, point) => sum + point.cost, 0)
 
   return (
@@ -136,6 +143,26 @@ export function WaveChart({ input, caption, loading, empty, locale, t, formatCos
           )}
         </svg>
         {empty && !loading ? <p className={css.waveEmpty}>{t('noUsage')}</p> : null}
+        {/* Kept out of the drawing above: that SVG stretches to fill the width
+          * without preserving its own aspect, so anything shaped inside it — a
+          * whale most of all — would come out squashed. This layer is measured in
+          * CSS pixels, where the animal keeps the proportions it was drawn at. */}
+        {swimming && (
+          <span className={css.waveSwimmer} data-still={still}>
+            {/* The product's own animal, from the same geometry its logo is
+              * drawn with — the package exports the path for exactly this, and a
+              * hand-drawn lookalike beside it would only ever be a lookalike. */}
+            <svg
+              viewBox={`0 0 ${String(FISH_LOGO_VIEWBOX.width)} ${String(FISH_LOGO_VIEWBOX.height)}`}
+              width="46"
+              height={(46 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path className={css.waveWhale} d={FISH_LOGO_PATH} />
+            </svg>
+          </span>
+        )}
       </div>
 
       {empty || loading ? null : (
