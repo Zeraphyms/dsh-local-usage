@@ -524,7 +524,25 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             ) : null}
 
             {gridState.status === 'loading' || gridState.status === 'idle'
-              ? <PanelSkeleton progress={progress} weeks={WINDOW_WEEKS} t={t} />
+              ? (
+                <PanelSkeleton progress={progress} weeks={WINDOW_WEEKS} t={t}>
+                  {/* The figure's own loading state, in the figure's own place: the
+                    * tide this panel draws for exactly this moment used to live
+                    * only inside the ready branch, so a first load showed ghost
+                    * lines where the chart goes and then a finished chart appeared
+                    * out of nothing. */}
+                  <WaveChart
+                    input={{ days: [], hourly: [], range: rangeId }}
+                    caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
+                    loading
+                    pending={false}
+                    empty={false}
+                    locale={activeLocale}
+                    t={t}
+                    formatCost={money}
+                  />
+                </PanelSkeleton>
+              )
               : null}
 
             {gridState.status === 'ready' ? (

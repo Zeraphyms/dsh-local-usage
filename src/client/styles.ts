@@ -349,22 +349,6 @@ export const styles = String.raw`
 
 /* ── The range's wave ─────────────────────────────────────────────────── */
 
-/* The whale's stretch of water, in the frame's own width. Registered so a range
- * switch can *move* it: an unregistered custom property is a string that changes
- * all at once, and the whale would teleport to the new water instead of heading
- * for it. */
-@property --dlu-swim-from {
-  syntax: '<length-percentage>';
-  inherits: false;
-  initial-value: 0cqw;
-}
-
-@property --dlu-swim-to {
-  syntax: '<length-percentage>';
-  inherits: false;
-  initial-value: 100cqw;
-}
-
 /* The range's own shape, under the calendar: the calendar answers a year, this
  * answers the window the reader selected. */
 .dlu-wave {
@@ -412,11 +396,6 @@ export const styles = String.raw`
  * three hundred are the same figure, and the page does not resize as ranges
  * change. */
 .dlu-waveFrame {
-  /* Its own size container, so the whale's crossing can be stated in the width it
-   * actually has. A percentage transform resolves against the element's *own*
-   * box — 108% of a 52px whale is 56px — which is how the crossing came out as a
-   * twitch near the left edge. */
-  container-type: inline-size;
   position: relative;
   block-size: 132px;
 }
@@ -456,137 +435,6 @@ export const styles = String.raw`
   margin: 0;
   font-size: 12px;
   color: var(--dsw-alias-label-tertiary);
-}
-
-/* The whale, on its own layer: it crosses the water at a walking pace, which is
- * slow enough to read the chart past it and fast enough to notice it is alive.
- * It is decoration with a job — the brand's own animal, and a second hand for
- * "this figure is water". */
-.dlu-waveSwimmer {
-  position: absolute;
-  inset-block-start: 34%;
-  inset-inline-start: 0;
-  display: block;
-  animation: dlu-swim 34s linear infinite;
-  transition:
-    --dlu-swim-from 500ms ease-out,
-    --dlu-swim-to 500ms ease-out;
-}
-
-.dlu-waveWhale {
-  fill: var(--dsw-alias-link);
-}
-
-/* The whole animal bobs on the swell; the tail swings on its own, shorter cycle,
- * because a body that only slides across reads as a sticker being pushed. */
-.dlu-waveSwimmer svg {
-  animation: dlu-bob 3.4s ease-in-out infinite;
-}
-
-.dlu-waveSwimmer svg > path:nth-child(2) {
-  transform-origin: 6px 12px;
-  animation: dlu-tail 1.1s ease-in-out infinite alternate;
-}
-
-@keyframes dlu-bob {
-  0%, 100% {
-    transform: translateY(0) rotate(-2deg);
-  }
-
-  50% {
-    transform: translateY(-5px) rotate(2deg);
-  }
-}
-
-@keyframes dlu-tail {
-  from {
-    transform: rotate(-12deg);
-  }
-
-  to {
-    transform: rotate(12deg);
-  }
-}
-
-.dlu-waveWhaleEye {
-  fill: var(--dsw-alias-bg-base);
-}
-
-/* A still whale for a reader who asked for less motion: no crossing, no bob, no
- * tail — the figure simply has one in it. */
-.dlu-waveSwimmer[data-still='true'] {
-  inset-inline-start: 12%;
-  animation: none;
-}
-
-/* The swell's own entrance, replayed whenever the series changes: it rises into
- * place instead of replacing the last one between two frames. */
-.dlu-wavePlot {
-  transform-origin: 50% 100%;
-  animation: dlu-swell 340ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-/* The rise is a movement, not a fade. It used to start from nothing, which put a
- * frame of empty water between the outgoing swell's dim and the incoming one's
- * appearance: 1 → 0.4 → 0 → 1, read as a flicker on every switch. */
-@keyframes dlu-swell {
-  from {
-    transform: translateY(9px) scaleY(0.9);
-  }
-
-  to {
-    transform: translateY(0) scaleY(1);
-  }
-}
-
-/* The axis is redrawn rather than moved — different buckets, different labels —
- * so it arrives on the swell's own beat instead of cutting between two frames. */
-.dlu-waveTicks {
-  animation: dlu-ticks 340ms ease-out;
-}
-
-@keyframes dlu-ticks {
-  from {
-    opacity: 0.3;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-/* A fold in flight: the figure stays, stated as the range before this one, and
- * says so by going quiet rather than by disappearing. */
-.dlu-wave[data-pending='true'] .dlu-wavePlot {
-  opacity: 0.4;
-  transition: opacity 180ms ease-out;
-}
-
-/* Across the water and out, then back in from the other side: the whale travels
- * the figure's own width rather than its own. */
-@keyframes dlu-swim {
-  from {
-    transform: translateX(var(--dlu-swim-from));
-  }
-
-  to {
-    transform: translateX(var(--dlu-swim-to));
-  }
-}
-
-/* The rules are drawn in the figure's own units but must stay hairlines: the
- * viewBox has no aspect ratio, so a stroke that scaled with it would be a
- * different weight at every panel width. */
-.dlu-waveRule {
-  stroke: var(--dsw-alias-border-l2);
-  stroke-width: 0.5;
-}
-
-/* The swell's own points, at the places the axis names. Filled with the figure's
- * own blue rather than a second colour: they are the line, marked, not an
- * annotation laid over it. */
-.dlu-waveNode {
-  fill: var(--dsw-alias-link);
 }
 
 /* The axis names several points, not just the ends. Each label is placed on the
@@ -2051,12 +1899,7 @@ export const styles = String.raw`
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dlu-waveSwimmer {
-    animation: none;
-  }
-
-  .dlu-wavePlot,
-  .dlu-waveTicks {
+    .dlu-wavePlot {
     animation: none;
   }
 

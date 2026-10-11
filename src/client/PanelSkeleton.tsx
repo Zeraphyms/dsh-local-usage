@@ -148,6 +148,14 @@ export interface PanelSkeletonProps {
   readonly progress: UsageInsightsProgress | undefined
   /** Week columns the calendar spans. */
   readonly weeks: number
+  /**
+   * What to draw under the ghost calendar.
+   *
+   * The loading frame is a stack the caller owns — the panel puts the range's
+   * figure in it, in its own loading state, so a first load shows the chart's
+   * tide where the chart will be instead of a blank and then a finished chart.
+   */
+  readonly children?: ReactNode
   readonly t: PropsLocale<'usage'>['t']
 }
 
@@ -196,7 +204,7 @@ function ReadProgressLine({ progress, t }: {
  * @param props - the read's progress, the calendar window, and the dictionary.
  * @returns the frame the real panel replaces.
  */
-export function PanelSkeleton({ progress, weeks, t }: PanelSkeletonProps): ReactNode {
+export function PanelSkeleton({ progress, weeks, t, children }: PanelSkeletonProps): ReactNode {
   const now = useMemo(() => Date.now(), [])
   const [from, to] = useMemo(() => heatmapWindow(now, weeks), [now, weeks])
   const first = midnight(from)
@@ -320,6 +328,8 @@ export function PanelSkeleton({ progress, weeks, t }: PanelSkeletonProps): React
           ))}
         </div>
       </section>
+
+      {children}
     </>
   )
 }
