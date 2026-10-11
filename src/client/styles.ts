@@ -349,6 +349,22 @@ export const styles = String.raw`
 
 /* ── The range's wave ─────────────────────────────────────────────────── */
 
+/* The whale's stretch of water, in the frame's own width. Registered so a range
+ * switch can *move* it: an unregistered custom property is a string that changes
+ * all at once, and the whale would teleport to the new water instead of heading
+ * for it. */
+@property --dlu-swim-from {
+  syntax: '<length-percentage>';
+  inherits: false;
+  initial-value: 0cqw;
+}
+
+@property --dlu-swim-to {
+  syntax: '<length-percentage>';
+  inherits: false;
+  initial-value: 100cqw;
+}
+
 /* The range's own shape, under the calendar: the calendar answers a year, this
  * answers the window the reader selected. */
 .dlu-wave {
@@ -452,6 +468,9 @@ export const styles = String.raw`
   inset-inline-start: 0;
   display: block;
   animation: dlu-swim 34s linear infinite;
+  transition:
+    --dlu-swim-from 500ms ease-out,
+    --dlu-swim-to 500ms ease-out;
 }
 
 .dlu-waveWhale {
@@ -504,18 +523,35 @@ export const styles = String.raw`
  * place instead of replacing the last one between two frames. */
 .dlu-wavePlot {
   transform-origin: 50% 100%;
-  animation: dlu-swell 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: dlu-swell 340ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
+/* The rise is a movement, not a fade. It used to start from nothing, which put a
+ * frame of empty water between the outgoing swell's dim and the incoming one's
+ * appearance: 1 → 0.4 → 0 → 1, read as a flicker on every switch. */
 @keyframes dlu-swell {
   from {
-    opacity: 0;
-    transform: translateY(6px) scaleY(0.94);
+    transform: translateY(9px) scaleY(0.9);
+  }
+
+  to {
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+/* The axis is redrawn rather than moved — different buckets, different labels —
+ * so it arrives on the swell's own beat instead of cutting between two frames. */
+.dlu-waveTicks {
+  animation: dlu-ticks 340ms ease-out;
+}
+
+@keyframes dlu-ticks {
+  from {
+    opacity: 0.3;
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scaleY(1);
   }
 }
 
@@ -530,11 +566,11 @@ export const styles = String.raw`
  * the figure's own width rather than its own. */
 @keyframes dlu-swim {
   from {
-    transform: translateX(-14cqw);
+    transform: translateX(var(--dlu-swim-from));
   }
 
   to {
-    transform: translateX(104cqw);
+    transform: translateX(var(--dlu-swim-to));
   }
 }
 
@@ -2019,7 +2055,8 @@ export const styles = String.raw`
     animation: none;
   }
 
-  .dlu-wavePlot {
+  .dlu-wavePlot,
+  .dlu-waveTicks {
     animation: none;
   }
 

@@ -15,7 +15,7 @@
  * @module dsh-local-usage/client/WaveChart
  */
 
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import { FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { prefersReducedMotion } from './count-up.ts'
@@ -117,6 +117,22 @@ export function WaveChart({
   // entrance: a curve that appears where the last one was reads as a jump,
   // and this costs one fade instead.
   const swellKey = `${points.length}:${points[0]?.label ?? ''}:${points[points.length - 1]?.label ?? ''}`
+  // Where the water is. A window can be mostly quiet — a day whose spending all
+  // happened between nine and six, a month with one busy week — and a whale that
+  // crosses the empty part of it is a whale crossing a desert. The band is the
+  // stretch the series actually spent in, in the frame's own width (`cqw`), with
+  // a floor so a single bucket does not leave it treading water.
+  const swim = useMemo(() => {
+    const spent = points.flatMap((point, index) => (point.cost > 0 ? [index] : []))
+    const first = spent[0]
+    const last = spent[spent.length - 1]
+    if (first === undefined || last === undefined) return undefined
+    const from = plot[first]?.x ?? 0
+    const to = plot[last]?.x ?? 1
+    const start = Math.max(0, from * 100 - 5)
+    const end = Math.min(100, Math.max(to * 100 + 1, start + 16))
+    return { start, end, seconds: Math.min(42, Math.max(11, ((end - start) / 100) * 40)) }
+  }, [plot, points])
   // The whale is the product's own animal, and it swims only where there is water
   // to swim in: a loading frame and an empty window are not a picture it belongs
   // in. A reader who asked for less motion gets it at rest, still visible.
@@ -125,12 +141,15 @@ export function WaveChart({
   // That was the jump. It leaves only when the water does.
   const swimming = !empty
   const still = useMemo(() => prefersReducedMotion(), [])
-  // Evenly spaced over the series with both ends named: a fixed stride would
-  // leave the window's last bucket unlabelled whenever it did not divide.
+  // A fixed stride, not an even division of the point count: dividing a series of
+  // ten months into seven labels rounds to 1, 3, 4, 6, 7, 9, 10 — an axis whose
+  // gaps alternate, which reads as a bug rather than as an axis. A stride gives
+  // every gap the same width, and the cost of that is the last bucket sometimes
+  // going unnamed.
   const ticks = useMemo(() => {
-    const count = Math.min(MAX_TICKS, points.length)
-    if (count === 0) return []
-    const seen = new Set<number>()
+    if (points.length === 0) return []
+    const stride = [1, 2, 3, 4, 6, 12].find(step => Math.ceil(points.length / step) <= MAX_TICKS)
+      ?? Math.ceil(points.length / MAX_TICKS)
     const chosen: {
       readonly index: number
       readonly x: number
@@ -138,11 +157,9 @@ export function WaveChart({
       readonly label: string
       readonly cost: number
     }[] = []
-    for (let tick = 0; tick < count; tick += 1) {
-      const index = count === 1 ? 0 : Math.round((tick * (points.length - 1)) / (count - 1))
+    for (let index = 0; index < points.length; index += stride) {
       const point = points[index]
-      if (point === undefined || seen.has(index)) continue
-      seen.add(index)
+      if (point === undefined) continue
       chosen.push({
         index,
         x: plot[index]?.x ?? 0,
@@ -229,15 +246,23 @@ export function WaveChart({
           * without preserving its own aspect, so anything shaped inside it — a
           * whale most of all — would come out squashed. This layer is measured in
           * CSS pixels, where the animal keeps the proportions it was drawn at. */}
-        {swimming && (
-          <span className={css.waveSwimmer} data-still={still}>
+        {swimming && swim !== undefined && (
+          <span
+            className={css.waveSwimmer}
+            data-still={still}
+            style={{
+              '--dlu-swim-from': `${swim.start.toFixed(2)}cqw`,
+              '--dlu-swim-to': `${swim.end.toFixed(2)}cqw`,
+              animationDuration: `${swim.seconds.toFixed(1)}s`,
+            } as CSSProperties}
+          >
             {/* The product's own animal, from the same geometry its logo is
               * drawn with — the package exports the path for exactly this, and a
               * hand-drawn lookalike beside it would only ever be a lookalike. */}
             <svg
               viewBox={`0 0 ${String(FISH_LOGO_VIEWBOX.width)} ${String(FISH_LOGO_VIEWBOX.height)}`}
-              width="46"
-              height={(46 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
+              width="30"
+              height={(30 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
               aria-hidden="true"
               focusable="false"
             >
@@ -248,7 +273,7 @@ export function WaveChart({
       </div>
 
       {empty || loading ? null : (
-        <div className={css.waveTicks}>
+        <div key={swellKey} className={css.waveTicks}>
           {ticks.map(tick => (
             // Positioned on the same share of the width the drawing uses, so a
             // label sits under the point it names rather than near it.
