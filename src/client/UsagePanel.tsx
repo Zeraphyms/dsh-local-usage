@@ -606,7 +606,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     * lines where the chart goes and then a finished chart appeared
                     * out of nothing. */}
                   <WaveChart
-                    input={{ days: [], hourly: [], range: rangeId }}
+                    input={{ days: [], hourly: [], routeSeries: [], range: rangeId }}
                     caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
                     loading
                     empty={false}
@@ -677,6 +677,12 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   input={{
                     days: waveSettled ? summaryState.report.days : [],
                     hourly: waveSettled ? summaryState.report.hourly : [],
+                    routeSeries: waveSettled
+                      ? (summaryState.report.routeSeries ??
+                        // a hand-built report (and an older Host) may lack the
+                        // series; the stack reads an empty one as no routes
+                        [])
+                      : [],
                     range: rangeId,
                   }}
                   caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}

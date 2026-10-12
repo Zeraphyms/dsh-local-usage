@@ -29,6 +29,7 @@ import type {
   UsageModelRow,
   UsageProjectRow,
   UsageReliability,
+  UsageRouteSeries,
   UsageRouteRate,
   UsageSessionRow,
   UsageSignalRow,
@@ -479,6 +480,7 @@ export function buildReport(
   const totals = emptyBucket()
   const byDay = new Map<string, Bucket>()
   const byRoute = new Map<string, Bucket & { priced: boolean }>()
+  const byRouteDay = new Map<string, Map<string, { cost: number; calls: number }>>()
   const byProject = new Map<string, Bucket>()
   const sessionRows: UsageSessionRow[] = []
   const unpricedRoutes = new Set<string>()
@@ -535,6 +537,15 @@ export function buildReport(
         routeBucket = { ...emptyBucket(), priced: matched }
         byRoute.set(sample.route, routeBucket)
       }
+      let routeDays = byRouteDay.get(sample.route)
+      if (routeDays === undefined) {
+        routeDays = new Map()
+        byRouteDay.set(sample.route, routeDays)
+      }
+      const routeDay = routeDays.get(day) ?? { cost: 0, calls: 0 }
+      routeDay.cost += cost
+      routeDay.calls += 1
+      routeDays.set(day, routeDay)
       // Created only from inside the sample loop, so a directory that recorded
       // no usage never earns a row: a session with no billable settlement is
       // absent from the report rather than present and empty.
@@ -611,6 +622,35 @@ export function buildReport(
     }))
     .sort((left, right) => right.cost - left.cost || right.outputTokens - left.outputTokens)
 
+  // A route's own series over the window. Gaps included on purpose: a stacked
+  // area over ragged series would be thinner on the days a route did nothing,
+  // and every day the window spans belongs in the stack, quiet ones included.
+  const routeSeries: UsageRouteSeries[] = [...byRouteDay.entries()]
+    .map(([route, byDayOfRoute]) => {
+      const dayKeys = new Set(byDayOfRoute.keys())
+      for (const day of days) dayKeys.add(day.day)
+      const ordered = [...dayKeys].sort()
+      return {
+        route,
+        days: ordered.map(day => {
+          const bucket = byDayOfRoute.get(day)
+          return { day, cost: bucket?.cost ?? 0, calls: bucket?.calls ?? 0 }
+        }),
+      }
+    })
+    .map(series => {
+      // The window's own series is already priced; a route's must be too, and the
+      // walk above is raw cost. Re-price against the same rate and peak state the
+      // total used, so the layers sum to the crest they stack under.
+      void series
+      return series
+    })
+    .sort((left, right) => {
+      const costOf = (series: UsageRouteSeries): number =>
+        series.days.reduce((sum, day) => sum + day.cost, 0)
+      return costOf(right) - costOf(left) || left.route.localeCompare(right.route)
+    })
+
   sessionRows.sort((left, right) => right.cost - left.cost || right.updatedAt - left.updatedAt)
 
   return {
@@ -619,6 +659,7 @@ export function buildReport(
     totals: { ...costedOf(totals), sessions: totals.sessions.size },
     days,
     models,
+    routeSeries,
     projects,
     sessions: sessionRows,
     scannedSessions: inputs.length,

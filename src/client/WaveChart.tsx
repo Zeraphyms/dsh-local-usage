@@ -18,7 +18,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import { wavePlot, waveSeries } from './wave.ts'
+import { wavePlot, waveStack, type StackLayer, type WavePoint } from './wave.ts'
 import type { WaveInput } from './wave.ts'
 import { css } from './classes.ts'
 
@@ -96,11 +96,20 @@ function swellPath(points: readonly { x: number; y: number }[]): string {
 export function WaveChart({
   input, caption, loading, empty, locale, t, formatCost,
 }: WaveChartProps): ReactNode {
-  const points = useMemo(
-    () => waveSeries(input, locale.toLowerCase().startsWith('zh')),
-    [input, locale],
-  )
+  const zh = locale.toLowerCase().startsWith('zh')
+  // The window's routes, stacked, with its totals beside them: the totals are
+  // what the axis, the outline, and the nodes are drawn from, and the layers are
+  // the swells between the baseline and that same outline.
+  const stack = useMemo(() => waveStack(input, zh), [input, zh])
+  const points = stack.totalPoints
   const plot = useMemo(() => wavePlot(points), [points])
+  const stackedLayers = useMemo(
+    () => (stack.remainder === undefined
+      ? [...stack.layers]
+      : [...stack.layers, stack.remainder]),
+    [stack],
+  )
+  const hasRoutes = stack.layers.length > 0
   const line = swellPath(plot)
   const area = line === '' ? '' : `${line} L ${String(VIEW_WIDTH)} ${String(VIEW_HEIGHT)} L 0 ${String(VIEW_HEIGHT)} Z`
   const peak = points.reduce((best, point) => (point.cost > best ? point.cost : best), 0)
@@ -188,10 +197,34 @@ export function WaveChart({
                   />
                 </g>
               ))}
-              <g className={css.wavePlot}>
-                <path className={css.waveArea} d={area} fill="url(#dlu-wave-fill)" />
-                <path className={css.waveLine} d={line} vectorEffect="non-scaling-stroke" />
-              </g>
+              {hasRoutes ? (
+                /* The window, stacked: each of its routes as its own swell, the
+                 * dearest at the baseline and the rest as one remainder, and the
+                 * outline of their sum over the top. The outline is the one line,
+                 * as it was before routes, so the stack reads as the window it
+                 * splits rather than as a separate chart. */
+                <g className={css.wavePlot}>
+                  {stackedLayers.map((layer, index) => (
+                    <StackedSwell
+                      key={layer.route}
+                      layer={layer}
+                      below={stackedLayers
+                        .slice(0, index)
+                        .reduce((tops, lower) => tops.map((top, at) => top + shareOf(lower.points[at] ?? { label: '', cost: 0 }, points[at])),
+                          plot.map(() => 0))}
+                      total={points}
+                      axis={plot}
+                      color={index % ROUTE_COLORS}
+                    />
+                  ))}
+                  <path className={css.waveLine} d={line} vectorEffect="non-scaling-stroke" />
+                </g>
+              ) : (
+                <g className={css.wavePlot}>
+                  <path className={css.waveArea} d={area} fill="url(#dlu-wave-fill)" />
+                  <path className={css.waveLine} d={line} vectorEffect="non-scaling-stroke" />
+                </g>
+              )}
             </>
           )}
         </svg>
@@ -246,6 +279,20 @@ export function WaveChart({
 
       {/* Always present: the row is 15px of the figure, and leaving it out while
         * a fold ran made the page under the chart shift down when the fold landed. */}
+      {empty || loading || !hasRoutes ? null : (
+        <div className={css.waveLegend}>
+          {stackedLayers.map((layer, index) => (
+            <span key={layer.route} className={css.waveLegendItem}>
+              <span className={css.waveLegendSwatch} data-color={String(index % ROUTE_COLORS)} />
+              <span className={css.waveLegendRoute} title={layer.route === 'other' ? undefined : layer.route}>
+                {layer.route === 'other' ? t('waveLegendOther') : layer.route}
+              </span>
+              <span className={css.waveLegendCost}>{formatCost(layer.cost)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       {empty || loading
         ? <div className={css.waveTicks} aria-hidden="true" />
         : (
@@ -269,3 +316,61 @@ export function WaveChart({
   )
 }
 
+
+/** The hues the routes are drawn in, in legend order. */
+const ROUTE_COLORS = 5
+
+/**
+ * A bucket's share of the window's height: the route's cost over the window's
+ * total for that bucket, so the layers beneath sum to the window's own crest.
+ *
+ * @param point - the route's bucket.
+ * @param total - the window's point for the same bucket.
+ * @returns the bucket's share of the window's height, zero where the window
+ * spent nothing.
+ */
+function shareOf(point: WavePoint, total: WavePoint | undefined): number {
+  if (total === undefined || total.cost <= 0) return 0
+  return point.cost / total.cost
+}
+
+/** One route's swell, drawn from the running top of the layers beneath it. */
+function StackedSwell({ layer, below, total, axis, color }: {
+  readonly layer: StackLayer
+  readonly below: readonly number[]
+  readonly total: readonly WavePoint[]
+  readonly axis: readonly { x: number }[]
+  readonly color: number
+}): ReactNode {
+  const top = layer.points.map((point, at) => (below[at] ?? 0) + shareOf(point, total[at]))
+  const d = bandPath(axis, top, below)
+  if (d === '') return null
+  return <path className={css.waveArea} data-color={String(color)} d={d} />
+}
+
+/**
+ * The closed path of one layer of the stack, from its crest down to the crest of
+ * the layer beneath it.
+ *
+ * @param axis - the window's points, for the x of each bucket.
+ * @param top - this layer's crest, as shares of the height.
+ * @param below - the layer beneath's crest, as shares of the height.
+ * @returns the band between the two, closed on itself.
+ */
+function bandPath(axis: readonly { x: number }[], top: readonly number[], below: readonly number[]): string {
+  if (axis.length === 0) return ''
+  const crest = swellPath(axis.map((point, index) => ({ x: point.x, y: top[index] ?? 0 })))
+  if (crest === '') return ''
+  // The floor walked right to left, so the band closes with no seam of its own.
+  const floor = axis
+    .map((point, index) => ({ x: point.x, y: below[index] ?? 0 }))
+    .reverse()
+  const floorPath = floor
+    .map((point) => {
+      const x = (point.x * VIEW_WIDTH).toFixed(2)
+      const y = ((1 - point.y * CREST) * VIEW_HEIGHT).toFixed(2)
+      return `L ${x} ${y}`
+    })
+    .join(' ')
+  return `${crest} ${floorPath} Z`
+}

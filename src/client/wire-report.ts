@@ -34,6 +34,7 @@ export function normalizeReport(value: WireReport): UsageInsightsReport {
   return {
     ...value,
     days: value.days ?? [],
+    routeSeries: value.routeSeries ?? [],
     models: value.models ?? [],
     projects: value.projects ?? [],
     sessions: value.sessions ?? [],
