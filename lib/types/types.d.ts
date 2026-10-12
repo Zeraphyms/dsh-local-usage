@@ -44,31 +44,6 @@ export interface UsageDayRow extends UsageCosted {
     /** Distinct sessions that recorded usage on this day. */
     readonly sessions: number;
 }
-/**
- * One route's day-by-day spend over a window, for a stacked reading of it.
- *
- * The per-day row answers when a window spent; the per-route row answers who
- * spent it. This is the product of the two: the same window, split into each
- * route's own series, so a reader can see that the rise last Tuesday was the
- * expensive model and not the cheap one. The day rows keep their gaps — a day a
- * route did nothing on has a row, or the stack would be thinner on quiet days —
- * because a stacked area drawn from ragged series cannot be read.
- */
-export interface UsageRouteSeries {
-    /** `provider/model`, or the unknown-route label when the log carries none. */
-    readonly route: string;
-    /** One row per day of the window, gaps included, ascending. */
-    readonly days: readonly UsageDaySeriesRow[];
-}
-/** A route's figures for one day. */
-export interface UsageDaySeriesRow {
-    /** Local calendar day as `YYYY-MM-DD`. */
-    readonly day: string;
-    /** Money spent on this route on this day. */
-    readonly cost: number;
-    /** Billed settlements on this route on this day. */
-    readonly calls: number;
-}
 /** Usage attributed to one `provider/model` route. */
 export interface UsageModelRow extends UsageCosted {
     /** `provider/model`, or `unknown` when the log carries no route attribution. */
@@ -271,13 +246,6 @@ export interface UsageInsightsReport {
     readonly days: readonly UsageDayRow[];
     /** Per-route rows ordered by descending cost. */
     readonly models: readonly UsageModelRow[];
-    /**
-     * Each route's day-by-day spend over the window, for a stacked reading of it.
-     *
-     * Folded with the day rows because a sample knows its route and its day in the
-     * same walk; it is what the panel's figure is stacked from.
-     */
-    readonly routeSeries: readonly UsageRouteSeries[];
     /** Per-working-directory rows over the requested window, ordered by descending cost. */
     readonly projects: readonly UsageProjectRow[];
     /** Per-session rows ordered by descending cost. */

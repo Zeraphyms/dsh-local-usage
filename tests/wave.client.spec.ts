@@ -28,7 +28,7 @@ const HOURS = Array.from({ length: 24 }, (_, index) => hour(index, index === 10 
 
 describe('waveSeries', () => {
   it('reads a single day in hours', () => {
-    const points = waveSeries({ days: [], hourly: HOURS, routeSeries: [], range: 'day' }, false)
+    const points = waveSeries({ days: [], hourly: HOURS, range: 'day' }, false)
 
     expect(points).toHaveLength(24)
     expect(points[0]?.label).toBe('00')
@@ -38,9 +38,9 @@ describe('waveSeries', () => {
   it('reads a week and a month in days', () => {
     const days = [day('2026-09-21', 1), day('2026-09-22', 2)]
 
-    expect(waveSeries({ days, hourly: [], routeSeries: [], range: 'week' }, false).map(p => p.label))
+    expect(waveSeries({ days, hourly: [], range: 'week' }, false).map(p => p.label))
       .toEqual(['09-21', '09-22'])
-    expect(waveSeries({ days, hourly: [], routeSeries: [], range: 'month' }, false)).toHaveLength(2)
+    expect(waveSeries({ days, hourly: [], range: 'month' }, false)).toHaveLength(2)
   })
 
   it('folds a quarter into the weeks its days belong to', () => {
@@ -48,7 +48,7 @@ describe('waveSeries', () => {
     // 28th opens the next.
     const points = waveSeries({
       days: [day('2026-09-21', 1), day('2026-09-23', 2), day('2026-09-28', 4)],
-      hourly: [], routeSeries: [],
+      hourly: [],
       range: 'quarter',
     }, false)
 
@@ -60,14 +60,14 @@ describe('waveSeries', () => {
   it('folds a year into months, in order, named for the locale', () => {
     const days = [day('2026-11-02', 3), day('2026-01-05', 1), day('2026-01-06', 2)]
 
-    const zh = waveSeries({ days, hourly: [], routeSeries: [], range: 'year' }, true)
+    const zh = waveSeries({ days, hourly: [], range: 'year' }, true)
     expect(zh).toEqual([{ label: '1月', cost: 3 }, { label: '11月', cost: 3 }])
-    expect(waveSeries({ days, hourly: [], routeSeries: [], range: 'year' }, false)[0]?.label).toBe('1')
+    expect(waveSeries({ days, hourly: [], range: 'year' }, false)[0]?.label).toBe('1')
   })
 
   it('answers nothing for a window that recorded nothing', () => {
-    expect(waveSeries({ days: [], hourly: [], routeSeries: [], range: 'year' }, false)).toEqual([])
-    expect(waveSeries({ days: [], hourly: [], routeSeries: [], range: 'day' }, false)).toEqual([])
+    expect(waveSeries({ days: [], hourly: [], range: 'year' }, false)).toEqual([])
+    expect(waveSeries({ days: [], hourly: [], range: 'day' }, false)).toEqual([])
   })
 })
 

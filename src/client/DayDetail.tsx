@@ -131,7 +131,7 @@ export function DayDetail({
               {/* The day's shape, waiting: the same figure the folded page shows,
                 * so the page does not reflow when the fold lands. */}
               <WaveChart
-                input={{ days: [], hourly: [], routeSeries: [], range: 'day' }}
+                input={{ days: [], hourly: [], range: 'day' }}
                 caption={t('waveHourScope')}
                 loading
                 empty={false}
@@ -199,7 +199,7 @@ function DayFigures({ report, locale, t, formatCost, formatTokens, formatInteger
         * just the window whose buckets are hours, and the fold that answers it —
         * `hourly` — is already in this report. */}
       <WaveChart
-        input={{ days: report.days, hourly: report.hourly, routeSeries: report.routeSeries, range: 'day' }}
+        input={{ days: report.days, hourly: report.hourly, range: 'day' }}
         caption={t('waveHourScope')}
         loading={false}
         empty={totals.calls === 0}
