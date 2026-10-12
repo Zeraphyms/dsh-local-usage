@@ -18,7 +18,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import { wavePlot, waveSeries } from './wave.ts'
+import { wavePlot, waveRoutes, waveSeries } from './wave.ts'
 import type { WaveInput } from './wave.ts'
 import { css } from './classes.ts'
 
@@ -96,11 +96,23 @@ function swellPath(points: readonly { x: number; y: number }[]): string {
 export function WaveChart({
   input, caption, loading, empty, locale, t, formatCost,
 }: WaveChartProps): ReactNode {
-  const points = useMemo(
-    () => waveSeries(input, locale.toLowerCase().startsWith('zh')),
-    [input, locale],
-  )
+  const zh = locale.toLowerCase().startsWith('zh')
+  const points = useMemo(() => waveSeries(input, zh), [input, zh])
   const plot = useMemo(() => wavePlot(points), [points])
+  // The models over the window, each drawn on the total's own scale: a curve
+  // normalised to itself would say every model is a hundred percent of
+  // something, which is the one thing a reader is not asking.
+  const routeLines = useMemo(() => {
+    const largest = points.reduce((best, point) => (point.cost > best ? point.cost : best), 0)
+    return waveRoutes(input, zh).map(swell => ({
+      route: swell.route,
+      cost: swell.cost,
+      path: swellPath(swell.points.map((point, at) => ({
+        x: plot[at]?.x ?? 0,
+        y: largest <= 0 ? 0 : point.cost / largest,
+      }))),
+    }))
+  }, [input, zh, plot, points])
   const line = swellPath(plot)
   const area = line === '' ? '' : `${line} L ${String(VIEW_WIDTH)} ${String(VIEW_HEIGHT)} L 0 ${String(VIEW_HEIGHT)} Z`
   const peak = points.reduce((best, point) => (point.cost > best ? point.cost : best), 0)
@@ -146,6 +158,20 @@ export function WaveChart({
         {empty || loading ? null : <span className={css.waveTotal}>{formatCost(total)}</span>}
       </figcaption>
 
+      {/* Named before the water rather than after it: a reader who meets four
+        * curves at once needs to know what they are before reading their shape. */}
+      {empty || loading || routeLines.length === 0 ? null : (
+        <div className={css.waveLegend}>
+          {routeLines.map((swell, index) => (
+            <span key={swell.route} className={css.waveLegendItem}>
+              <span className={css.waveLegendSwatch} data-color={String(index % ROUTE_LINES)} />
+              <span className={css.waveLegendRoute} title={swell.route}>{swell.route}</span>
+              <span className={css.waveLegendCost}>{formatCost(swell.cost)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className={css.waveFrame} data-loading={loading}>
         <svg
           className={css.waveSvg}
@@ -190,6 +216,18 @@ export function WaveChart({
               ))}
               <g className={css.wavePlot}>
                 <path className={css.waveArea} d={area} fill="url(#dlu-wave-fill)" />
+                {/* The models, over the window they make up. Thin strokes that
+                  * opt out of the figure's scale, so a curve is a hairline at
+                  * every panel width rather than a band at the wide ones. */}
+                {routeLines.map((swell, index) => (
+                  <path
+                    key={swell.route}
+                    className={css.waveRoute}
+                    data-color={String(index % ROUTE_LINES)}
+                    d={swell.path}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
                 <path className={css.waveLine} d={line} vectorEffect="non-scaling-stroke" />
               </g>
             </>
@@ -269,3 +307,6 @@ export function WaveChart({
   )
 }
 
+
+/** How many curves the figure draws over its total, matching the model's cap. */
+const ROUTE_LINES = 4

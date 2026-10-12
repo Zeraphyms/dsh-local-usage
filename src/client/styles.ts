@@ -576,6 +576,88 @@ export const styles = String.raw`
   }
 }
 
+/* The models over the window, as curves. Strokes rather than fills: the area
+ * below them is the window's total, and a second filled shape on top of it would
+ * read as a second total. The element's own vector-effect keeps every one a
+ * hairline however wide the panel is. */
+.dlu-waveRoute {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The hues run from the brand's own blue to the success green, interpolated
+ * rather than picked: two tokens this product already has, and the steps between
+ * them are the palette. Red is deliberately absent — nothing here is failing. */
+.dlu-waveRoute[data-color='0'] {
+  stroke: var(--dsw-alias-link);
+}
+
+.dlu-waveRoute[data-color='1'] {
+  stroke: color-mix(in oklab, var(--dsw-alias-link) 60%, var(--dsw-alias-state-success-primary));
+}
+
+.dlu-waveRoute[data-color='2'] {
+  stroke: color-mix(in oklab, var(--dsw-alias-link) 25%, var(--dsw-alias-state-success-primary));
+}
+
+.dlu-waveRoute[data-color='3'] {
+  stroke: var(--dsw-alias-state-success-primary);
+}
+
+/* The legend: a stroke of the hue, the route, and what it spent. It reads as a
+ * key to the curves above it rather than as a table of its own. */
+.dlu-waveLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.dlu-waveLegendItem {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.dlu-waveLegendRoute {
+  max-inline-size: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dlu-waveLegendCost {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* A swatch the shape of the thing it labels: a stroke, not a chip. */
+.dlu-waveLegendSwatch {
+  display: inline-block;
+  inline-size: 13px;
+  block-size: 2px;
+  border-radius: 1px;
+}
+
+.dlu-waveLegendSwatch[data-color='0'] {
+  background: var(--dsw-alias-link);
+}
+
+.dlu-waveLegendSwatch[data-color='1'] {
+  background: color-mix(in oklab, var(--dsw-alias-link) 60%, var(--dsw-alias-state-success-primary));
+}
+
+.dlu-waveLegendSwatch[data-color='2'] {
+  background: color-mix(in oklab, var(--dsw-alias-link) 25%, var(--dsw-alias-state-success-primary));
+}
+
+.dlu-waveLegendSwatch[data-color='3'] {
+  background: var(--dsw-alias-state-success-primary);
+}
+
 /* The axis names several points, not just the ends. Each label is placed on the
  * share of the width its point sits at, and the two ends are pulled inward so a
  * label under the first or last bucket stays inside the figure. */

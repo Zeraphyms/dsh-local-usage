@@ -36,7 +36,13 @@ export declare const css: {
     readonly waveCaption: "dlu-waveCaption";
     readonly waveEmpty: "dlu-waveEmpty";
     readonly waveFrame: "dlu-waveFrame";
+    readonly waveLegend: "dlu-waveLegend";
+    readonly waveLegendCost: "dlu-waveLegendCost";
+    readonly waveLegendItem: "dlu-waveLegendItem";
+    readonly waveLegendRoute: "dlu-waveLegendRoute";
+    readonly waveLegendSwatch: "dlu-waveLegendSwatch";
     readonly waveLine: "dlu-waveLine";
+    readonly waveRoute: "dlu-waveRoute";
     readonly wavePeak: "dlu-wavePeak";
     readonly waveScope: "dlu-waveScope";
     readonly waveStopBottom: "dlu-waveStopBottom";
