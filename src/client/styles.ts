@@ -576,86 +576,43 @@ export const styles = String.raw`
   }
 }
 
-/* The models over the window, as curves. Strokes rather than fills: the area
- * below them is the window's total, and a second filled shape on top of it would
- * read as a second total. The element's own vector-effect keeps every one a
- * hairline however wide the panel is. */
-.dlu-waveRoute {
-  fill: none;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* The hues run from the brand's own blue to the success green, interpolated
- * rather than picked: two tokens this product already has, and the steps between
- * them are the palette. Red is deliberately absent — nothing here is failing. */
-.dlu-waveRoute[data-color='0'] {
-  stroke: var(--dsw-alias-link);
-}
-
-.dlu-waveRoute[data-color='1'] {
-  stroke: color-mix(in oklab, var(--dsw-alias-link) 60%, var(--dsw-alias-state-success-primary));
-}
-
-.dlu-waveRoute[data-color='2'] {
-  stroke: color-mix(in oklab, var(--dsw-alias-link) 25%, var(--dsw-alias-state-success-primary));
-}
-
-.dlu-waveRoute[data-color='3'] {
-  stroke: var(--dsw-alias-state-success-primary);
-}
-
-/* The legend: a stroke of the hue, the route, and what it spent. It reads as a
- * key to the curves above it rather than as a table of its own. */
-.dlu-waveLegend {
+/* The window listed under the figure: by model, then by project. Two tables in
+ * one block, because they are the same table asking two questions, and the
+ * spacing between them is what says they are separate answers rather than one
+ * long list. */
+.dlu-statsBlock {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dlu-tableBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dlu-tableHeading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* What a truncated table left out, said rather than implied: a table that stops
+ * at eight rows without saying so reads as a window with eight routes. */
+.dlu-tableNote {
+  margin: 0;
   font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-caption);
 }
 
-.dlu-waveLegendItem {
-  display: inline-flex;
-  gap: 5px;
-  align-items: center;
-  white-space: nowrap;
-}
-
-.dlu-waveLegendRoute {
-  max-inline-size: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dlu-waveLegendCost {
-  color: var(--dsw-alias-label-tertiary);
-}
-
-/* A swatch the shape of the thing it labels: a stroke, not a chip. */
-.dlu-waveLegendSwatch {
-  display: inline-block;
-  inline-size: 13px;
-  block-size: 2px;
-  border-radius: 1px;
-}
-
-.dlu-waveLegendSwatch[data-color='0'] {
-  background: var(--dsw-alias-link);
-}
-
-.dlu-waveLegendSwatch[data-color='1'] {
-  background: color-mix(in oklab, var(--dsw-alias-link) 60%, var(--dsw-alias-state-success-primary));
-}
-
-.dlu-waveLegendSwatch[data-color='2'] {
-  background: color-mix(in oklab, var(--dsw-alias-link) 25%, var(--dsw-alias-state-success-primary));
-}
-
-.dlu-waveLegendSwatch[data-color='3'] {
-  background: var(--dsw-alias-state-success-primary);
+/* The route or directory column of these tables has more to say than the day
+ * page's does — a fallback-rate badge rides beside the name — so it keeps the
+ * row's line box from growing by seating the badge on the baseline. */
+.dlu-tableBlock .dlu-unpricedBadge {
+  margin-left: 8px;
+  vertical-align: baseline;
 }
 
 /* The axis names several points, not just the ends. Each label is placed on the

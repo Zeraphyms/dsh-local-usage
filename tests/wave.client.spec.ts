@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { ROUTE_LINES, wavePlot, waveRoutes, waveSeries } from '../src/client/wave.ts'
+import { wavePlot, waveSeries } from '../src/client/wave.ts'
 import type { UsageDayRow, UsageHourRow } from '../src/types.ts'
 
 /** One day row carrying a cost, dated so its month and weekday are known. */
@@ -97,57 +97,5 @@ describe('wavePlot', () => {
 
   it('answers nothing for no points', () => {
     expect(wavePlot([])).toEqual([])
-  })
-})
-
-describe('waveRoutes', () => {
-  /** One route's series over three days, the middle one quiet. */
-  const series = {
-    route: 'demo/flash',
-    days: [
-      { day: '2026-09-21', cost: 2, calls: 1 },
-      { day: '2026-09-22', cost: 0, calls: 0 },
-      { day: '2026-09-23', cost: 4, calls: 2 },
-    ],
-  }
-
-  it('draws a route on the total’s own buckets, quiet days at zero', () => {
-    const days = [day('2026-09-21', 3), day('2026-09-22', 1), day('2026-09-23', 6)]
-    const lines = waveRoutes({ days, hourly: [], routeSeries: [series], range: 'week' }, false)
-
-    expect(lines).toHaveLength(1)
-    expect(lines[0]?.route).toBe('demo/flash')
-    expect(lines[0]?.points.map(point => point.cost)).toEqual([2, 0, 4])
-    // The curve's own total is the route's money, not the window's.
-    expect(lines[0]?.cost).toBe(6)
-  })
-
-  it('folds a route through the window’s own bucketing', () => {
-    const days = [
-      day('2026-09-21', 3), day('2026-09-22', 1), day('2026-09-23', 6),
-      day('2026-09-28', 5),
-    ]
-    const lines = waveRoutes({ days, hourly: [], routeSeries: [series], range: 'quarter' }, false)
-
-    // Two working weeks: the 21st–27th (2 + 0 + 4) and the 28th onward (0).
-    expect(lines[0]?.points.map(point => point.cost)).toEqual([6, 0])
-  })
-
-  it('keeps at most the curves worth telling apart', () => {
-    const days = [day('2026-09-21', 10)]
-    const many = Array.from({ length: ROUTE_LINES + 3 }, (_, index) => ({
-      route: `demo/route-${String(index)}`,
-      days: [{ day: '2026-09-21', cost: 10 - index, calls: 1 }],
-    }))
-    const lines = waveRoutes({ days, hourly: [], routeSeries: many, range: 'week' }, false)
-
-    expect(lines).toHaveLength(ROUTE_LINES)
-    expect(lines.map(line => line.route)).toEqual(['demo/route-0', 'demo/route-1', 'demo/route-2', 'demo/route-3'])
-  })
-
-  it('answers nothing for a report with no routes, so the total is drawn alone', () => {
-    expect(waveRoutes({ days: [day('2026-09-21', 1)], hourly: [], range: 'week' }, false)).toEqual([])
-    expect(waveRoutes({ days: [day('2026-09-21', 1)], hourly: [], routeSeries: [], range: 'week' }, false))
-      .toEqual([])
   })
 })

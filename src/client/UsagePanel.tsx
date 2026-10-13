@@ -48,6 +48,7 @@ import {
 } from './summary-state.ts'
 import type { SummaryState } from './summary-state.ts'
 import { Tile } from './Tile.tsx'
+import { StatsTables } from './StatsTables.tsx'
 import { WaveChart } from './WaveChart.tsx'
 import { dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
 import { tokensOf } from './tokens.ts'
@@ -606,7 +607,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     * lines where the chart goes and then a finished chart appeared
                     * out of nothing. */}
                   <WaveChart
-                    input={{ days: [], hourly: [], routeSeries: [], range: rangeId }}
+                    input={{ days: [], hourly: [], range: rangeId }}
                     caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
                     loading
                     empty={false}
@@ -677,7 +678,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   input={{
                     days: waveSettled ? summaryState.report.days : [],
                     hourly: waveSettled ? summaryState.report.hourly : [],
-                    routeSeries: waveSettled ? summaryState.report.routeSeries : [],
                     range: rangeId,
                   }}
                   caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
@@ -687,6 +687,18 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   t={t}
                   formatCost={money}
                 />
+
+                {/* The window listed, under the figure that drew it. Gated on the
+                  * same flag the figure is: rows belong to a range, and the rows of
+                  * the range before this one are not this range's rows. */}
+                {waveSettled ? (
+                  <StatsTables
+                    report={summaryState.report}
+                    t={t}
+                    formatCost={money}
+                    formatInteger={integer}
+                  />
+                ) : null}
 
 
               </>

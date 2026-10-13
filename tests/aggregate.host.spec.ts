@@ -367,34 +367,3 @@ describe('buildReport: the shape of the day', () => {
     expect(report.hourly.reduce((sum, row) => sum + row.calls, 0)).toBe(2)
   })
 })
-
-describe('buildReport: a route series over the window', () => {
-  it('folds each route its own day-by-day, dearest first', () => {
-    const report = buildReport([
-      session('a', [[PEAK, 'x/flash', tokens(1_000_000)], [OFF_PEAK, 'x/flash', tokens(1_000_000)]]),
-      session('b', [[OFF_PEAK, 'x/pro', tokens(2_000_000)]]),
-    ], OPTIONS, META)
-
-    expect(report.routeSeries).toHaveLength(2)
-    // pro spent 2, flash spent 2 — order breaks on the route name.
-    expect(report.routeSeries.map(row => row.route).sort()).toEqual(['x/flash', 'x/pro'])
-    const pro = report.routeSeries.find(row => row.route === 'x/pro')
-    const flash = report.routeSeries.find(row => row.route === 'x/flash')
-    // 'x/pro' matches no card's substring: it bills at the 2/1M fallback, so
-    // 2M input = 4. flash's own card is 1/1M: peak 2.00, off-peak 1.00.
-    expect(pro?.days.reduce((sum, day) => sum + day.cost, 0)).toBeCloseTo(4)
-    expect(flash?.days.reduce((sum, day) => sum + day.cost, 0)).toBeCloseTo(3)
-  })
-
-  it('gives a route a row for every day of the window, gaps at zero', () => {
-    const report = buildReport([
-      session('a', [[PEAK, 'x/flash', tokens(1_000_000)], [NEXT_DAY, 'x/flash', tokens(1_000_000)]]),
-    ], OPTIONS, META)
-
-    const flash = report.routeSeries[0]
-    expect(flash?.days).toHaveLength(2)
-    // 1M input on the 1/1M flash card: 2.00 at peak (×2), 1.00 off-peak.
-    expect(flash?.days[0]?.cost).toBeCloseTo(2)
-    expect(flash?.days[1]?.cost).toBeCloseTo(1)
-  })
-})

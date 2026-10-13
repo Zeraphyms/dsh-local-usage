@@ -36,13 +36,7 @@ export declare const css: {
     readonly waveCaption: "dlu-waveCaption";
     readonly waveEmpty: "dlu-waveEmpty";
     readonly waveFrame: "dlu-waveFrame";
-    readonly waveLegend: "dlu-waveLegend";
-    readonly waveLegendCost: "dlu-waveLegendCost";
-    readonly waveLegendItem: "dlu-waveLegendItem";
-    readonly waveLegendRoute: "dlu-waveLegendRoute";
-    readonly waveLegendSwatch: "dlu-waveLegendSwatch";
     readonly waveLine: "dlu-waveLine";
-    readonly waveRoute: "dlu-waveRoute";
     readonly wavePeak: "dlu-wavePeak";
     readonly waveScope: "dlu-waveScope";
     readonly waveStopBottom: "dlu-waveStopBottom";
@@ -135,6 +129,10 @@ export declare const css: {
     readonly projectName: "dlu-projectName";
     readonly projectPath: "dlu-projectPath";
     readonly projectTable: "dlu-projectTable";
+    readonly statsBlock: "dlu-statsBlock";
+    readonly tableBlock: "dlu-tableBlock";
+    readonly tableHeading: "dlu-tableHeading";
+    readonly tableNote: "dlu-tableNote";
     readonly projectToggle: "dlu-projectToggle";
     readonly projectToggleHint: "dlu-projectToggleHint";
     readonly sessionInTable: "dlu-sessionInTable";
