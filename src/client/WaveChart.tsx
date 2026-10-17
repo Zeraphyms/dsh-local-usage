@@ -108,10 +108,12 @@ export function WaveChart({
   // ten months into seven labels rounds to 1, 3, 4, 6, 7, 9, 10 — an axis whose
   // gaps alternate, which reads as a bug rather than as an axis. A stride gives
   // every gap the same width, and the cost of that is the last bucket sometimes
-  // going unnamed.
+  // going unnamed. The list is ordered and includes 18 and 24 so that a day, whose
+  // 144 slices divide by them, lands its labels on whole and half hours rather
+  // than on an arbitrary 21-slice gap.
   const ticks = useMemo(() => {
     if (points.length === 0) return []
-    const stride = [1, 2, 3, 4, 6, 12].find(step => Math.ceil(points.length / step) <= MAX_TICKS)
+    const stride = [1, 2, 3, 4, 6, 9, 12, 18, 24].find(step => Math.ceil(points.length / step) <= MAX_TICKS)
       ?? Math.ceil(points.length / MAX_TICKS)
     const chosen: {
       readonly index: number

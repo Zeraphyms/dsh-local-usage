@@ -607,7 +607,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     * lines where the chart goes and then a finished chart appeared
                     * out of nothing. */}
                   <WaveChart
-                    input={{ days: [], hourly: [], range: rangeId }}
+                    input={{ days: [], slices: [], range: rangeId }}
                     caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
                     loading
                     empty={false}
@@ -677,7 +677,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                 <WaveChart
                   input={{
                     days: waveSettled ? summaryState.report.days : [],
-                    hourly: waveSettled ? summaryState.report.hourly : [],
+                    slices: waveSettled ? summaryState.report.slices : [],
                     range: rangeId,
                   }}
                   caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}

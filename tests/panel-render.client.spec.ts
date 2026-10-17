@@ -119,7 +119,7 @@ describe('a day whose total is large', () => {
       // The day page draws the day's own hour profile, so a fixture standing in
       // for a report has to carry the fold a report carries.
       days: [],
-      hourly: [],
+      slices: [],
       peakMultiplier: 2,
     } as unknown as UsageInsightsReport
   }

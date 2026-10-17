@@ -584,6 +584,13 @@ export const styles = String.raw`
   display: flex;
   flex-direction: column;
   gap: 18px;
+  /* A table is read down its columns, and columns spread across a full-width
+   * panel stop being comparable: the eye has to travel to pair a route with its
+   * cost. Held to a measure and centred under the figure, the same rows read as a
+   * table rather than as four lists side by side. */
+  inline-size: 100%;
+  max-inline-size: 860px;
+  margin-inline: auto;
 }
 
 .dlu-tableBlock {

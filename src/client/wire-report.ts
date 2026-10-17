@@ -53,8 +53,8 @@ export function normalizeReport(value: WireReport): UsageInsightsReport {
     peakWindows: value.peakWindows ?? [],
     peakWeekdaysOnly: value.peakWeekdaysOnly ?? true,
     // The wave's own fold, defaulted so the figure stays total over a report from
-    // a Host that has not learned it yet: an empty hour list is absence, which the
+    // a Host that has not learned it yet: an empty slice list is absence, which the
     // wave draws as no profile rather than as a day of zeroes.
-    hourly: value.hourly ?? [],
+    slices: value.slices ?? [],
   }
 }

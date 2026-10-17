@@ -13,7 +13,7 @@
  * @module dsh-local-usage/client/wave
  */
 
-import type { UsageDayRow, UsageHourRow } from '../types.ts'
+import type { UsageDayRow, UsageDaySlice } from '../types.ts'
 
 /** One bucket of the wave: a label for the axis and the money it holds. */
 export interface WavePoint {
@@ -28,9 +28,14 @@ export interface WaveInput {
   /** The range's day rows, ascending, gaps omitted. */
   readonly days: readonly UsageDayRow[]
   /** The range's hours, Beijing time; only a one-day window uses them. */
-  readonly hourly: readonly UsageHourRow[]
+  readonly slices: readonly UsageDaySlice[]
   /** Range id: `day`, `week`, `month`, `quarter` or `year`. */
   readonly range: string
+}
+
+/** `HH:mm` for minutes after midnight, the label a day's axis carries. */
+function clockLabel(minutes: number): string {
+  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
 }
 
 /** Two-digit zero padding, for a label that has to line up. */
@@ -77,7 +82,9 @@ function weekStartOf(day: string): number {
 export function waveSeries(input: WaveInput, zh: boolean): WavePoint[] {
   // A single day is the one window the day rows cannot describe: it has hours.
   if (input.range === 'day') {
-    return input.hourly.map(row => ({ label: pad(row.hour), cost: row.cost }))
+    // A report built by hand, or read from a Host that has not learned the fold,
+    // carries no slices; the day view then has no profile rather than a crash.
+    return (input.slices ?? []).map(row => ({ label: clockLabel(row.minutes), cost: row.cost }))
   }
   if (input.range === 'year') {
     const byMonth = new Map<number, number>()

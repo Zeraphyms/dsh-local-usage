@@ -340,30 +340,34 @@ describe('route rates', () => {
 })
 
 describe('buildReport: the shape of the day', () => {
-  it('always answers 24 hours, in order, with the quiet ones at zero', () => {
+  it('always answers a whole day of ten-minute slices, quiet ones at zero', () => {
     const report = buildReport([session('a', [[PEAK, 'x/flash', tokens(1_000_000)]])], OPTIONS, META)
 
-    expect(report.hourly).toHaveLength(24)
-    expect(report.hourly.map(row => row.hour)).toEqual([...Array(24).keys()])
-    expect(report.hourly[0]).toMatchObject({ cost: 0, calls: 0, tokens: 0 })
+    expect(report.slices).toHaveLength(144)
+    expect(report.slices.map(row => row.minutes)).toEqual(
+      Array.from({ length: 144 }, (_, index) => index * 10),
+    )
+    expect(report.slices[0]).toMatchObject({ cost: 0, calls: 0, tokens: 0 })
   })
 
-  it('buckets by hour in Beijing time rather than the host machine’s zone', () => {
-    // 02:00 UTC is 10:00 in Beijing, whatever the machine running this believes.
+  it('buckets in Beijing time rather than the host machine’s zone', () => {
+    // 02:00 UTC is 10:00 in Beijing, whatever the machine running this believes:
+    // the sixtieth slice is the one that carries it.
     const report = buildReport([session('a', [[PEAK, 'x/flash', tokens(1_000_000)]])], OPTIONS, META)
 
-    expect(report.hourly[10]?.calls).toBe(1)
-    expect(report.hourly[10]?.cost).toBeCloseTo(2)
-    expect(report.hourly[10]?.tokens).toBe(1_000_000)
+    expect(report.slices[60]?.minutes).toBe(600)
+    expect(report.slices[60]?.calls).toBe(1)
+    expect(report.slices[60]?.cost).toBeCloseTo(2)
+    expect(report.slices[60]?.tokens).toBe(1_000_000)
   })
 
-  it('accumulates several settlements into the hour they share', () => {
+  it('accumulates settlements a minute apart into the slice they share', () => {
     const report = buildReport([
       session('a', [[PEAK, 'x/flash', tokens(1_000_000)]]),
       session('b', [[PEAK + 60_000, 'x/flash', tokens(2_000_000)]]),
     ], OPTIONS, META)
 
-    expect(report.hourly[10]).toMatchObject({ calls: 2, tokens: 3_000_000 })
-    expect(report.hourly.reduce((sum, row) => sum + row.calls, 0)).toBe(2)
+    expect(report.slices[60]).toMatchObject({ calls: 2, tokens: 3_000_000 })
+    expect(report.slices.reduce((sum, row) => sum + row.calls, 0)).toBe(2)
   })
 })

@@ -249,24 +249,32 @@ export function reliabilityIsEmpty(reliability: UsageReliability): boolean {
 
 
 
-/** One hour of the day, folded over the window. */
-export interface UsageHourRow {
+/**
+ * One ten-minute slice of a day, in Beijing time.
+ *
+ * Ten minutes rather than an hour because the figure's day view is read as a
+ * working day: an hour is coarse enough that a morning's two peaks merge into
+ * one, and the panel's own axis names times to the minute. The host folds this
+ * only for a one-day window, so the row count costs a day's report and nothing
+ * else.
+ */
+export interface UsageDaySlice {
   /**
-   * Hour after Beijing midnight, `0`–`23`.
+   * Minutes after Beijing midnight, `0`–`1430` in steps of ten.
    *
    * Beijing time rather than the reader's, because that is the clock the peak
-   * schedule — and therefore {@link UsagePeakSplit} — is stated in: an hour
-   * profile on another clock could not be read against the windows it exists to
-   * explain.
+   * schedule is stated in: a day view on another clock could not be read against
+   * the rules that priced it.
    */
-  readonly hour: number
-  /** Money spent in this hour over the window. */
+  readonly minutes: number
+  /** Money spent in this slice over the window. */
   readonly cost: number
-  /** Billed settlements in this hour. */
+  /** Billed settlements in this slice. */
   readonly calls: number
-  /** Tokens of every bucket in this hour. */
+  /** Tokens of every bucket in this slice. */
   readonly tokens: number
 }
+
 
 
 /** One complete aggregate over every readable session log. */
@@ -325,10 +333,10 @@ export interface UsageInsightsReport {
   /** Whether weekends are always billed off-peak. */
   readonly peakWeekdaysOnly: boolean
   /**
-   * This window split by hour of the day, Beijing time.
+   * This window split into ten-minute slices of the day, Beijing time.
    *
-   * Always 24 rows in ascending order, quiet hours included: a profile with its
+   * Always 144 rows in ascending order, quiet slices included: a profile with its
    * gaps dropped would draw a different shape than the day has.
    */
-  readonly hourly: readonly UsageHourRow[]
+  readonly slices: readonly UsageDaySlice[]
 }

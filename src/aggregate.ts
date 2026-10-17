@@ -458,14 +458,19 @@ function costedOf(bucket: Bucket): UsageCosted {
  * @param meta - host-supplied report facts.
  * @returns the complete report, day rows ascending and ranking rows by cost.
  */
+/** Minutes in each slice of the day the figure's day view is drawn from. */
+const SLICE_MINUTES = 10
+/** Slices in a day: `1440 / SLICE_MINUTES`. */
+const SLICES_PER_DAY = 144
+
 /**
- * Money, calls and tokens accumulated for one hour of the day.
+ * Money, calls and tokens accumulated for one ten-minute slice of the day.
  *
- * Deliberately not a {@link Bucket}: an hour never needs the set of contributing
- * sessions, and carrying one would cost 24 sets per report for a figure nothing
+ * Deliberately not a {@link Bucket}: a slice never needs the set of contributing
+ * sessions, and carrying one would cost 144 sets per report for a figure nothing
  * reads.
  */
-interface HourBucket {
+interface SliceBucket {
   cost: number
   calls: number
   tokens: number
@@ -485,7 +490,7 @@ export function buildReport(
   let unpricedTokens = 0
   // The shape of the day, which falls out of the same walk: pricing a sample
   // already resolves the clock this buckets by.
-  const hours: HourBucket[] = Array.from({ length: 24 }, () => ({ cost: 0, calls: 0, tokens: 0 }))
+  const slices: SliceBucket[] = Array.from({ length: SLICES_PER_DAY }, () => ({ cost: 0, calls: 0, tokens: 0 }))
 
   for (const input of inputs) {
     const sessionBucket = emptyBucket()
@@ -516,11 +521,11 @@ export function buildReport(
 
       const readTokens = sample.tokens.cacheReadTokens
 
-      const hour = hours[Math.floor(beijing.minutes / 60)]
-      if (hour !== undefined) {
-        hour.cost += cost
-        hour.calls += 1
-        hour.tokens += sample.tokens.uncachedInputTokens + sample.tokens.outputTokens
+      const slice = slices[Math.floor(beijing.minutes / SLICE_MINUTES)]
+      if (slice !== undefined) {
+        slice.cost += cost
+        slice.calls += 1
+        slice.tokens += sample.tokens.uncachedInputTokens + sample.tokens.outputTokens
           + readTokens + sample.tokens.cacheWriteTokens
       }
 
@@ -645,8 +650,8 @@ export function buildReport(
     routeRates,
     peakWindows: options.peakWindows.map(window => `${clock(window.start)}-${clock(window.end)}`),
     peakWeekdaysOnly: options.peakWeekdaysOnly,
-    hourly: hours.map((bucket, hour) => ({
-      hour,
+    slices: slices.map((bucket, index) => ({
+      minutes: index * SLICE_MINUTES,
       cost: bucket.cost,
       calls: bucket.calls,
       tokens: bucket.tokens,

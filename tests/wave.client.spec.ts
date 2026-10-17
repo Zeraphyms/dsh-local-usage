@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { wavePlot, waveSeries } from '../src/client/wave.ts'
-import type { UsageDayRow, UsageHourRow } from '../src/types.ts'
+import type { UsageDayRow, UsageDaySlice } from '../src/types.ts'
 
 /** One day row carrying a cost, dated so its month and weekday are known. */
 function day(day: string, cost: number): UsageDayRow {
@@ -19,28 +19,31 @@ function day(day: string, cost: number): UsageDayRow {
   }
 }
 
-/** One hour row carrying a cost. */
-function hour(hourOfDay: number, cost: number): UsageHourRow {
-  return { hour: hourOfDay, cost, calls: 1, tokens: 0 }
+/** One ten-minute slice of the day carrying a cost. */
+function slice(minutes: number, cost: number): UsageDaySlice {
+  return { minutes, cost, calls: 1, tokens: 0 }
 }
 
-const HOURS = Array.from({ length: 24 }, (_, index) => hour(index, index === 10 ? 5 : 0))
+/** A whole day, quiet except for ten o'clock. */
+const SLICES = Array.from({ length: 144 }, (_, index) => slice(index * 10, index === 60 ? 5 : 0))
 
 describe('waveSeries', () => {
-  it('reads a single day in hours', () => {
-    const points = waveSeries({ days: [], hourly: HOURS, range: 'day' }, false)
+  it('reads a single day in ten-minute slices, labelled as clock times', () => {
+    const points = waveSeries({ days: [], slices: SLICES, range: 'day' }, false)
 
-    expect(points).toHaveLength(24)
-    expect(points[0]?.label).toBe('00')
-    expect(points[10]).toEqual({ label: '10', cost: 5 })
+    expect(points).toHaveLength(144)
+    expect(points[0]?.label).toBe('00:00')
+    // The tenth hour of the day is its sixtieth slice.
+    expect(points[60]).toEqual({ label: '10:00', cost: 5 })
+    expect(points[61]).toEqual({ label: '10:10', cost: 0 })
   })
 
   it('reads a week and a month in days', () => {
     const days = [day('2026-09-21', 1), day('2026-09-22', 2)]
 
-    expect(waveSeries({ days, hourly: [], range: 'week' }, false).map(p => p.label))
+    expect(waveSeries({ days, slices: [], range: 'week' }, false).map(p => p.label))
       .toEqual(['09-21', '09-22'])
-    expect(waveSeries({ days, hourly: [], range: 'month' }, false)).toHaveLength(2)
+    expect(waveSeries({ days, slices: [], range: 'month' }, false)).toHaveLength(2)
   })
 
   it('folds a quarter into the weeks its days belong to', () => {
@@ -48,7 +51,7 @@ describe('waveSeries', () => {
     // 28th opens the next.
     const points = waveSeries({
       days: [day('2026-09-21', 1), day('2026-09-23', 2), day('2026-09-28', 4)],
-      hourly: [],
+      slices: [],
       range: 'quarter',
     }, false)
 
@@ -60,14 +63,14 @@ describe('waveSeries', () => {
   it('folds a year into months, in order, named for the locale', () => {
     const days = [day('2026-11-02', 3), day('2026-01-05', 1), day('2026-01-06', 2)]
 
-    const zh = waveSeries({ days, hourly: [], range: 'year' }, true)
+    const zh = waveSeries({ days, slices: [], range: 'year' }, true)
     expect(zh).toEqual([{ label: '1月', cost: 3 }, { label: '11月', cost: 3 }])
-    expect(waveSeries({ days, hourly: [], range: 'year' }, false)[0]?.label).toBe('1')
+    expect(waveSeries({ days, slices: [], range: 'year' }, false)[0]?.label).toBe('1')
   })
 
   it('answers nothing for a window that recorded nothing', () => {
-    expect(waveSeries({ days: [], hourly: [], range: 'year' }, false)).toEqual([])
-    expect(waveSeries({ days: [], hourly: [], range: 'day' }, false)).toEqual([])
+    expect(waveSeries({ days: [], slices: [], range: 'year' }, false)).toEqual([])
+    expect(waveSeries({ days: [], slices: [], range: 'day' }, false)).toEqual([])
   })
 })
 
