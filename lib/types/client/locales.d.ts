@@ -146,6 +146,9 @@ export declare const zh: {
     pricingPageSubtitle: string;
     pricingSectionUsage: string;
     pricingPriceSet: string;
+    rateSetPeak: string;
+    rateSetOffPeak: string;
+    rateSetFlat: string;
     pricingEdit: string;
     pricingCancel: string;
     pricingSaveOne: string;
@@ -340,6 +343,9 @@ export declare const en: {
     pricingPageSubtitle: string;
     pricingSectionUsage: string;
     pricingPriceSet: string;
+    rateSetPeak: string;
+    rateSetOffPeak: string;
+    rateSetFlat: string;
     pricingEdit: string;
     pricingCancel: string;
     pricingSaveOne: string;

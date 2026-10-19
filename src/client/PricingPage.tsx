@@ -47,14 +47,6 @@ export interface PricingPageProps {
 export function PricingPage({
   report, weeks, locale, t, onSaveRates, onBack,
 }: PricingPageProps): ReactNode {
-  // Resolved only when it will be rendered: an empty window list drops the
-  // sentence outright rather than filling it with a placeholder.
-  const schedule = report.peakWindows.length === 0
-    ? undefined
-    : t('pricingPeakSchedule', {
-      windows: report.peakWindows.join(t('listSeparator')),
-      weekdayScope: report.peakWeekdaysOnly ? t('pricingWeekdaysOnly') : t('pricingEveryDay'),
-    })
   // Every model the window recorded, with the card that prices it: a configured
   // one, an edited one, or the fallback standing in until the reader writes their
   // own. One list, because the question is "what does this model cost" — not
@@ -80,20 +72,6 @@ export function PricingPage({
           <p className={css.subtitle}>{t('pricingPageSubtitle')}</p>
         </div>
       </header>
-
-      {/* What the figure is, before what can be changed about it. */}
-      <section className={css.pricingSection}>
-        <p>{t('pricingFormula')}</p>
-        {schedule === undefined ? null : <p>{schedule}</p>}
-        <p>{t('pricingSource')}</p>
-        <p className={css.pricingCaveat}>{t('pricingNotBill')}</p>
-      </section>
-
-      {report.unpricedRoutes.length === 0 ? null : (
-        <p className={css.warning} role="note">
-          {t('unpriced', { list: report.unpricedRoutes.join(', ') })}
-        </p>
-      )}
 
       <RateEditor
         rows={rows}
