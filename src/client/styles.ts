@@ -443,6 +443,18 @@ export const styles = String.raw`
   border-color: color-mix(in oklab, var(--dsw-alias-link) 45%, transparent);
 }
 
+/* The model's volume, set quiet beside its name: it says how much the row is
+ * worth reading without competing with the prices it is priced by. */
+.dlu-rateVolume {
+  flex: none;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-caption);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .dlu-rateSetLabel {
   font-size: 11px;
   color: var(--dsw-alias-label-tertiary);

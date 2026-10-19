@@ -151,6 +151,7 @@ export const css = {
   rateRow: 'dlu-rateRow',
   rateSetLabel: 'dlu-rateSetLabel',
   rateValue: 'dlu-rateValue',
+  rateVolume: 'dlu-rateVolume',
   pricingSection: 'dlu-pricingSection',
   projectTable: 'dlu-projectTable',
   statsBlock: 'dlu-statsBlock',

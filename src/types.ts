@@ -140,6 +140,14 @@ export interface UsageRouteRate {
   readonly route: string
   /** The model card that claimed it, absent when the fallback paid. */
   readonly model?: string
+  /**
+   * The model the route names, in the spelling the panel should show.
+   *
+   * Derived from the route's last segment, so every vendor route of one model
+   * states the same model: this is what the pricing page groups by, and what a
+   * card written there is keyed on.
+   */
+  readonly detected: string
   /** Whether that card prices peak separately. */
   readonly peakEnabled: boolean
   /** Prices inside a peak window. */

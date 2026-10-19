@@ -17,10 +17,19 @@
 import { type ReactNode } from 'react';
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
 import type { UsageModelPrice, UsagePricingUpdate } from '../types.ts';
+/** One row of the price sheet: a model, what it spent, and the rates it is on. */
+export interface RateRow {
+    /** The card that prices the model — configured, edited, or the fallback's. */
+    readonly card: UsageModelPrice;
+    /** Tokens the model spent in the window. */
+    readonly tokens: number;
+    /** How many routes of the model the window recorded. */
+    readonly routes: number;
+}
 /** Props for the card table. */
 export interface RateEditorProps {
-    /** The cards in match order; the fallback card has an empty `match`. */
-    readonly models: readonly UsageModelPrice[];
+    /** One row per model the window recorded, dearest first. */
+    readonly rows: readonly RateRow[];
     /** Currency every price is expressed in, shown once above the table. */
     readonly currency: string;
     /** Panel translate function. */
@@ -33,4 +42,4 @@ export interface RateEditorProps {
  * @param props - the cards, currency, dictionary and the save action.
  * @returns the table and its one open editor, if any.
  */
-export declare function RateEditor({ models, currency, t, onSave }: RateEditorProps): ReactNode;
+export declare function RateEditor({ rows, currency, t, onSave }: RateEditorProps): ReactNode;

@@ -25,6 +25,7 @@
  * @module dsh-local-usage/pricing
  */
 
+import { modelKey, modelOf } from './model-name.ts'
 import type { UsageRate, UsageTokens } from './types.ts'
 
 /** Minutes to add to UTC to reach Beijing time; China observes no daylight saving. */
@@ -160,6 +161,14 @@ export function matchModel(
   fallback: ModelPrice,
   route: string,
 ): ModelMatch {
+  // The route's own model first: one identity per model, so every vendor prefix
+  // and every `-fast` tier of it lands on the same card without configuration.
+  const model = modelOf(route)
+  const key = modelKey(model)
+  const exact = models.find(candidate => modelKey(candidate.match) === key)
+  if (exact !== undefined) return { card: exact, source: 'model' }
+  // Then the substring rule, which is what a short configured name like `flash`
+  // relies on. Kept after the identity match so a specific card wins.
   const needle = route.toLocaleLowerCase()
   const claimed = models.find(candidate => needle.includes(candidate.match.toLocaleLowerCase()))
   return claimed === undefined

@@ -147,6 +147,7 @@ export declare const css: {
     readonly rateRow: "dlu-rateRow";
     readonly rateSetLabel: "dlu-rateSetLabel";
     readonly rateValue: "dlu-rateValue";
+    readonly rateVolume: "dlu-rateVolume";
     readonly pricingSection: "dlu-pricingSection";
     readonly projectTable: "dlu-projectTable";
     readonly statsBlock: "dlu-statsBlock";

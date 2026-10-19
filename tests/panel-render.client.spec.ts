@@ -153,7 +153,7 @@ describe('the rate editor', () => {
   }
 
   it('states an empty window instead of vanishing from the panel', () => {
-    const markup = renderToStaticMarkup(createElement(RateEditor, { ...base, models: [] }))
+    const markup = renderToStaticMarkup(createElement(RateEditor, { ...base, rows: [] }))
 
     expect(markup).toContain('pricingModelsTitle')
     expect(markup).toContain('pricingEditorEmpty')
@@ -168,7 +168,10 @@ describe('the rate editor', () => {
     })
     const markup = renderToStaticMarkup(createElement(RateEditor, {
       ...base,
-      models: [card('p/m'), card('q/m')],
+      rows: [
+        { card: card('p/m'), tokens: 100, routes: 1 },
+        { card: card('q/m'), tokens: 50, routes: 2 },
+      ],
     }))
 
     expect(markup).toContain('pricingModelsHint')
@@ -189,7 +192,7 @@ describe('the rate editor', () => {
   }
 
   it('states an empty window instead of vanishing from the panel', () => {
-    const markup = renderToStaticMarkup(createElement(RateEditor, { ...base, models: [] }))
+    const markup = renderToStaticMarkup(createElement(RateEditor, { ...base, rows: [] }))
 
     expect(markup).toContain('pricingModelsTitle')
     expect(markup).toContain('pricingEditorEmpty')
@@ -204,7 +207,10 @@ describe('the rate editor', () => {
     })
     const markup = renderToStaticMarkup(createElement(RateEditor, {
       ...base,
-      models: [card('p/m'), card('q/m')],
+      rows: [
+        { card: card('p/m'), tokens: 100, routes: 1 },
+        { card: card('q/m'), tokens: 50, routes: 2 },
+      ],
     }))
 
     expect(markup).toContain('pricingModelsHint')

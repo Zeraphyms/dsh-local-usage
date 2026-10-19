@@ -25,8 +25,6 @@ export interface PricingPageProps {
     /** Active locale id, for the grouped counts. */
     readonly locale: string;
     readonly t: PropsLocale<'usage'>['t'];
-    /** Compact token formatter, for the grouped volume column. */
-    readonly formatTokens: (value: number) => string;
     /** Persist one change to the model prices. */
     readonly onSaveRates: (update: UsagePricingUpdate) => Promise<void>;
     /** Leave the page and return to the calendar. */
@@ -37,4 +35,4 @@ export interface PricingPageProps {
  * @param props - the report, the dictionary, the formatters and the controls.
  * @returns the page.
  */
-export declare function PricingPage({ report, weeks, locale, t, formatTokens, onSaveRates, onBack, }: PricingPageProps): ReactNode;
+export declare function PricingPage({ report, weeks, locale, t, onSaveRates, onBack, }: PricingPageProps): ReactNode;

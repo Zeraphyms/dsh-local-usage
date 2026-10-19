@@ -19,6 +19,7 @@ import type {} from '@deepseek-ai/dsh-llm-retry/types'
 // reliability fold counts, so context that could not be compacted is reported.
 import type {} from '@deepseek-ai/dsh-compaction/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import { modelOf } from './model-name.ts'
 import { beijingClock, costOf, isPeakClock, matchModel, selectRate } from './pricing.ts'
 import type { ModelPrice, PeakWindow } from './pricing.ts'
 import { UNKNOWN_PROJECT } from './types.ts'
@@ -590,6 +591,7 @@ export function buildReport(
       const match = matchModel(options.models, options.fallback, route)
       return {
         route,
+        detected: modelOf(route),
         ...match.source === 'fallback' ? {} : { model: match.card.match },
         peakEnabled: match.card.peakEnabled,
         peak: match.card.peak,

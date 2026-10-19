@@ -19,8 +19,9 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageInsightsReport, UsagePricingUpdate } from '../types.ts'
 import { DataSourceNotes } from './DataSourceNotes.tsx'
-import { RateEditor } from './RateEditor.tsx'
+import { RateEditor, type RateRow } from './RateEditor.tsx'
 import { groupRouteUsage } from './route-models.ts'
+import { modelKey } from '../model-name.ts'
 import { css } from './classes.ts'
 
 /** Props for the pricing page. */
@@ -32,8 +33,6 @@ export interface PricingPageProps {
   /** Active locale id, for the grouped counts. */
   readonly locale: string
   readonly t: PropsLocale<'usage'>['t']
-  /** Compact token formatter, for the grouped volume column. */
-  readonly formatTokens: (value: number) => string
   /** Persist one change to the model prices. */
   readonly onSaveRates: (update: UsagePricingUpdate) => Promise<void>
   /** Leave the page and return to the calendar. */
@@ -46,7 +45,7 @@ export interface PricingPageProps {
  * @returns the page.
  */
 export function PricingPage({
-  report, weeks, locale, t, formatTokens, onSaveRates, onBack,
+  report, weeks, locale, t, onSaveRates, onBack,
 }: PricingPageProps): ReactNode {
   // Resolved only when it will be rendered: an empty window list drops the
   // sentence outright rather than filling it with a placeholder.
@@ -56,7 +55,19 @@ export function PricingPage({
       windows: report.peakWindows.join(t('listSeparator')),
       weekdayScope: report.peakWeekdaysOnly ? t('pricingWeekdaysOnly') : t('pricingEveryDay'),
     })
-  const models = groupRouteUsage(report.routeRates)
+  // Every model the window recorded, with the card that prices it: a configured
+  // one, an edited one, or the fallback standing in until the reader writes their
+  // own. One list, because the question is "what does this model cost" — not
+  // "which of the two tables do I read".
+  const configured = report.prices
+  const rows: RateRow[] = groupRouteUsage(report.routeRates).map(group => {
+    const card = configured.find(candidate => modelKey(candidate.match) === group.key)
+    return {
+      card: card ?? { ...report.fallbackPrice, match: group.model },
+      tokens: group.tokens,
+      routes: group.routes.length,
+    }
+  })
 
   return (
     <section className={css.pricingPage} aria-label={t('pricingTitle')}>
@@ -78,54 +89,18 @@ export function PricingPage({
         <p className={css.pricingCaveat}>{t('pricingNotBill')}</p>
       </section>
 
+      {report.unpricedRoutes.length === 0 ? null : (
+        <p className={css.warning} role="note">
+          {t('unpriced', { list: report.unpricedRoutes.join(', ') })}
+        </p>
+      )}
+
       <RateEditor
-        models={[...report.prices, report.fallbackPrice]}
+        rows={rows}
         currency={report.currency}
         t={t}
         onSave={onSaveRates}
       />
-
-      {/* The routes those cards price, read as models: one row per model, its
-        * routes beneath it, and one volume for the model as a whole. */}
-      <section className={css.pricingSection}>
-        <h4 className={css.editorTitle}>{t('pricingSectionUsage')}</h4>
-        {models.length === 0
-          ? <p className={css.editorHint}>{t('pricingEditorEmpty')}</p>
-          : (
-            <table className={css.editorTable}>
-              <thead>
-                <tr>
-                  <th scope="col">{t('pricingModelColumn')}</th>
-                  <th scope="col" className={css.numeric}>{t('pricingRouteCount')}</th>
-                  <th scope="col" className={css.numeric}>{t('totalTokens')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {models.map(group => (
-                  <tr key={group.model ?? ''}>
-                    <th scope="row">
-                      <span className={css.projectName}>
-                        {group.model ?? t('pricingFallback')}
-                      </span>
-                      {group.routes.map(route => (
-                        <code key={route.route} className={css.projectPath} title={route.route}>
-                          {route.route}
-                        </code>
-                      ))}
-                    </th>
-                    <td className={css.numeric}>{String(group.routes.length)}</td>
-                    <td className={css.numeric}>{formatTokens(group.tokens)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        {report.unpricedRoutes.length === 0 ? null : (
-          <p className={css.warning} role="note">
-            {t('unpriced', { list: report.unpricedRoutes.join(', ') })}
-          </p>
-        )}
-      </section>
 
       <section className={css.pricingSection}>
         <h4 className={css.editorTitle}>{t('dataTitle')}</h4>

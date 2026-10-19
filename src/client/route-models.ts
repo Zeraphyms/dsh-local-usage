@@ -11,12 +11,15 @@
  * @module dsh-local-usage/client/route-models
  */
 
+import { displayModel, modelKey } from '../model-name.ts'
 import type { UsageRouteRate } from '../types.ts'
 
 /** One model, with the routes it was sold through in the window. */
 export interface ModelUsage {
-  /** The card's `match`, or `undefined` for the routes the fallback priced. */
-  readonly model: string | undefined
+  /** The model's key: identity across vendor prefixes and spellings. */
+  readonly key: string
+  /** The spelling to show for it, chosen from the ones observed. */
+  readonly model: string
   /** Tokens across every route of this model. */
   readonly tokens: number
   /** Its routes, heaviest first. */
@@ -34,18 +37,21 @@ export interface ModelUsage {
  * @returns one entry per model, ordered by descending tokens.
  */
 export function groupRouteUsage(routes: readonly UsageRouteRate[]): ModelUsage[] {
-  const groups = new Map<string | undefined, UsageRouteRate[]>()
+  const groups = new Map<string, UsageRouteRate[]>()
   for (const route of routes) {
-    const key = route.model
+    // The route's own model, not the card's name: a route nothing has priced yet
+    // is still a model the reader should be able to price.
+    const key = modelKey(route.detected)
     const bucket = groups.get(key)
     if (bucket === undefined) groups.set(key, [route])
     else bucket.push(route)
   }
   return [...groups.entries()]
-    .map(([model, group]) => ({
-      model,
+    .map(([key, group]) => ({
+      key,
+      model: displayModel(group.map(route => route.detected)),
       tokens: group.reduce((sum, route) => sum + route.tokens, 0),
       routes: [...group].sort((left, right) => right.tokens - left.tokens),
     }))
-    .sort((left, right) => right.tokens - left.tokens || (left.model ?? '').localeCompare(right.model ?? ''))
+    .sort((left, right) => right.tokens - left.tokens || left.model.localeCompare(right.model))
 }

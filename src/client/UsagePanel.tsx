@@ -519,7 +519,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             weeks={WINDOW_WEEKS}
             locale={activeLocale}
             t={t}
-            formatTokens={tokens}
             onSaveRates={saveRateTable}
             onBack={() => { setShowPricing(false) }}
           />

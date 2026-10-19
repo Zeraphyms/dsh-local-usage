@@ -39,10 +39,20 @@ const FIELD_KEYS: Record<RateField, 'pricingColumnInput' | 'pricingColumnCacheRe
   output: 'pricingColumnOutput',
 }
 
+/** One row of the price sheet: a model, what it spent, and the rates it is on. */
+export interface RateRow {
+  /** The card that prices the model — configured, edited, or the fallback's. */
+  readonly card: UsageModelPrice
+  /** Tokens the model spent in the window. */
+  readonly tokens: number
+  /** How many routes of the model the window recorded. */
+  readonly routes: number
+}
+
 /** Props for the card table. */
 export interface RateEditorProps {
-  /** The cards in match order; the fallback card has an empty `match`. */
-  readonly models: readonly UsageModelPrice[]
+  /** One row per model the window recorded, dearest first. */
+  readonly rows: readonly RateRow[]
   /** Currency every price is expressed in, shown once above the table. */
   readonly currency: string
   /** Panel translate function. */
@@ -56,7 +66,8 @@ export interface RateEditorProps {
  * @param props - the cards, currency, dictionary and the save action.
  * @returns the table and its one open editor, if any.
  */
-export function RateEditor({ models, currency, t, onSave }: RateEditorProps): ReactNode {
+export function RateEditor({ rows, currency, t, onSave }: RateEditorProps): ReactNode {
+  const models = rows.map(row => row.card)
   const [drafts, setDrafts] = useState<ModelDrafts>(() => draftsFrom(models))
   /** The model whose prices are open for editing, if any. */
   const [editing, setEditing] = useState<string | undefined>(undefined)
@@ -153,7 +164,8 @@ export function RateEditor({ models, currency, t, onSave }: RateEditorProps): Re
       </div>
 
       <div className={css.editorCards}>
-        {models.map(card => {
+        {rows.map(row => {
+          const card = row.card
           const draft = drafts[card.match]
           const open = editing === card.match
           const invalid = pending.status === 'invalid' && pending.model === card.match ? pending : undefined
@@ -165,6 +177,11 @@ export function RateEditor({ models, currency, t, onSave }: RateEditorProps): Re
                 </code>
                 <span className={css.rateBadge} data-peak={card.peakEnabled}>
                   {card.peakEnabled ? t('pricingPeakBadge') : t('pricingFlatBadge')}
+                </span>
+                <span className={css.rateVolume}>
+                  {row.tokens === 0
+                    ? null
+                    : `${formatCompact(row.tokens)} · ${t('pricingRouteCount', { count: String(row.routes) })}`}
                 </span>
                 {open
                   ? (
@@ -312,6 +329,14 @@ function PriceRow({ card, set, label, draft, invalid, busy, t, write }: {
       <span />
     </div>
   )
+}
+
+/** A token count as the row's volume: thousands, millions, billions. */
+function formatCompact(value: number): string {
+  if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`
+  if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`
+  if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`
+  return String(value)
 }
 
 /** A price as it reads in the table: the number as typed, without grouping. */

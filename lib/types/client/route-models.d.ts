@@ -13,8 +13,10 @@
 import type { UsageRouteRate } from '../types.ts';
 /** One model, with the routes it was sold through in the window. */
 export interface ModelUsage {
-    /** The card's `match`, or `undefined` for the routes the fallback priced. */
-    readonly model: string | undefined;
+    /** The model's key: identity across vendor prefixes and spellings. */
+    readonly key: string;
+    /** The spelling to show for it, chosen from the ones observed. */
+    readonly model: string;
     /** Tokens across every route of this model. */
     readonly tokens: number;
     /** Its routes, heaviest first. */
