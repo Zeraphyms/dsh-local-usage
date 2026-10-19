@@ -553,7 +553,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     {yearReport === undefined ? null : (
                       <PricingNotes
                         report={yearReport}
-                        locale={activeLocale}
                         t={t}
                         formatTokens={tokens}
                         onSaveRates={saveRateTable}
@@ -757,9 +756,9 @@ function SummaryStrip({ report, animate, stale, onEntranceEnd, t, money, tokens,
         <span className={css.heroValue} data-room={figureRoom(cost)}>
           {money(totals.cost * share)}
         </span>
-        {report.peakMultiplier <= 1
-          ? null
-          : <span className={css.heroDetail}>{t('peakNote', { multiplier: String(report.peakMultiplier) })}</span>}
+        {report.prices.some(card => card.peakEnabled) || report.fallbackPrice.peakEnabled
+          ? <span className={css.heroDetail}>{t('peakNoteSeparate')}</span>
+          : null}
       </div>
       <div className={css.tiles}>
         <Tile value={tokens(rangeTokens * share)} label={t('totalTokens')} />
