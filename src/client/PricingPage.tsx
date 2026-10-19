@@ -33,6 +33,8 @@ export interface PricingPageProps {
   /** Active locale id, for the grouped counts. */
   readonly locale: string
   readonly t: PropsLocale<'usage'>['t']
+  /** Cost formatter, for each model's own spend. */
+  readonly formatCost: (value: number) => string
   /** Persist one change to the model prices. */
   readonly onSaveRates: (update: UsagePricingUpdate) => Promise<void>
   /** Leave the page and return to the calendar. */
@@ -45,27 +47,29 @@ export interface PricingPageProps {
  * @returns the page.
  */
 export function PricingPage({
-  report, weeks, locale, t, onSaveRates, onBack,
+  report, weeks, locale, t, formatCost, onSaveRates, onBack,
 }: PricingPageProps): ReactNode {
   // Every model the window recorded, with the card that prices it: a configured
   // one, an edited one, or the fallback standing in until the reader writes their
   // own. One list, because the question is "what does this model cost" — not
   // "which of the two tables do I read".
   const configured = report.prices
-  const rows: RateRow[] = groupRouteUsage(report.routeRates).map(group => {
+  // Every route's own cost, so a model's share is a share of the money rather
+  // than of the tokens: at these prices those are not the same quantity.
+  const costByRoute = new Map(report.models.map(row => [row.route, row.cost]))
+  const grouped = groupRouteUsage(report.routeRates, route => costByRoute.get(route) ?? 0)
+  const totalCost = grouped.reduce((sum, group) => sum + group.cost, 0)
+  const rows: RateRow[] = grouped.map(group => {
     const card = configured.find(candidate => modelKey(candidate.match) === group.key)
     return {
       card: card ?? { ...report.fallbackPrice, match: group.model },
       tokens: group.tokens,
+      cost: group.cost,
       routes: group.routes.length,
       inherited: card === undefined,
-      share: 0,
+      share: totalCost <= 0 ? 0 : group.cost / totalCost,
     }
   })
-  const busiest = rows.reduce((best, row) => (row.tokens > best ? row.tokens : best), 0)
-  for (const row of rows) {
-    ;(row as { share: number }).share = busiest <= 0 ? 0 : row.tokens / busiest
-  }
 
   return (
     <section className={css.pricingPage} aria-label={t('pricingTitle')}>
@@ -82,6 +86,7 @@ export function PricingPage({
       <RateEditor
         rows={rows}
         currency={report.currency}
+        formatCost={formatCost}
         t={t}
         onSave={onSaveRates}
       />

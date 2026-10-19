@@ -22,6 +22,8 @@ export interface ModelUsage {
   readonly model: string
   /** Tokens across every route of this model. */
   readonly tokens: number
+  /** What this model cost over the window, across all of its routes. */
+  readonly cost: number
   /** Its routes, heaviest first. */
   readonly routes: readonly UsageRouteRate[]
 }
@@ -36,7 +38,10 @@ export interface ModelUsage {
  * @param routes - the route rows the report published.
  * @returns one entry per model, ordered by descending tokens.
  */
-export function groupRouteUsage(routes: readonly UsageRouteRate[]): ModelUsage[] {
+export function groupRouteUsage(
+  routes: readonly UsageRouteRate[],
+  costOf: (route: string) => number = () => 0,
+): ModelUsage[] {
   const groups = new Map<string, UsageRouteRate[]>()
   for (const route of routes) {
     // The route's own model, not the card's name: a route nothing has priced yet
@@ -59,7 +64,9 @@ export function groupRouteUsage(routes: readonly UsageRouteRate[]): ModelUsage[]
         route.detected === undefined || route.detected.length === 0 ? modelOf(route.route) : route.detected
       ))),
       tokens: group.reduce((sum, route) => sum + route.tokens, 0),
+      cost: group.reduce((sum, route) => sum + costOf(route.route), 0),
       routes: [...group].sort((left, right) => right.tokens - left.tokens),
     }))
-    .sort((left, right) => right.tokens - left.tokens || left.model.localeCompare(right.model))
+    .sort((left, right) => right.cost - left.cost || right.tokens - left.tokens
+      || left.model.localeCompare(right.model))
 }

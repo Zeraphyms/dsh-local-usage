@@ -148,7 +148,7 @@ describe('the rate editor', () => {
   const base = {
     currency: 'CNY',
     t,
-    formatTokens: String,
+    formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
     onSave: () => Promise.resolve(),
   }
 
@@ -169,9 +169,10 @@ describe('the rate editor', () => {
     const markup = renderToStaticMarkup(createElement(RateEditor, {
       ...base,
       rows: [
-        { card: card('p/m'), tokens: 100, routes: 1, inherited: false, share: 0 },
-        { card: card('q/m'), tokens: 50, routes: 2, inherited: true, share: 0 },
+        { card: card('p/m'), tokens: 100, cost: 1, routes: 1, inherited: false, share: 0.6 },
+        { card: card('q/m'), tokens: 50, cost: 0.4, routes: 2, inherited: true, share: 0.4 },
       ],
+      formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
     }))
 
     expect(markup).toContain('pricingModelsHint')
@@ -187,7 +188,7 @@ describe('the rate editor', () => {
   const base = {
     currency: 'CNY',
     t,
-    formatTokens: String,
+    formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
     onSave: () => Promise.resolve(),
   }
 
@@ -208,9 +209,10 @@ describe('the rate editor', () => {
     const markup = renderToStaticMarkup(createElement(RateEditor, {
       ...base,
       rows: [
-        { card: card('p/m'), tokens: 100, routes: 1, inherited: false, share: 0 },
-        { card: card('q/m'), tokens: 50, routes: 2, inherited: true, share: 0 },
+        { card: card('p/m'), tokens: 100, cost: 1, routes: 1, inherited: false, share: 0.6 },
+        { card: card('q/m'), tokens: 50, cost: 0.4, routes: 2, inherited: true, share: 0.4 },
       ],
+      formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
     }))
 
     expect(markup).toContain('pricingModelsHint')

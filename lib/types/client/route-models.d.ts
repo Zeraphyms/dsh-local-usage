@@ -19,6 +19,8 @@ export interface ModelUsage {
     readonly model: string;
     /** Tokens across every route of this model. */
     readonly tokens: number;
+    /** What this model cost over the window, across all of its routes. */
+    readonly cost: number;
     /** Its routes, heaviest first. */
     readonly routes: readonly UsageRouteRate[];
 }
@@ -32,4 +34,4 @@ export interface ModelUsage {
  * @param routes - the route rows the report published.
  * @returns one entry per model, ordered by descending tokens.
  */
-export declare function groupRouteUsage(routes: readonly UsageRouteRate[]): ModelUsage[];
+export declare function groupRouteUsage(routes: readonly UsageRouteRate[], costOf?: (route: string) => number): ModelUsage[];

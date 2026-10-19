@@ -426,10 +426,12 @@ export const styles = String.raw`
 /* Name, tag and action on the first line; the weight bar and its volume on the
  * second, so the bar reads as an underline of the model rather than a rule
  * between two labels. */
+/* The bar is a mark beside the figures, not a rule across the row: it keeps a
+ * short track so its length is read as a proportion rather than as a divider. */
 .dlu-rateCardHead .dlu-rateBar {
   order: 5;
-  flex-basis: 100%;
-  inline-size: auto;
+  flex: none;
+  inline-size: 88px;
   margin-top: 0;
 }
 

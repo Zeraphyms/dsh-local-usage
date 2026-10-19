@@ -47,17 +47,29 @@ export interface RateRow {
   readonly tokens: number
   /** How many routes of the model the window recorded. */
   readonly routes: number
+  /** What the model cost over the window, shown beside its volume. */
+  readonly cost: number
   /**
-   * Whether the model is priced by its own card rather than the default.
+   * Whether a card of its own prices the model, or the default rate does.
    *
-   * A row that inherits the default rate is not stating this model's price — it is
+   * A row that inherits the default is not stating this model's price — it is
    * stating the price that will be used until someone writes one — and a table
    * that shows the two identically is telling the reader something untrue.
    */
   readonly inherited: boolean
-  /** The model's share of the window's busiest model, for the row's volume bar. */
+  /** Its share of the window's spend, for the row's bar. */
   readonly share: number
 }
+
+/**
+ * The rows the sheet lists separately, and those still on the default rate.
+ *
+ * A model priced by its own card states its price; a model inheriting the default
+ * states only what will be charged until someone writes one. Shown identically,
+ * the table would tell the reader something untrue — and shown as a per-row tag,
+ * the tag drowned the list once a profile had a dozen unpriced models. They are
+ * two groups now, and the second one is a to-do list.
+ */
 
 /** Props for the card table. */
 export interface RateEditorProps {
@@ -65,6 +77,8 @@ export interface RateEditorProps {
   readonly rows: readonly RateRow[]
   /** Currency every price is expressed in, shown once above the table. */
   readonly currency: string
+  /** Cost formatter, for each row's own spend. */
+  readonly formatCost: (value: number) => string
   /** Panel translate function. */
   readonly t: PropsLocale<'usage'>['t']
   /** Persist one update; rejects with a message the editor shows. */
@@ -76,7 +90,7 @@ export interface RateEditorProps {
  * @param props - the cards, currency, dictionary and the save action.
  * @returns the table and its one open editor, if any.
  */
-export function RateEditor({ rows, currency, t, onSave }: RateEditorProps): ReactNode {
+export function RateEditor({ rows, currency, formatCost, t, onSave }: RateEditorProps): ReactNode {
   const models = rows.map(row => row.card)
   const [drafts, setDrafts] = useState<ModelDrafts>(() => draftsFrom(models))
   /** The model whose prices are open for editing, if any. */
@@ -185,7 +199,6 @@ export function RateEditor({ rows, currency, t, onSave }: RateEditorProps): Reac
                 <code className={css.priceMatch} title={card.match === '' ? t('pricingFallback') : card.match}>
                   {card.match === '' ? t('pricingFallback') : card.match}
                 </code>
-                {row.inherited ? <span className={css.rateDefaultTag}>{t('pricingInherited')}</span> : null}
                 {/* The row's own weight: a hairline whose length is its share of
                   * the busiest model, under the name it belongs to. */}
                 <span className={css.rateBar} aria-hidden="true">
@@ -193,7 +206,7 @@ export function RateEditor({ rows, currency, t, onSave }: RateEditorProps): Reac
                 </span>
 
                 <span className={css.rateVolume}>
-                  {formatCompact(row.tokens)} · {t('pricingRouteCount', { count: String(row.routes) })}
+                  {formatCost(row.cost)} · {formatCompact(row.tokens)} · {t('pricingRouteCount', { count: String(row.routes) })}
                 </span>
                 {open
                   ? (
