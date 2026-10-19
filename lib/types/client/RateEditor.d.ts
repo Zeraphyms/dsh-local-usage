@@ -1,26 +1,27 @@
 /**
- * The reader's price cards, one per model.
+ * The price cards, one per model, edited one at a time.
  *
- * Prices belong to models, not to routes: a model sold through four vendors is
- * the same model at the same price, and pricing is the one thing that should not
- * be re-entered per vendor. Each card therefore states its model's name, whether
- * it prices peak separately, and both sets of prices — four numbers inside a peak
- * window and four outside it, or one set when the switch is off.
+ * A price sheet and a form are different things. Most visits to this page end
+ * without a change — a reader comes to see what a model costs, or which card
+ * claimed a route — so the card opens as a table row: the model, whether it
+ * prices peak, and its eight numbers under one header that says which column is
+ * which. Editing is a mode of one card at a time, because the alternative was a
+ * wall of eight inputs per model with no column labels and one save button at the
+ * bottom that could not say what it would write.
  *
- * Consumption is not edited here and is not folded into these numbers: the route
- * table beside this editor states what each route spent, so a reader can see
- * which routes one card now covers without the two figures being merged.
+ * Consumption is not edited here and is not folded into these numbers: the page
+ * states the routes beside the cards, and the two figures stay separate.
  *
  * @module dsh-local-usage/client/RateEditor
  */
 import { type ReactNode } from 'react';
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
 import type { UsageModelPrice, UsagePricingUpdate } from '../types.ts';
-/** Props for the card editor. */
+/** Props for the card table. */
 export interface RateEditorProps {
     /** The cards in match order; the fallback card has an empty `match`. */
     readonly models: readonly UsageModelPrice[];
-    /** Currency every price is expressed in, shown once beside the save action. */
+    /** Currency every price is expressed in, shown once above the table. */
     readonly currency: string;
     /** Panel translate function. */
     readonly t: PropsLocale<'usage'>['t'];
@@ -28,8 +29,8 @@ export interface RateEditorProps {
     readonly onSave: (update: UsagePricingUpdate) => Promise<void>;
 }
 /**
- * Render the editable price cards.
+ * Render the price cards.
  * @param props - the cards, currency, dictionary and the save action.
- * @returns the editor.
+ * @returns the table and its one open editor, if any.
  */
 export declare function RateEditor({ models, currency, t, onSave }: RateEditorProps): ReactNode;

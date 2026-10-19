@@ -138,6 +138,15 @@ export declare const css: {
     readonly projectName: "dlu-projectName";
     readonly projectPath: "dlu-projectPath";
     readonly pricingPage: "dlu-pricingPage";
+    readonly pricingSectionHead: "dlu-pricingSectionHead";
+    readonly rateBadge: "dlu-rateBadge";
+    readonly rateCard: "dlu-rateCard";
+    readonly rateCardHead: "dlu-rateCardHead";
+    readonly rateHead: "dlu-rateHead";
+    readonly rateInputCell: "dlu-rateInputCell";
+    readonly rateRow: "dlu-rateRow";
+    readonly rateSetLabel: "dlu-rateSetLabel";
+    readonly rateValue: "dlu-rateValue";
     readonly pricingSection: "dlu-pricingSection";
     readonly projectTable: "dlu-projectTable";
     readonly statsBlock: "dlu-statsBlock";

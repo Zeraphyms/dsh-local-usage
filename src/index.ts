@@ -144,14 +144,14 @@ export const DEFAULT_CONFIG: UsageInsightsConfig = {
   currency: 'CNY',
   models: [
     {
-      match: 'v4-pro',
+      match: 'deepseek-v4-pro',
       input: 4.5,
       cacheRead: 0.15,
       cacheWrite: 4.5,
       output: 13.5,
       peak: { input: 9, cacheRead: 0.3, cacheWrite: 9, output: 27 },
     },
-    { match: 'flash', ...FLASH_RATE, peak: FLASH_PEAK },
+    { match: 'deepseek-v4.1-flash', ...FLASH_RATE, peak: FLASH_PEAK },
   ],
   fallback: { ...FLASH_RATE, peak: FLASH_PEAK },
   peakWindows: ['09:00-12:00', '14:00-18:00'],

@@ -145,6 +145,12 @@ export declare const zh: {
     pricingModelsTitle: string;
     pricingPageSubtitle: string;
     pricingSectionUsage: string;
+    pricingPriceSet: string;
+    pricingEdit: string;
+    pricingCancel: string;
+    pricingSaveOne: string;
+    pricingPeakBadge: string;
+    pricingFlatBadge: string;
     pricingModelColumn: string;
     pricingRouteCount: string;
     pricingModelsHint: string;
@@ -333,6 +339,12 @@ export declare const en: {
     pricingModelsTitle: string;
     pricingPageSubtitle: string;
     pricingSectionUsage: string;
+    pricingPriceSet: string;
+    pricingEdit: string;
+    pricingCancel: string;
+    pricingSaveOne: string;
+    pricingPeakBadge: string;
+    pricingFlatBadge: string;
     pricingModelColumn: string;
     pricingRouteCount: string;
     pricingModelsHint: string;

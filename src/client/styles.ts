@@ -358,9 +358,106 @@ export const styles = String.raw`
 .dlu-pricingSection {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   padding-top: 16px;
   border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+/* The prose on this page is one argument in four sentences, not four blocks:
+ * the product's paragraph margins would turn each of them into a section. */
+.dlu-pricingSection > p {
+  margin: 0;
+  max-inline-size: 78ch;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+/* The price sheet: a table, not a form. One header names the four buckets for
+ * every card, each row states one set of prices in the same columns, and only the
+ * open card swaps its numbers for inputs. */
+.dlu-pricingSectionHead {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+/* Five columns after the label column: the set, then the four buckets. */
+.dlu-rateHead,
+.dlu-rateRow {
+  display: grid;
+  grid-template-columns: 18px 86px repeat(4, minmax(0, 1fr)) 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.dlu-rateHead {
+  padding-block: 2px 6px;
+  font-size: 10.5px;
+  color: var(--dsw-alias-label-caption);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.dlu-rateCard {
+  padding-block: 7px 7px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.dlu-rateCard[data-open='true'] {
+  padding-block-end: 10px;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 2.5%, transparent);
+  border-radius: 8px;
+}
+
+.dlu-rateCardHead {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-block: 2px;
+}
+
+.dlu-rateCardHead .dlu-priceMatch {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Whether the card prices peak is a property of the card, so it reads as a badge
+ * beside its name rather than as a control buried in the form. */
+.dlu-rateBadge {
+  flex: none;
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--dsw-alias-label-caption);
+  white-space: nowrap;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+}
+
+.dlu-rateBadge[data-peak='true'] {
+  color: var(--dsw-alias-link);
+  border-color: color-mix(in oklab, var(--dsw-alias-link) 45%, transparent);
+}
+
+.dlu-rateSetLabel {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-rateValue {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.dlu-rateInputCell .dlu-editorField {
+  inline-size: 100%;
+  text-align: end;
 }
 
 /* The price cards, one per model.

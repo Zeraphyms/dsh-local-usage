@@ -133,7 +133,7 @@ dsh plugin add /path/to/dsh-local-usage                               # 从本�
 
 ![费率面板：计价公式、高峰时段、当前生效的费率表，以及按路由逐条改写价格](https://raw.githubusercontent.com/webxiaobaiyu-droid/dsh-local-usage/main/docs/rates.zh.png)
 
-*页头的**计价方式**按钮打开的一整页：公式与高峰日程在上，按模型的价目卡片居中，按模型归一化的用量在下。*
+*页头的**计价方式**按钮打开的一整页：公式与高峰日程在上，按模型的价目表居中（默认收起成一行，点「编辑」才展开该模型的八个价），按模型归一化的用量在下。*
 
 ```sh
 $DSH_HOME/local-usage/pricing.json     # 编辑器写入的文件；DSH_HOME 默认为 ~/.dsh
