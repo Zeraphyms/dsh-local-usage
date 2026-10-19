@@ -1739,6 +1739,19 @@ export const styles = String.raw`
   box-shadow: 0 18px 44px rgb(0 0 0 / 0.18);
 }
 
+/* The eight pixels between the trigger and the panel are the panel's, not a
+ * gap. Without this the pointer leaves the host while crossing them, the panel
+ * closes under the hand travelling towards it, and the reference material is
+ * unreachable by hover — which is the whole gesture. A transparent strip above
+ * the panel makes the crossing one continuous hit area. */
+.dlu-popoverPanel::before {
+  content: '';
+  position: absolute;
+  inset-block-start: -8px;
+  inset-inline: 0;
+  block-size: 8px;
+}
+
 .dlu-popoverTitle {
   margin: 0 0 8px;
   font-size: 12.5px;

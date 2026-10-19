@@ -43,10 +43,30 @@ export interface PopoverProps {
  * @param props - identity, copy, icon, width, availability and panel content.
  * @returns the host element.
  */
+/** How long the pointer may be outside before the hover preview closes. */
+const HOVER_GRACE_MS = 160
+
 export function Popover({ id, label, hint, icon, width = 560, disabled = false, children }: PopoverProps): ReactNode {
   const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
   const host = useRef<HTMLDivElement>(null)
+  const grace = useRef<number | undefined>(undefined)
+
+  // A pointer leaving the host closes the preview, but not on the first frame it
+  // is outside: a hand crossing a gap — or slipping off the edge of a rate field
+  // and back — would otherwise lose the panel mid-gesture. The timer is cleared
+  // by any return, and on unmount.
+  const holdOpen = (): void => {
+    if (disabled) return
+    window.clearTimeout(grace.current)
+    grace.current = undefined
+    setHovered(true)
+  }
+  const releaseAfterGrace = (): void => {
+    window.clearTimeout(grace.current)
+    grace.current = window.setTimeout(() => { setHovered(false) }, HOVER_GRACE_MS)
+  }
+  useEffect(() => () => { window.clearTimeout(grace.current) }, [])
   const open = !disabled && (pinned || hovered)
   const panelId = `${id}-panel`
 
@@ -56,12 +76,14 @@ export function Popover({ id, label, hint, icon, width = 560, disabled = false, 
     if (!open) return
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
+        window.clearTimeout(grace.current)
         setPinned(false)
         setHovered(false)
       }
     }
     const onPointerDown = (event: PointerEvent): void => {
       if (host.current !== null && !host.current.contains(event.target as Node)) {
+        window.clearTimeout(grace.current)
         setPinned(false)
         setHovered(false)
       }
@@ -78,8 +100,8 @@ export function Popover({ id, label, hint, icon, width = 560, disabled = false, 
     <div
       className={css.popoverHost}
       ref={host}
-      onPointerEnter={() => { if (!disabled) setHovered(true) }}
-      onPointerLeave={() => { setHovered(false) }}
+      onPointerEnter={holdOpen}
+      onPointerLeave={releaseAfterGrace}
     >
       <button
         type="button"

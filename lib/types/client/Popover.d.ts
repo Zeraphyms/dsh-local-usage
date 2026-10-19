@@ -34,11 +34,6 @@ export interface PopoverProps {
     readonly disabled?: boolean;
     readonly children: ReactNode;
 }
-/**
- * Render one icon trigger with its panel.
- * @param props - identity, copy, icon, width, availability and panel content.
- * @returns the host element.
- */
 export declare function Popover({ id, label, hint, icon, width, disabled, children }: PopoverProps): ReactNode;
 /** Rate-card glyph: a percent sign inside a card outline. */
 export declare function RateIcon(): ReactNode;
