@@ -25,6 +25,16 @@ export interface RateRow {
     readonly tokens: number;
     /** How many routes of the model the window recorded. */
     readonly routes: number;
+    /**
+     * Whether the model is priced by its own card rather than the default.
+     *
+     * A row that inherits the default rate is not stating this model's price — it is
+     * stating the price that will be used until someone writes one — and a table
+     * that shows the two identically is telling the reader something untrue.
+     */
+    readonly inherited: boolean;
+    /** The model's share of the window's busiest model, for the row's volume bar. */
+    readonly share: number;
 }
 /** Props for the card table. */
 export interface RateEditorProps {

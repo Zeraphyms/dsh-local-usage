@@ -169,8 +169,8 @@ describe('the rate editor', () => {
     const markup = renderToStaticMarkup(createElement(RateEditor, {
       ...base,
       rows: [
-        { card: card('p/m'), tokens: 100, routes: 1 },
-        { card: card('q/m'), tokens: 50, routes: 2 },
+        { card: card('p/m'), tokens: 100, routes: 1, inherited: false, share: 0 },
+        { card: card('q/m'), tokens: 50, routes: 2, inherited: true, share: 0 },
       ],
     }))
 
@@ -208,8 +208,8 @@ describe('the rate editor', () => {
     const markup = renderToStaticMarkup(createElement(RateEditor, {
       ...base,
       rows: [
-        { card: card('p/m'), tokens: 100, routes: 1 },
-        { card: card('q/m'), tokens: 50, routes: 2 },
+        { card: card('p/m'), tokens: 100, routes: 1, inherited: false, share: 0 },
+        { card: card('q/m'), tokens: 50, routes: 2, inherited: true, share: 0 },
       ],
     }))
 

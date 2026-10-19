@@ -398,6 +398,12 @@ export const styles = String.raw`
   border-bottom: 0.5px solid var(--dsw-alias-border-l2);
 }
 
+/* A column of numbers is read down its right edge, so its heading ends there
+ * too: a label flush left over values flush right reads as two columns. */
+.dlu-rateHead > span:nth-child(n + 3) {
+  text-align: end;
+}
+
 .dlu-rateCard {
   padding-block: 7px 7px;
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
@@ -411,18 +417,97 @@ export const styles = String.raw`
 
 .dlu-rateCardHead {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   align-items: center;
   padding-block: 2px;
 }
 
+/* Name, tag and action on the first line; the weight bar and its volume on the
+ * second, so the bar reads as an underline of the model rather than a rule
+ * between two labels. */
+.dlu-rateCardHead .dlu-rateBar {
+  order: 5;
+  flex-basis: 100%;
+  inline-size: auto;
+  margin-top: 0;
+}
+
+.dlu-rateCardHead .dlu-rateVolume {
+  order: 6;
+}
+
 .dlu-rateCardHead .dlu-priceMatch {
-  flex: 1;
   min-inline-size: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* The row's weight, drawn as a hairline under its name: long for the model that
+ * dominates the window, short for the one on its tail. One measured line is the
+ * only ornament this list needs. */
+.dlu-rateBar {
+  display: block;
+  inline-size: 132px;
+  block-size: 2px;
+  margin-top: 3px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 7%, transparent);
+  border-radius: 999px;
+}
+
+.dlu-rateBar > span {
+  display: block;
+  block-size: 100%;
+  background: color-mix(in oklab, var(--dsw-alias-link) 55%, transparent);
+  border-radius: inherit;
+}
+
+/* A model priced by the default card is not stating its price, and says so. */
+.dlu-rateDefaultTag {
+  flex: none;
+  font-size: 10px;
+  color: var(--dsw-alias-label-caption);
+  white-space: nowrap;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  padding: 0 6px;
+  line-height: 1.7;
+}
+
+/* The action sits below the data in weight: a word, not a button. */
+.dlu-rateAction {
+  flex: none;
+  order: 4;
+  margin-inline-start: auto;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.dlu-rateAction:hover {
+  color: var(--dsw-alias-link);
+  text-decoration: underline;
+}
+
+.dlu-rateAction:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 2px;
+}
+
+/* The reference material folds away. */
+.dlu-pricingSummary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
 }
 
 /* Whether the card prices peak is a property of the card, so it reads as a badge

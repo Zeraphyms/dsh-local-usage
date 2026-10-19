@@ -47,6 +47,16 @@ export interface RateRow {
   readonly tokens: number
   /** How many routes of the model the window recorded. */
   readonly routes: number
+  /**
+   * Whether the model is priced by its own card rather than the default.
+   *
+   * A row that inherits the default rate is not stating this model's price — it is
+   * stating the price that will be used until someone writes one — and a table
+   * that shows the two identically is telling the reader something untrue.
+   */
+  readonly inherited: boolean
+  /** The model's share of the window's busiest model, for the row's volume bar. */
+  readonly share: number
 }
 
 /** Props for the card table. */
@@ -175,20 +185,22 @@ export function RateEditor({ rows, currency, t, onSave }: RateEditorProps): Reac
                 <code className={css.priceMatch} title={card.match === '' ? t('pricingFallback') : card.match}>
                   {card.match === '' ? t('pricingFallback') : card.match}
                 </code>
-                <span className={css.rateBadge} data-peak={card.peakEnabled}>
-                  {card.peakEnabled ? t('pricingPeakBadge') : t('pricingFlatBadge')}
+                {row.inherited ? <span className={css.rateDefaultTag}>{t('pricingInherited')}</span> : null}
+                {/* The row's own weight: a hairline whose length is its share of
+                  * the busiest model, under the name it belongs to. */}
+                <span className={css.rateBar} aria-hidden="true">
+                  <span style={{ inlineSize: `${String(Math.round((row.share <= 0 ? 0 : row.share) * 100))}%` }} />
                 </span>
+
                 <span className={css.rateVolume}>
-                  {row.tokens === 0
-                    ? null
-                    : `${formatCompact(row.tokens)} · ${t('pricingRouteCount', { count: String(row.routes) })}`}
+                  {formatCompact(row.tokens)} · {t('pricingRouteCount', { count: String(row.routes) })}
                 </span>
                 {open
                   ? (
                     <>
                       <button
                         type="button"
-                        className={css.rankMore}
+                        className={css.rateAction}
                         disabled={busy}
                         onClick={discard}
                       >
@@ -196,7 +208,7 @@ export function RateEditor({ rows, currency, t, onSave }: RateEditorProps): Reac
                       </button>
                       <button
                         type="button"
-                        className={css.rankMore}
+                        className={css.rateAction}
                         disabled={busy}
                         onClick={() => { void commit() }}
                       >
@@ -207,7 +219,7 @@ export function RateEditor({ rows, currency, t, onSave }: RateEditorProps): Reac
                   : (
                     <button
                       type="button"
-                      className={css.rankMore}
+                      className={css.rateAction}
                       onClick={() => {
                         setSaved(false)
                         setFailure(undefined)

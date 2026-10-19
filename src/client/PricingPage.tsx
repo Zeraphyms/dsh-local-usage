@@ -58,8 +58,14 @@ export function PricingPage({
       card: card ?? { ...report.fallbackPrice, match: group.model },
       tokens: group.tokens,
       routes: group.routes.length,
+      inherited: card === undefined,
+      share: 0,
     }
   })
+  const busiest = rows.reduce((best, row) => (row.tokens > best ? row.tokens : best), 0)
+  for (const row of rows) {
+    ;(row as { share: number }).share = busiest <= 0 ? 0 : row.tokens / busiest
+  }
 
   return (
     <section className={css.pricingPage} aria-label={t('pricingTitle')}>
@@ -80,10 +86,12 @@ export function PricingPage({
         onSave={onSaveRates}
       />
 
-      <section className={css.pricingSection}>
-        <h4 className={css.editorTitle}>{t('dataTitle')}</h4>
+      {/* Reference material, folded away: it is read once and must not compete
+        * with the prices above it. */}
+      <details className={css.pricingSection}>
+        <summary className={css.pricingSummary}>{t('dataTitle')}</summary>
         <DataSourceNotes report={report} weeks={weeks} locale={locale} t={t} />
-      </section>
+      </details>
     </section>
   )
 }

@@ -139,6 +139,10 @@ export declare const css: {
     readonly projectPath: "dlu-projectPath";
     readonly pricingPage: "dlu-pricingPage";
     readonly pricingSectionHead: "dlu-pricingSectionHead";
+    readonly pricingSummary: "dlu-pricingSummary";
+    readonly rateAction: "dlu-rateAction";
+    readonly rateBar: "dlu-rateBar";
+    readonly rateDefaultTag: "dlu-rateDefaultTag";
     readonly rateBadge: "dlu-rateBadge";
     readonly rateCard: "dlu-rateCard";
     readonly rateCardHead: "dlu-rateCardHead";

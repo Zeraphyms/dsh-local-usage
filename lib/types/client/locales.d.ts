@@ -158,6 +158,7 @@ export declare const zh: {
     pricingRouteCount: string;
     pricingModelsHint: string;
     pricingPeakEnabled: string;
+    pricingInherited: string;
     pricingPeakPrices: string;
     pricingOffPeakPrices: string;
     pricingFlatPrice: string;
@@ -355,6 +356,7 @@ export declare const en: {
     pricingRouteCount: string;
     pricingModelsHint: string;
     pricingPeakEnabled: string;
+    pricingInherited: string;
     pricingPeakPrices: string;
     pricingOffPeakPrices: string;
     pricingFlatPrice: string;
