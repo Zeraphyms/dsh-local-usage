@@ -35,10 +35,7 @@ import { CalendarHeatmap } from './CalendarHeatmap.tsx'
 import { cacheHitRate } from './cache-rate.ts'
 import { useEntrance } from './count-up.ts'
 import { DayDetail } from './DayDetail.tsx'
-import { DataSourceNotes } from './DataSourceNotes.tsx'
 import { PanelSkeleton, SummarySkeleton } from './PanelSkeleton.tsx'
-import { Popover, RateIcon, SourceIcon } from './Popover.tsx'
-import { PricingNotes } from './PricingNotes.tsx'
 import {
   summaryFailed,
   summaryIdle,
@@ -48,6 +45,7 @@ import {
 } from './summary-state.ts'
 import type { SummaryState } from './summary-state.ts'
 import { Tile } from './Tile.tsx'
+import { PricingPage } from './PricingPage.tsx'
 import { StatsTables } from './StatsTables.tsx'
 import { WaveChart } from './WaveChart.tsx'
 import { dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
@@ -319,6 +317,9 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   const [summaryRequest, setSummaryRequest] = useState(0)
   // The day page: which day is open, that day's own fold, and a retry counter.
   const [selectedDay, setSelectedDay] = useState<string | undefined>(undefined)
+  // The prices live on a page rather than in a hover panel: the reader comes
+  // here to type, and a panel that closes on pointer-leave cannot be typed into.
+  const [showPricing, setShowPricing] = useState(false)
   const [dayState, setDayState] = useState<DayState>({ status: 'idle' })
   const [dayRequest, setDayRequest] = useState(0)
   // Bumped after a rate write, so every view re-prices against the new table
@@ -512,6 +513,16 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
               setSelectedDay(undefined)
             }}
           />
+        ) : showPricing && yearReport !== undefined ? (
+          <PricingPage
+            report={yearReport}
+            weeks={WINDOW_WEEKS}
+            locale={activeLocale}
+            t={t}
+            formatTokens={tokens}
+            onSaveRates={saveRateTable}
+            onBack={() => { setShowPricing(false) }}
+          />
         ) : (
           <>
             <header className={css.header}>
@@ -534,54 +545,20 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   ))}
                 </div>
                 <div className={css.tools}>
-                  {/* Both of these are consulted rather than read through, so
-                      they live beside the figures as hover panels instead of at
-                      the bottom of a column the reader has to scroll. They read
-                      the year's report, so they wait for it — in place, inert,
-                      like the recount button beside them. A control that removes
-                      itself for the length of a read is a control the reader
-                      reports as missing, and the loading frame around it looks
-                      enough like the finished page to be believed. */}
-                  <Popover
-                    id="dlu-rates"
-                    label={t('pricingTitle')}
-                    hint={t('pricingTooltip')}
-                    icon={<RateIcon />}
-                    width={700}
+                  {/* Prices are a page, not a hover panel: eight fields per model
+                      do not fit a tooltip, and a panel that closes on pointer-leave
+                      cannot be typed into. The button waits for the year's report
+                      in place, inert, like the recount beside it. */}
+                  <button
+                    type="button"
+                    className={css.breakout}
                     disabled={yearReport === undefined}
+                    onClick={() => { setShowPricing(true) }}
                   >
-                    {yearReport === undefined ? null : (
-                      <PricingNotes
-                        report={yearReport}
-                        t={t}
-                        formatTokens={tokens}
-                        onSaveRates={saveRateTable}
-                      />
-                    )}
-                  </Popover>
-                  <Popover
-                    id="dlu-source"
-                    label={t('dataTitle')}
-                    hint={t('dataTooltip')}
-                    icon={<SourceIcon />}
-                    width={560}
-                    disabled={yearReport === undefined}
-                  >
-                    {yearReport === undefined ? null : (
-                      <DataSourceNotes
-                        report={yearReport}
-                        weeks={WINDOW_WEEKS}
-                        locale={activeLocale}
-                        t={t}
-                      />
-                    )}
-                  </Popover>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={gridState.status === 'loading'}
-                    onClick={() => { setRequest(value => value + 1) }}
-                  >
+                    {t('pricingTitle')}
+                  </button>
+                  {/* Recount: discard the Host's folds and read every log again. */}
+                  <Button variant="outline" size="sm" onClick={() => { setRequest(value => value + 1) }}>
                     {t('refresh')}
                   </Button>
                 </div>

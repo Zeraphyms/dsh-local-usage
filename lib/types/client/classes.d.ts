@@ -137,6 +137,8 @@ export declare const css: {
     readonly projectHeading: "dlu-projectHeading";
     readonly projectName: "dlu-projectName";
     readonly projectPath: "dlu-projectPath";
+    readonly pricingPage: "dlu-pricingPage";
+    readonly pricingSection: "dlu-pricingSection";
     readonly projectTable: "dlu-projectTable";
     readonly statsBlock: "dlu-statsBlock";
     readonly tableBlock: "dlu-tableBlock";

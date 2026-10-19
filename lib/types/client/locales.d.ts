@@ -143,6 +143,10 @@ export declare const zh: {
     pricingUnknownRoute: string;
     pricingPeakSchedule: string;
     pricingModelsTitle: string;
+    pricingPageSubtitle: string;
+    pricingSectionUsage: string;
+    pricingModelColumn: string;
+    pricingRouteCount: string;
     pricingModelsHint: string;
     pricingPeakEnabled: string;
     pricingPeakPrices: string;
@@ -327,6 +331,10 @@ export declare const en: {
     pricingUnknownRoute: string;
     pricingPeakSchedule: string;
     pricingModelsTitle: string;
+    pricingPageSubtitle: string;
+    pricingSectionUsage: string;
+    pricingModelColumn: string;
+    pricingRouteCount: string;
     pricingModelsHint: string;
     pricingPeakEnabled: string;
     pricingPeakPrices: string;

@@ -347,6 +347,22 @@ export const styles = String.raw`
   font-weight: 400;
 }
 
+/* The pricing page: the day view's frame, because it is the same kind of thing —
+ * a page the panel replaces itself with, not a panel floating over the figures. */
+.dlu-pricingPage {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.dlu-pricingSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
 /* The price cards, one per model.
 
  * A card is a block rather than a table row: it states two sets of four prices

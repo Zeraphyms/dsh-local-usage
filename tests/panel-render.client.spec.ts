@@ -25,7 +25,6 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { UsagePanel } from '../src/client/UsagePanel.tsx'
 import type { UsagePanelProps } from '../src/client/UsagePanel.tsx'
 import { DayDetail } from '../src/client/DayDetail.tsx'
-import { Popover } from '../src/client/Popover.tsx'
 import { RateEditor } from '../src/client/RateEditor.tsx'
 import type { UsageModelPrice } from '../src/types.ts'
 import type { UsageInsightsReport } from '../src/types.ts'
@@ -51,14 +50,12 @@ function panelProps(): UsagePanelProps {
 describe('the panel before its report arrives', () => {
   const markup = renderToStaticMarkup(createElement(UsagePanel, panelProps()))
 
-  it('keeps the rate panel in the header, inert rather than absent', () => {
-    expect(markup).toContain('aria-label="pricingTitle"')
-    expect(markup).toContain('data-disabled="true"')
-    expect(markup).toContain('aria-expanded="false"')
-  })
-
-  it('keeps the provenance panel there beside it', () => {
-    expect(markup).toContain('aria-label="dataTitle"')
+  it('keeps the way into the prices, inert rather than absent', () => {
+    // Prices live on a page now, reached by this control. It waits for the year's
+    // report in place: a control that removes itself for the length of a read is
+    // the failure this assertion exists to prevent.
+    expect(markup).toContain('pricingTitle')
+    expect(markup).toContain('disabled')
   })
 
   it('keeps the recount button, which was already always present', () => {
@@ -68,23 +65,6 @@ describe('the panel before its report arrives', () => {
   it('draws the loading frame rather than a page that looks finished', () => {
     expect(markup).toContain('dlu-cellGhost')
     expect(markup).toContain('role="progressbar"')
-  })
-})
-
-describe('a popover with data behind it', () => {
-  it('is live and carries its content once it has something to show', () => {
-    const markup = renderToStaticMarkup(createElement(Popover, {
-      id: 'x',
-      label: 'label',
-      hint: 'hint',
-      icon: null,
-      children: createElement('p', null, 'body'),
-    }))
-
-    expect(markup).toContain('aria-disabled="false"')
-    expect(markup).toContain('data-disabled="false"')
-    // Mounted while closed, so a pinned panel keeps half-typed fields.
-    expect(markup).toContain('body')
   })
 })
 

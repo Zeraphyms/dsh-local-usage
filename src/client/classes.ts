@@ -141,6 +141,8 @@ export const css = {
   projectHeading: 'dlu-projectHeading',
   projectName: 'dlu-projectName',
   projectPath: 'dlu-projectPath',
+  pricingPage: 'dlu-pricingPage',
+  pricingSection: 'dlu-pricingSection',
   projectTable: 'dlu-projectTable',
   statsBlock: 'dlu-statsBlock',
   tableBlock: 'dlu-tableBlock',

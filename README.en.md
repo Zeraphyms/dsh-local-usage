@@ -135,7 +135,7 @@ Each rate card states `input`, `cacheRead`, `cacheWrite`, and `output` in curren
 
 ![The rate panel: the pricing formula, the peak schedule, the rate card in effect, and a row per route whose four prices can be typed over](https://raw.githubusercontent.com/webxiaobaiyu-droid/dsh-local-usage/main/docs/rates.en.png)
 
-*The first of the header's two icons: the formula and the rates in effect above, the per-route prices you can correct below.*
+*What the header's **prices** button opens: the formula and the peak schedule above, a card per model in the middle, and the window's usage grouped by model below.*
 
 ```sh
 $DSH_HOME/local-usage/pricing.json     # what the editor writes; ~/.dsh by default
