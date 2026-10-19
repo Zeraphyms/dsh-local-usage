@@ -91,3 +91,20 @@ describe('groupRouteUsage', () => {
     expect(groupRouteUsage([])).toEqual([])
   })
 })
+
+describe('a Host that does not state the model', () => {
+  it('reads it out of the route rather than folding every route together', () => {
+    const bare = (name: string, tokens: number): UsageRouteRate => ({
+      ...route(name, tokens),
+      detected: undefined as unknown as string,
+    })
+    const groups = groupRouteUsage([
+      bare('workbuddy/cn:deepseek-v4.1-flash', 300),
+      bare('commoncode/deepseek/deepseek-v4.1-flash', 100),
+      bare('ds123/grok-4.6', 200),
+    ])
+
+    expect(groups.map(group => group.model)).toEqual(['deepseek-v4.1-flash', 'grok-4.6'])
+    expect(groups[0]?.tokens).toBe(400)
+  })
+})

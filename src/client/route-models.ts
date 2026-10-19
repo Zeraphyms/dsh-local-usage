@@ -11,7 +11,7 @@
  * @module dsh-local-usage/client/route-models
  */
 
-import { displayModel, modelKey } from '../model-name.ts'
+import { displayModel, modelKey, modelOf } from '../model-name.ts'
 import type { UsageRouteRate } from '../types.ts'
 
 /** One model, with the routes it was sold through in the window. */
@@ -40,8 +40,14 @@ export function groupRouteUsage(routes: readonly UsageRouteRate[]): ModelUsage[]
   const groups = new Map<string, UsageRouteRate[]>()
   for (const route of routes) {
     // The route's own model, not the card's name: a route nothing has priced yet
-    // is still a model the reader should be able to price.
-    const key = modelKey(route.detected)
+    // is still a model the reader should be able to price. A Host that predates
+    // the field states nothing, so the model is read out of the route here —
+    // without that, every route folded into one nameless row and the page looked
+    // empty of models on a Host a version behind the panel.
+    const name = route.detected === undefined || route.detected.length === 0
+      ? modelOf(route.route)
+      : route.detected
+    const key = modelKey(name)
     const bucket = groups.get(key)
     if (bucket === undefined) groups.set(key, [route])
     else bucket.push(route)
@@ -49,7 +55,9 @@ export function groupRouteUsage(routes: readonly UsageRouteRate[]): ModelUsage[]
   return [...groups.entries()]
     .map(([key, group]) => ({
       key,
-      model: displayModel(group.map(route => route.detected)),
+      model: displayModel(group.map(route => (
+        route.detected === undefined || route.detected.length === 0 ? modelOf(route.route) : route.detected
+      ))),
       tokens: group.reduce((sum, route) => sum + route.tokens, 0),
       routes: [...group].sort((left, right) => right.tokens - left.tokens),
     }))

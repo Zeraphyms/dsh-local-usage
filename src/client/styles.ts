@@ -386,7 +386,7 @@ export const styles = String.raw`
 .dlu-rateHead,
 .dlu-rateRow {
   display: grid;
-  grid-template-columns: 18px 86px repeat(4, minmax(0, 1fr)) 44px;
+  grid-template-columns: 18px 86px repeat(4, minmax(0, 1fr)) minmax(56px, max-content);
   gap: 8px;
   align-items: center;
 }
