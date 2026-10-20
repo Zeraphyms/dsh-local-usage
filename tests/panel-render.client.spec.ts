@@ -144,13 +144,28 @@ describe('the stylesheet keeps the layout a function of the panel, not of the da
   })
 })
 
-describe('the rate editor', () => {
+describe('the price sheet', () => {
   const base = {
     currency: 'CNY',
     t,
     formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
     onSave: () => Promise.resolve(),
   }
+
+  /** One card, peak-priced, as the report publishes it. */
+  const card = (match: string): UsageModelPrice => ({
+    match,
+    peakEnabled: true,
+    offPeak: { input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 },
+    peak: { input: 2, cacheRead: 0.04, cacheWrite: 2, output: 8 },
+  })
+
+  const rows = [
+    { card: card('p/m'), tokens: 100, cost: 1, routes: 1, inherited: false },
+    // A flat card that no card of its own prices: the default tag is the sheet's
+    // only warning that the numbers in that row are not that model's own.
+    { card: { ...card('q/m'), peakEnabled: false }, tokens: 50, cost: 0.4, routes: 2, inherited: true },
+  ]
 
   it('states an empty window instead of vanishing from the panel', () => {
     const markup = renderToStaticMarkup(createElement(RateEditor, { ...base, rows: [] }))
@@ -159,67 +174,23 @@ describe('the rate editor', () => {
     expect(markup).toContain('pricingEditorEmpty')
   })
 
-  it('offers a card per model, with both of its price sets', () => {
-    const card = (match: string): UsageModelPrice => ({
-      match,
-      peakEnabled: true,
-      offPeak: { input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 },
-      peak: { input: 2, cacheRead: 0.04, cacheWrite: 2, output: 8 },
-    })
-    const markup = renderToStaticMarkup(createElement(RateEditor, {
-      ...base,
-      rows: [
-        { card: card('p/m'), tokens: 100, cost: 1, routes: 1, inherited: false, share: 0.6 },
-        { card: card('q/m'), tokens: 50, cost: 0.4, routes: 2, inherited: true, share: 0.4 },
-      ],
-      formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
-    }))
+  it('reads as a table: one header, then a row per set of prices', () => {
+    const markup = renderToStaticMarkup(createElement(RateEditor, { ...base, rows }))
 
-    expect(markup).toContain('pricingModelsHint')
-    expect(markup).not.toContain('pricingEditorEmpty')
+    expect(markup).toContain('<table')
+    expect(markup).toContain('pricingTableModel')
+    expect(markup).toContain('pricingColumnInput')
+    expect(markup).toContain('pricingTableUsage')
+    // Both models are listed, and the one on the default rate says so.
     expect(markup).toContain('p/m')
     expect(markup).toContain('q/m')
-    // The peak set is stated for a model that prices it.
-    expect(markup).toContain('pricingPeakPrices')
-  })
-})
-
-describe('the rate editor', () => {
-  const base = {
-    currency: 'CNY',
-    t,
-    formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
-    onSave: () => Promise.resolve(),
-  }
-
-  it('states an empty window instead of vanishing from the panel', () => {
-    const markup = renderToStaticMarkup(createElement(RateEditor, { ...base, rows: [] }))
-
-    expect(markup).toContain('pricingModelsTitle')
-    expect(markup).toContain('pricingEditorEmpty')
-  })
-
-  it('offers a card per model, with both of its price sets', () => {
-    const card = (match: string): UsageModelPrice => ({
-      match,
-      peakEnabled: true,
-      offPeak: { input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 },
-      peak: { input: 2, cacheRead: 0.04, cacheWrite: 2, output: 8 },
-    })
-    const markup = renderToStaticMarkup(createElement(RateEditor, {
-      ...base,
-      rows: [
-        { card: card('p/m'), tokens: 100, cost: 1, routes: 1, inherited: false, share: 0.6 },
-        { card: card('q/m'), tokens: 50, cost: 0.4, routes: 2, inherited: true, share: 0.4 },
-      ],
-      formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
-    }))
-
-    expect(markup).toContain('pricingModelsHint')
-    expect(markup).not.toContain('pricingEditorEmpty')
-    expect(markup).toContain('p/m')
-    expect(markup).toContain('q/m')
-    // The peak set is stated for a model that prices it.
-    expect(markup).toContain('pricingPeakPrices')
+    expect(markup).toContain('pricingInherited')
+    // The peak-priced model states two sets; the flat one states a single row.
+    expect(markup).toContain('rateSetPeak')
+    expect(markup).toContain('rateSetFlat')
+    // The model is the header of its group of rows, not a caption above them.
+    expect(markup).toContain('scope="rowgroup"')
+    // The models' spend and volume are one of the columns, not a line of prose.
+    expect(markup).toContain('pricingVolumeLine')
   })
 })

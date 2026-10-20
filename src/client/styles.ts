@@ -372,9 +372,9 @@ export const styles = String.raw`
   line-height: 1.7;
 }
 
-/* The price sheet: a table, not a form. One header names the four buckets for
- * every card, each row states one set of prices in the same columns, and only the
- * open card swaps its numbers for inputs. */
+/* The sheet's column: a page of prose wide enough for eight columns is not a
+ * page anyone reads across, so the table states its own measure and the heading
+ * above it ends where the table does. */
 .dlu-pricingSectionHead {
   display: flex;
   gap: 12px;
@@ -382,109 +382,189 @@ export const styles = String.raw`
   justify-content: space-between;
 }
 
-/* Five columns after the label column: the set, then the four buckets. */
-.dlu-rateHead,
-.dlu-rateRow {
-  display: grid;
-  grid-template-columns: 18px 86px repeat(4, minmax(0, 1fr)) minmax(56px, max-content);
-  gap: 8px;
-  align-items: center;
+.dlu-rateSheet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-inline-size: 900px;
 }
 
-.dlu-rateHead {
-  padding-block: 2px 6px;
+/* Narrower than its columns, the sheet scrolls: folding it would put a column
+ * under a heading that no longer names it. */
+.dlu-rateTableWrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* The price sheet: one table, one row per set of prices. The name takes the
+ * width the figures do not need; the rates hold a fixed column each, so opening
+ * a row's fields cannot widen a column and shift the sheet. */
+.dlu-rateTable {
+  inline-size: 100%;
+  min-inline-size: 600px;
+  table-layout: fixed;
+}
+
+.dlu-rateTable .dlu-rateColSet {
+  inline-size: 56px;
+}
+
+.dlu-rateTable .dlu-rateColValue {
+  inline-size: 88px;
+}
+
+.dlu-rateTable .dlu-rateColUsage {
+  inline-size: 200px;
+}
+
+.dlu-rateTable .dlu-rateColAction {
+  inline-size: 52px;
+}
+
+.dlu-rateTable th[scope='col'] {
+  padding-block: 0 7px;
+  padding-inline: 5px;
   font-size: 10.5px;
-  color: var(--dsw-alias-label-caption);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+  white-space: nowrap;
+}
+
+.dlu-rateTable th[scope='col']:first-child {
+  padding-inline: 0 20px;
+}
+
+.dlu-rateTable th[scope='col']:last-child {
+  padding-inline: 5px 0;
 }
 
 /* A column of numbers is read down its right edge, so its heading ends there
  * too: a label flush left over values flush right reads as two columns. */
-.dlu-rateHead > span:nth-child(n + 3) {
+.dlu-rateTable .dlu-numeric {
   text-align: end;
 }
 
-.dlu-rateCard {
-  padding-block: 7px 7px;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+.dlu-rateTable td,
+.dlu-rateTable th[scope='rowgroup'] {
+  padding-block: 6px;
+  /* A model's name and spend belong to its whole block, but a block is read from
+   * its first row down: baseline alignment puts the name on the line of the
+   * prices it introduces instead of straddling the rule between them. */
+  vertical-align: baseline;
 }
 
-.dlu-rateCard[data-open='true'] {
-  padding-block-end: 10px;
+.dlu-rateTable td.dlu-numeric,
+.dlu-rateTable td.dlu-rateSet {
+  padding-inline: 5px;
+}
+
+/* One model's rows are one block: closed by a stronger rule than the one
+ * between its own price sets. */
+.dlu-rateGroup > tr:last-child > * {
+  border-bottom-color: var(--dsw-alias-border-l2);
+}
+
+/* The open block is the one being written, so it is shaded as one object rather
+ * than as three rows that happen to sit together. */
+.dlu-rateGroup[data-open='true'] > tr > * {
   background: color-mix(in oklab, var(--dsw-alias-label-primary) 2.5%, transparent);
-  border-radius: 8px;
 }
 
-.dlu-rateCardHead {
+/* The model's name is its identity, set in the code face the rest of the panel
+ * names routes in. */
+.dlu-rateModel {
+  padding-inline: 0 20px;
+  font-weight: 400;
+  text-align: start;
+}
+
+.dlu-rateModelLine {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 6px;
   align-items: center;
-  padding-block: 2px;
+  min-inline-size: 0;
 }
 
-/* Name, tag and action on the first line; the weight bar and its volume on the
- * second, so the bar reads as an underline of the model rather than a rule
- * between two labels. */
-/* The bar is a mark beside the figures, not a rule across the row: it keeps a
- * short track so its length is read as a proportion rather than as a divider. */
-.dlu-rateCardHead .dlu-rateBar {
-  order: 5;
-  flex: none;
-  inline-size: 88px;
-  margin-top: 0;
-}
-
-.dlu-rateCardHead .dlu-rateVolume {
-  order: 6;
-}
-
-.dlu-rateCardHead .dlu-priceMatch {
+.dlu-rateModel .dlu-priceMatch {
   min-inline-size: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-/* The row's weight, drawn as a hairline under its name: long for the model that
- * dominates the window, short for the one on its tail. One measured line is the
- * only ornament this list needs. */
-.dlu-rateBar {
-  display: block;
-  inline-size: 132px;
-  block-size: 2px;
+/* The cost under the name, for the widths where the usage column is gone. */
+.dlu-rateModelMeta {
+  display: none;
   margin-top: 3px;
-  overflow: hidden;
-  background: color-mix(in oklab, var(--dsw-alias-label-primary) 7%, transparent);
-  border-radius: 999px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-caption);
 }
 
-.dlu-rateBar > span {
+/* Which half of the day a row is priced for. The heading above it says so once;
+ * the cell itself is a word, because the row is a price, not a period. */
+.dlu-rateSet {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.dlu-rateTable td.dlu-numeric {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The fields sit exactly where their figures were, one per column: the reader
+ * corrects a rate in the cell that states it, not in a form below the table. */
+.dlu-rateField {
+  inline-size: 100%;
+  padding-block: 1px;
+  padding-inline: 4px;
+  font-size: 12px;
+  line-height: 1.25;
+  border-radius: 5px;
+}
+
+/* What the model cost, beside the rates it was charged: a gap after the last
+ * rate column keeps the amount from reading as a fifth rate. */
+.dlu-rateTable td.dlu-rateUsage {
+  padding-inline-start: 14px;
+}
+
+/* The amount, then the volume it bought: two lines, because the amount is the
+ * figure the eye scans down and the tokens are its answer, not its peer. */
+.dlu-rateCost {
   display: block;
-  block-size: 100%;
-  background: color-mix(in oklab, var(--dsw-alias-link) 55%, transparent);
-  border-radius: inherit;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dlu-rateVolume {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-caption);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* A model priced by the default card is not stating its price, and says so. */
 .dlu-rateDefaultTag {
   flex: none;
+  padding: 0 6px;
   font-size: 10px;
+  line-height: 1.7;
   color: var(--dsw-alias-label-caption);
   white-space: nowrap;
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 999px;
-  padding: 0 6px;
-  line-height: 1.7;
 }
 
 /* The action sits below the data in weight: a word, not a button. */
 .dlu-rateAction {
-  flex: none;
-  order: 4;
-  margin-inline-start: auto;
   padding: 2px 0;
   font: inherit;
   font-size: 11.5px;
@@ -492,6 +572,11 @@ export const styles = String.raw`
   cursor: pointer;
   background: transparent;
   border: 0;
+}
+
+.dlu-rateActions {
+  padding-inline-end: 0;
+  text-align: end;
 }
 
 .dlu-rateAction:hover {
@@ -504,6 +589,11 @@ export const styles = String.raw`
   outline-offset: 2px;
 }
 
+.dlu-rateAction:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 /* The reference material folds away. */
 .dlu-pricingSummary {
   font-size: 13px;
@@ -512,87 +602,32 @@ export const styles = String.raw`
   cursor: pointer;
 }
 
-/* Whether the card prices peak is a property of the card, so it reads as a badge
- * beside its name rather than as a control buried in the form. */
-.dlu-rateBadge {
-  flex: none;
-  padding: 0 6px;
-  font-size: 10px;
-  line-height: 1.7;
-  color: var(--dsw-alias-label-caption);
-  white-space: nowrap;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 999px;
+/* The open block's footer: the switch that shapes the card, then the two words
+ * that end the edit. A row of the table so it lands after every field in the tab
+ * order, and spans the columns so both actions sit where the action was. */
+.dlu-rateEditorCell {
+  padding-block: 9px 10px;
 }
 
-.dlu-rateBadge[data-peak='true'] {
-  color: var(--dsw-alias-link);
-  border-color: color-mix(in oklab, var(--dsw-alias-link) 45%, transparent);
-}
-
-/* The model's volume, set quiet beside its name: it says how much the row is
- * worth reading without competing with the prices it is priced by. */
-.dlu-rateVolume {
-  flex: none;
-  overflow: hidden;
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-  color: var(--dsw-alias-label-caption);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.dlu-rateSetLabel {
-  font-size: 11px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.dlu-rateValue {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  text-align: end;
-  color: var(--dsw-alias-label-secondary);
-}
-
-.dlu-rateInputCell .dlu-editorField {
-  inline-size: 100%;
-  text-align: end;
-}
-
-/* The price cards, one per model.
-
- * A card is a block rather than a table row: it states two sets of four prices
- * and a switch, which is nine controls, and nine columns of a table would be
- * unreadable at the width this popover has. Stacked, each card reads as one
- * model's price sheet. */
-.dlu-editorCards {
+.dlu-rateToolbar {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.dlu-editorCard {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  min-inline-size: 0;
-  margin: 0;
-  padding: 10px 12px 11px;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
-}
-
-.dlu-editorCardName {
-  padding: 0 5px;
-  font-size: 11.5px;
-  color: var(--dsw-alias-label-primary);
-}
-
-.dlu-editorCardRow {
-  display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   align-items: center;
   justify-content: space-between;
+}
+
+.dlu-rateEditorActions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+/* Saving is the one write on this page; it is the only action stated in the
+ * link colour rather than in the caption grey. */
+.dlu-rateCommit {
+  font-weight: 500;
+  color: var(--dsw-alias-link);
 }
 
 .dlu-editorToggle {
@@ -611,34 +646,34 @@ export const styles = String.raw`
   accent-color: var(--dsw-alias-link);
 }
 
-/* Each set of four prices: the label states which half of the day the numbers
- * are for, and the four fields line up across cards so they can be compared
- * down the block. */
-.dlu-editorPriceRow {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
+/* Below this width the name column is too narrow to hold both the model and the
+ * four rates: the usage column is what a reader can do without at the point of
+ * correcting a price, and its cost moves under the name. */
+@container (max-width: 860px) {
+  /* A collapsed column, not a hidden cell: hiding the cells would take them out
+   * of the row and shift every cell after them one column to the left. */
+  .dlu-rateTable .dlu-rateColUsage {
+    inline-size: 0;
+    visibility: collapse;
+  }
+
+  .dlu-rateModelMeta {
+    display: block;
+  }
+
+  .dlu-rateModel .dlu-priceMatch {
+    white-space: normal;
+  }
 }
 
-.dlu-editorPriceLabel {
-  font-size: 11px;
-  color: var(--dsw-alias-label-tertiary);
-}
+@container (max-width: 640px) {
+  .dlu-rateTable .dlu-rateColSet {
+    inline-size: 48px;
+  }
 
-.dlu-editorPriceFields {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.dlu-editorPriceField {
-  display: flex;
-  min-inline-size: 0;
-}
-
-.dlu-editorPriceField .dlu-editorField {
-  inline-size: 100%;
+  .dlu-rateTable .dlu-rateColValue {
+    inline-size: 76px;
+  }
 }
 
 /* ── The range's wave ─────────────────────────────────────────────────── */

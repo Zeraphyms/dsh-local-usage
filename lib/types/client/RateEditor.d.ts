@@ -1,16 +1,22 @@
 /**
- * The price cards, one per model, edited one at a time.
+ * The price sheet: one row per set of prices, edited where the figures are.
  *
- * A price sheet and a form are different things. Most visits to this page end
- * without a change — a reader comes to see what a model costs, or which card
- * claimed a route — so the card opens as a table row: the model, whether it
- * prices peak, and its eight numbers under one header that says which column is
- * which. Editing is a mode of one card at a time, because the alternative was a
- * wall of eight inputs per model with no column labels and one save button at the
- * bottom that could not say what it would write.
+ * Every model the window recorded gets a group of rows — one row for each price
+ * set it bills at, two when it prices peak separately — under a single header that
+ * names the four buckets once. That is what a price sheet is: a table whose
+ * columns are read down, because the question at this page is not "what is this
+ * model" but "how does its output rate compare with the one above it".
  *
- * Consumption is not edited here and is not folded into these numbers: the page
- * states the routes beside the cards, and the two figures stay separate.
+ * The rows are a real table, not a grid of divs, for the same reason: a reader
+ * comparing four numbers across eight models needs the columns to hold their
+ * place, both against the header and while a row is being edited. Editing is a
+ * mode of one model at a time: its figures become fields in exactly the cells the
+ * numbers were in, its switch and its two actions sit in a footer row beneath —
+ * so the columns stay readable, and nothing moves when the reader starts typing.
+ *
+ * Consumption is not edited here and is not folded into these numbers: the sheet
+ * states what each model cost in the window beside the rates it was charged, and
+ * the two stay separate.
  *
  * @module dsh-local-usage/client/RateEditor
  */
@@ -35,19 +41,8 @@ export interface RateRow {
      * that shows the two identically is telling the reader something untrue.
      */
     readonly inherited: boolean;
-    /** Its share of the window's spend, for the row's bar. */
-    readonly share: number;
 }
-/**
- * The rows the sheet lists separately, and those still on the default rate.
- *
- * A model priced by its own card states its price; a model inheriting the default
- * states only what will be charged until someone writes one. Shown identically,
- * the table would tell the reader something untrue — and shown as a per-row tag,
- * the tag drowned the list once a profile had a dozen unpriced models. They are
- * two groups now, and the second one is a to-do list.
- */
-/** Props for the card table. */
+/** Props for the price sheet. */
 export interface RateEditorProps {
     /** One row per model the window recorded, dearest first. */
     readonly rows: readonly RateRow[];
@@ -61,8 +56,8 @@ export interface RateEditorProps {
     readonly onSave: (update: UsagePricingUpdate) => Promise<void>;
 }
 /**
- * Render the price cards.
- * @param props - the cards, currency, dictionary and the save action.
+ * Render the price sheet.
+ * @param props - the rows, the currency, the dictionary and the save action.
  * @returns the table and its one open editor, if any.
  */
 export declare function RateEditor({ rows, currency, formatCost, t, onSave }: RateEditorProps): ReactNode;

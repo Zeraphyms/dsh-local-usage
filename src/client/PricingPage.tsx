@@ -54,11 +54,11 @@ export function PricingPage({
   // own. One list, because the question is "what does this model cost" — not
   // "which of the two tables do I read".
   const configured = report.prices
-  // Every route's own cost, so a model's share is a share of the money rather
-  // than of the tokens: at these prices those are not the same quantity.
+  // Every route's own cost, so a model's spend is the money its routes were
+  // billed rather than a figure derived from their tokens: at these prices
+  // those are not the same quantity.
   const costByRoute = new Map(report.models.map(row => [row.route, row.cost]))
   const grouped = groupRouteUsage(report.routeRates, route => costByRoute.get(route) ?? 0)
-  const totalCost = grouped.reduce((sum, group) => sum + group.cost, 0)
   const rows: RateRow[] = grouped.map(group => {
     const card = configured.find(candidate => modelKey(candidate.match) === group.key)
     return {
@@ -67,7 +67,6 @@ export function PricingPage({
       cost: group.cost,
       routes: group.routes.length,
       inherited: card === undefined,
-      share: totalCost <= 0 ? 0 : group.cost / totalCost,
     }
   })
 
