@@ -1555,9 +1555,12 @@ export const styles = String.raw`
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 
+/* A row's name sits on its row's centre line, not on its top edge: the padding
+ * above belongs to the column labels, and a body cell that kept it rode a few
+ * pixels higher than the figures it labels. */
 .dlu-projectTable th.dlu-projectCell {
-  padding-right: 20px;
-  vertical-align: top;
+  padding: 7px 20px 7px 0;
+  vertical-align: middle;
 }
 
 .dlu-projectName {
