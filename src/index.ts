@@ -129,16 +129,74 @@ export interface UsageInsightsConfig {
   warmupDelayMs: number
 }
 
-/** The published off-peak DeepSeek-V4.1-Flash card, in CNY per one million tokens. */
+/**
+ * DeepSeek's published CNY card for V4.1 Flash, per one million tokens.
+ *
+ * The vendor charges cache hits, cache misses and output; it has no separate
+ * cache-write price, so the write bucket repeats the miss price. `deepseek-flash`
+ * is the API model name of this card — `deepseek-v4-flash` and
+ * `deepseek-v4.1-flash` are the names the same model is routed under here, and
+ * the vendor bills them at this one price.
+ */
 const FLASH_RATE: UsageInsightsPriceConfig = { input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 }
 /** The same model inside its peak windows; stated, not derived from the off-peak card. */
 const FLASH_PEAK: UsageInsightsPriceConfig = { input: 2, cacheRead: 0.04, cacheWrite: 2, output: 8 }
 
 /**
- * Shipped defaults: DeepSeek's published off-peak CNY prices. A route served
- * through an aggregator or a reseller has to be priced by the operator, and the
- * panel names every route that fell back to the default rather than implying a
- * figure it cannot support.
+ * Dollars per yuan, for the vendors that publish in USD.
+ *
+ * The panel converts nothing at read time: a card is stated in the currency this
+ * configuration names, and these cards are converted once, at the rate the
+ * defaults were written (2026-10-20). An operator whose own invoices are in USD
+ * should set `currency: 'USD'` and write the vendor's list prices directly; one
+ * whose invoice is in another currency should do the same in that currency.
+ */
+const USD_CNY = 6.6937
+
+/**
+ * A vendor's USD list price as the CNY figure a card states.
+ * @param usd - price per one million tokens, in USD.
+ * @returns the same price in CNY, to the milliyuan.
+ */
+function inYuan(usd: number): number {
+  return Math.round(usd * USD_CNY * 1_000) / 1_000
+}
+
+/** GLM-5.3-Flash, from Z.AI's list: $0.15 input, $0.03 cached input, $0.50 output. */
+const GLM_FLASH: UsageInsightsPriceConfig = {
+  input: inYuan(0.15),
+  cacheRead: inYuan(0.03),
+  // Cached-input storage is free at the list's date, and the vendor has no
+  // per-token write charge to state.
+  cacheWrite: 0,
+  output: inYuan(0.5),
+}
+
+/** GPT-5.6 Sol, from OpenAI's list: $2 input, $0.20 cached, $2.50 written, $10 output. */
+const GPT_SOL: UsageInsightsPriceConfig = {
+  input: inYuan(2),
+  cacheRead: inYuan(0.2),
+  cacheWrite: inYuan(2.5),
+  output: inYuan(10),
+}
+
+/** Grok 4.6, from xAI's list: $2 input, $0.50 cached, $6 output, writes not charged. */
+const GROK: UsageInsightsPriceConfig = {
+  input: inYuan(2),
+  cacheRead: inYuan(0.5),
+  cacheWrite: 0,
+  output: inYuan(6),
+}
+
+/**
+ * Shipped defaults: the published card of each model this panel knows, in the
+ * currency named above. DeepSeek's own prices are stated in CNY and are exact;
+ * every other card is a vendor's USD list price converted at `USD_CNY`.
+ *
+ * A route served through an aggregator or a reseller has to be priced by the
+ * operator, and the panel names every route that fell back to the default rather
+ * than implying a figure it cannot support. `kimi-k2.8-preview` is such a route:
+ * its vendor publishes no K2.8 card, so it falls back until someone prices it.
  */
 export const DEFAULT_CONFIG: UsageInsightsConfig = {
   currency: 'CNY',
@@ -151,7 +209,14 @@ export const DEFAULT_CONFIG: UsageInsightsConfig = {
       output: 13.5,
       peak: { input: 9, cacheRead: 0.3, cacheWrite: 9, output: 27 },
     },
+    // One model, three names: the API's own (`deepseek-flash`) and the two the
+    // vendor kept accepting after renaming it. Each is matched by its own key.
     { match: 'deepseek-v4.1-flash', ...FLASH_RATE, peak: FLASH_PEAK },
+    { match: 'deepseek-v4-flash', ...FLASH_RATE, peak: FLASH_PEAK },
+    { match: 'deepseek-flash', ...FLASH_RATE, peak: FLASH_PEAK },
+    { match: 'glm-5.3-flash', ...GLM_FLASH },
+    { match: 'gpt-5.6-sol', ...GPT_SOL },
+    { match: 'grok-4.6', ...GROK },
   ],
   fallback: { ...FLASH_RATE, peak: FLASH_PEAK },
   peakWindows: ['09:00-12:00', '14:00-18:00'],

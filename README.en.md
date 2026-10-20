@@ -119,7 +119,7 @@ It reads as an explanation of the figures above rather than a report of its own:
 | Field | Default | Meaning |
 |---|---|---|
 | `currency` | `CNY` | Currency every figure is expressed in; the plugin performs no conversion. |
-| `models` | DeepSeek V4.1 Flash and V4 Pro cards | Rate cards matched against the routed model, first match wins. |
+| `models` | The published DeepSeek, GLM, GPT and Grok cards (below) | Rate cards matched against the routed model, first match wins. |
 | `fallback` | the Flash card | Rate applied to a route no card matches. |
 | `peakWindows` | `09:00-12:00`, `14:00-18:00` | Peak windows in Beijing time; empty disables peak pricing. |
 | `peakWeekdaysOnly` | `true` | Whether weekends are always billed off-peak. |
@@ -127,7 +127,7 @@ It reads as an explanation of the figures above rather than a report of its own:
 | `warmup` | `true` | Fold the whole corpus in the background at activation, so the first open of the panel is a re-price. |
 | `warmupDelayMs` | `4000` | How long after activation that background fold starts, in milliseconds. |
 
-Each rate card states `input`, `cacheRead`, `cacheWrite`, and `output` in currency units per one million tokens, plus the `match` substring that claims a route. The shipped defaults are DeepSeek's published off-peak CNY prices for `deepseek-flash` and `deepseek-v4-pro`; a route served through an aggregator or a reseller must be priced by the operator, and the page names every route that fell back to the default rate instead of implying a figure it cannot support.
+Each rate card states `input`, `cacheRead`, `cacheWrite`, and `output` in currency units per one million tokens, plus the `match` substring that claims a route. The shipped cards cover DeepSeek (`deepseek-v4-pro`, and the three names of one Flash model: `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4.1-flash`), GLM-5.3-Flash, GPT-5.6 Sol, and Grok 4.6: DeepSeek's own card is its published CNY price (peak and off-peak), and every other card is the vendor's USD list price converted at the 2026-10-20 rate of 6.6937, so those figures are estimates rather than invoices. `kimi-k2.8-preview` publishes no card and keeps falling back; a route served through an aggregator or a reseller must be priced by the operator, and the page names every route that fell back to the default rate instead of implying a figure it cannot support.
 
 **Warming up.** The first read after an install decodes every session log, and that wait used to land on the moment a reader opened the panel. `warmup` runs it in the background shortly after the process starts instead, so the panel's first request finds every fold already in hand and is only a re-price. The window is unbounded because the fold cache keeps every sample a session recorded regardless of the window asked for, so one pass covers every range the panel can select; a machine that is already warm pays only the corpus listing. A request that arrives while that fold is running waits for it rather than decoding the same logs a second time. Set `warmup` to false to read nothing until asked, and pay the read on first open again.
 
