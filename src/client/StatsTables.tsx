@@ -128,7 +128,13 @@ function StatsTable({ heading, nameColumn, countColumn, rows, total, t, formatCo
       {rows.length === 0
         ? <p className={css.empty}>{t('noUsage')}</p>
         : (
-          <table className={css.projectTable}>
+          <table className={`${css.projectTable} ${css.statsTable}`}>
+            <colgroup>
+              <col className={css.statsColName} />
+              <col className={css.statsColTokens} />
+              <col className={css.statsColCost} />
+              <col className={css.statsColCount} />
+            </colgroup>
             <thead>
               <tr>
                 <th scope="col">{nameColumn}</th>

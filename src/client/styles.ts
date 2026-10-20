@@ -921,13 +921,33 @@ export const styles = String.raw`
   display: flex;
   flex-direction: column;
   gap: 18px;
-  /* A table is read down its columns, and columns spread across a full-width
-   * panel stop being comparable: the eye has to travel to pair a route with its
-   * cost. Held to a measure and centred under the figure, the same rows read as a
-   * table rather than as four lists side by side. */
+  /* The tables take the same measure as the cards above them: a block inset on
+   * both sides reads as a different surface, and its figures stop lining up with
+   * anything else on the page. */
   inline-size: 100%;
-  max-inline-size: 860px;
-  margin-inline: auto;
+}
+
+/* Two tables of the same four columns, laid out by the same shares: a route's
+ * cost and a directory's cost sit in the same column, so the block can be read
+ * down as one grid rather than as two tables that happen to be stacked. */
+.dlu-statsTable {
+  table-layout: fixed;
+}
+
+.dlu-statsColName {
+  inline-size: 58%;
+}
+
+.dlu-statsColTokens {
+  inline-size: 16%;
+}
+
+.dlu-statsColCost {
+  inline-size: 14%;
+}
+
+.dlu-statsColCount {
+  inline-size: 12%;
 }
 
 .dlu-tableBlock {

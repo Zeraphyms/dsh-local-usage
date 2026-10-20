@@ -158,6 +158,11 @@ export declare const css: {
     readonly pricingSection: "dlu-pricingSection";
     readonly projectTable: "dlu-projectTable";
     readonly statsBlock: "dlu-statsBlock";
+    readonly statsColCost: "dlu-statsColCost";
+    readonly statsColCount: "dlu-statsColCount";
+    readonly statsColName: "dlu-statsColName";
+    readonly statsColTokens: "dlu-statsColTokens";
+    readonly statsTable: "dlu-statsTable";
     readonly tableBlock: "dlu-tableBlock";
     readonly tableHeading: "dlu-tableHeading";
     readonly tableNote: "dlu-tableNote";
