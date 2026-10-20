@@ -366,17 +366,24 @@ function RateGroup({
               </td>
             )
             : null}
-          {index === 0 && !editing
+          {index === 0
             ? (
+              // Held open while the model is edited, empty: the column keeps its
+              // place, and the block's right edge stays a filled edge instead of
+              // ending where the last figure happens to stop.
               <td rowSpan={sets.length} className={css.rateActions}>
-                <button
-                  type="button"
-                  className={css.rateAction}
-                  data-rate-edit={card.match}
-                  onClick={onEdit}
-                >
-                  {t('pricingEdit')}
-                </button>
+                {editing
+                  ? null
+                  : (
+                    <button
+                      type="button"
+                      className={css.rateAction}
+                      data-rate-edit={card.match}
+                      onClick={onEdit}
+                    >
+                      {t('pricingEdit')}
+                    </button>
+                  )}
               </td>
             )
             : null}

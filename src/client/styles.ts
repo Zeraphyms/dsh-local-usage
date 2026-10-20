@@ -515,8 +515,11 @@ export const styles = String.raw`
 }
 
 /* The fields sit exactly where their figures were, one per column: the reader
- * corrects a rate in the cell that states it, not in a form below the table. */
-.dlu-rateField {
+ * corrects a rate in the cell that states it, not in a form below the table. Two
+ * classes deep so the generic field's padding and width do not win: a 60px field
+ * with 3px padding stands taller than the row it replaced. */
+.dlu-rateTable .dlu-rateField {
+  display: block;
   inline-size: 100%;
   padding-block: 1px;
   padding-inline: 4px;
