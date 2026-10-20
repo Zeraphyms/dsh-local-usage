@@ -386,7 +386,6 @@ export const styles = String.raw`
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-inline-size: 900px;
 }
 
 /* Narrower than its columns, the sheet scrolls: folding it would put a column
@@ -397,8 +396,11 @@ export const styles = String.raw`
 }
 
 /* The price sheet: one table, one row per set of prices. The name takes the
- * width the figures do not need; the rates hold a fixed column each, so opening
- * a row's fields cannot widen a column and shift the sheet. */
+ * width the figures do not need; every other column is a share of the table, so
+ * the sheet fills the panel the way the tables above and below it do, and the
+ * amounts end where the heading over them does. Shares, not pixels: a pixel
+ * column would leave the sheet's right edge short of the panel's on a wide
+ * window, and a table that stops mid-page reads as an unfinished one. */
 .dlu-rateTable {
   inline-size: 100%;
   min-inline-size: 600px;
@@ -406,19 +408,19 @@ export const styles = String.raw`
 }
 
 .dlu-rateTable .dlu-rateColSet {
-  inline-size: 56px;
+  inline-size: 5.5%;
 }
 
 .dlu-rateTable .dlu-rateColValue {
-  inline-size: 88px;
+  inline-size: 9.5%;
 }
 
 .dlu-rateTable .dlu-rateColUsage {
-  inline-size: 200px;
+  inline-size: 24%;
 }
 
 .dlu-rateTable .dlu-rateColAction {
-  inline-size: 52px;
+  inline-size: 6.5%;
 }
 
 .dlu-rateTable th[scope='col'] {
@@ -654,10 +656,23 @@ export const styles = String.raw`
  * correcting a price, and its cost moves under the name. */
 @container (max-width: 860px) {
   /* A collapsed column, not a hidden cell: hiding the cells would take them out
-   * of the row and shift every cell after them one column to the left. */
+   * of the row and shift every cell after them one column to the left. The
+   * remaining columns take the freed share, so the sheet still fills the panel. */
   .dlu-rateTable .dlu-rateColUsage {
     inline-size: 0;
     visibility: collapse;
+  }
+
+  .dlu-rateTable .dlu-rateColSet {
+    inline-size: 6%;
+  }
+
+  .dlu-rateTable .dlu-rateColValue {
+    inline-size: 12.5%;
+  }
+
+  .dlu-rateTable .dlu-rateColAction {
+    inline-size: 7%;
   }
 
   .dlu-rateModelMeta {
@@ -666,16 +681,6 @@ export const styles = String.raw`
 
   .dlu-rateModel .dlu-priceMatch {
     white-space: normal;
-  }
-}
-
-@container (max-width: 640px) {
-  .dlu-rateTable .dlu-rateColSet {
-    inline-size: 48px;
-  }
-
-  .dlu-rateTable .dlu-rateColValue {
-    inline-size: 76px;
   }
 }
 
