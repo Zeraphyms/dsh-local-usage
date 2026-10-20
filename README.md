@@ -117,7 +117,7 @@ dsh plugin add /path/to/dsh-local-usage                               # 从本�
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `currency` | `CNY` | 所有金额的表达币种；插件不做汇率换算。 |
-| `models` | DeepSeek、GLM、GPT、Grok 的公开价目（见下） | 按路由模型匹配的价目表，先匹配者生效。 |
+| `models` | DeepSeek、GLM、GPT、Grok、Kimi 的价目（见下） | 按路由模型匹配的价目表，先匹配者生效。 |
 | `fallback` | Flash 价目 | 没有任何价目命中的路由所用的费率。 |
 | `peakWindows` | `09:00-12:00`、`14:00-18:00` | 北京时间的高峰时段；留空即关闭高峰计价。 |
 | `peakWeekdaysOnly` | `true` | 周末是否始终按空闲时段计价。 |
@@ -125,7 +125,7 @@ dsh plugin add /path/to/dsh-local-usage                               # 从本�
 | `warmup` | `true` | 激活后先在后台折叠一次全部日志，使首次打开面板变成一次重新计价。 |
 | `warmupDelayMs` | `4000` | 后台折叠在激活后多久开始（毫秒）。 |
 
-每张价目给出 `input`、`cacheRead`、`cacheWrite`、`output`（币种单位／百万 token），以及认领路由的 `match` 子串。内置价目覆盖 DeepSeek（`deepseek-v4-pro`，以及同一模型的三个名字 `deepseek-flash`、`deepseek-v4-flash`、`deepseek-v4.1-flash`）、GLM-5.3-Flash、GPT-5.6 Sol 与 Grok 4.6：DeepSeek 用官方人民币价目（高峰／空闲两套），其余按 2026-10-20 的 6.6937 汇率把官方美元表价折成人民币，因此它们是估价而不是账单。`kimi-k2.8-preview` 目前没有公开价目，仍按回退费率计价；经聚合商或转售商提供的路由同样必须由使用者自行定价，页面会点名所有回退到默认费率的路由，而不是给出一个它无法支撑的数字。
+每张价目给出 `input`、`cacheRead`、`cacheWrite`、`output`（币种单位／百万 token），以及认领路由的 `match` 子串。内置价目覆盖 DeepSeek（`deepseek-v4.1-flash`、`deepseek-flash` 及其旧名 `deepseek-v4-flash`、`deepseek-v4-pro`）、GLM-5.3-Flash、GPT-5.6 Sol、Grok 4.6、Kimi K3-1 与 Kimi K2.8-preview，单位人民币／百万 token，数字取自各家公开价目（2026-10-20）。其中 `deepseek-v4.1-flash` 的缓存写入按 2.5 计，而 `deepseek-flash` 的价目没有单列缓存写入（按 0 计）；Kimi K3-1 的缓存写入按 5 分钟 TTL 的 20 计（1 小时 TTL 为 40，一张价目只能写一个数）；GPT-5.6 Sol 与 Grok 4.6 的数字是约值，因此金额是估价而不是账单。经聚合商或转售商提供的路由必须由使用者自行定价，页面会点名所有回退到默认费率的路由，而不是给出一个它无法支撑的数字。
 
 **预热。** 装好之后的第一次读取要解码全部会话日志，而这份等待原本落在读者打开面板的那一刻。`warmup` 让它在进程起来之后（`warmupDelayMs` 之后）先在后台跑完：面板第一次打开时，折叠结果已经在手里，那次请求只是一次重新计价。窗口用的是「不设边界」，因为折叠缓存保存的是每个会话的全部样本、与窗口无关，所以预热一次就覆盖了面板能选的所有区间；而已经预热过的机器只付一次语料列举的代价。预热期间到达的请求会**等这次折叠**，而不是把同一批日志再读一遍。不想让它在没人看的时候读盘，把 `warmup` 关掉即可——代价回到首次打开。
 

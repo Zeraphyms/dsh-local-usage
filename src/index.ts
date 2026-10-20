@@ -130,93 +130,55 @@ export interface UsageInsightsConfig {
 }
 
 /**
- * DeepSeek's published CNY card for V4.1 Flash, per one million tokens.
+ * The shipped cards, in CNY per one million tokens.
  *
- * The vendor charges cache hits, cache misses and output; it has no separate
- * cache-write price, so the write bucket repeats the miss price. `deepseek-flash`
- * is the API model name of this card — `deepseek-v4-flash` and
- * `deepseek-v4.1-flash` are the names the same model is routed under here, and
- * the vendor bills them at this one price.
+ * The numbers are the operator's collected list prices (2026-10-20) for the
+ * models this panel sees. They are stated as published: where a list has no
+ * per-token cache-write price the write bucket is 0 rather than a repeated miss
+ * price, because a repeated price would claim a charge the vendor does not make.
+ * The two DeepSeek Flash cards differ only in the write price the list states.
  */
-const FLASH_RATE: UsageInsightsPriceConfig = { input: 1, cacheRead: 0.02, cacheWrite: 1, output: 4 }
+
+/** `deepseek-v4.1-flash`, off-peak and peak. The list states a cache-write price. */
+const V41_FLASH_RATE: UsageInsightsPriceConfig = { input: 1, cacheRead: 0.02, cacheWrite: 2.5, output: 4 }
 /** The same model inside its peak windows; stated, not derived from the off-peak card. */
-const FLASH_PEAK: UsageInsightsPriceConfig = { input: 2, cacheRead: 0.04, cacheWrite: 2, output: 8 }
+const V41_FLASH_PEAK: UsageInsightsPriceConfig = { input: 2, cacheRead: 0.04, cacheWrite: 2.5, output: 8 }
 
 /**
- * Dollars per yuan, for the vendors that publish in USD.
- *
- * The panel converts nothing at read time: a card is stated in the currency this
- * configuration names, and these cards are converted once, at the rate the
- * defaults were written (2026-10-20). An operator whose own invoices are in USD
- * should set `currency: 'USD'` and write the vendor's list prices directly; one
- * whose invoice is in another currency should do the same in that currency.
+ * `deepseek-flash` — the model's API name — and `deepseek-v4-flash`, the name it
+ * was routed under before the rename: one card, and no cache-write price listed.
  */
-const USD_CNY = 6.6937
+const FLASH_RATE: UsageInsightsPriceConfig = { input: 1, cacheRead: 0.02, cacheWrite: 0, output: 4 }
+/** The same card inside its peak windows. */
+const FLASH_PEAK: UsageInsightsPriceConfig = { input: 2, cacheRead: 0.04, cacheWrite: 0, output: 8 }
+
+/** `deepseek-v4-pro`, the larger DeepSeek card, off-peak and peak. */
+const PRO_RATE: UsageInsightsPriceConfig = { input: 4.5, cacheRead: 0.15, cacheWrite: 4.5, output: 13.5 }
+/** The same card inside its peak windows. */
+const PRO_PEAK: UsageInsightsPriceConfig = { input: 9, cacheRead: 0.3, cacheWrite: 9, output: 27 }
 
 /**
- * A vendor's USD list price as the CNY figure a card states.
- * @param usd - price per one million tokens, in USD.
- * @returns the same price in CNY, to the milliyuan.
- */
-function inYuan(usd: number): number {
-  return Math.round(usd * USD_CNY * 1_000) / 1_000
-}
-
-/** GLM-5.3-Flash, from Z.AI's list: $0.15 input, $0.03 cached input, $0.50 output. */
-const GLM_FLASH: UsageInsightsPriceConfig = {
-  input: inYuan(0.15),
-  cacheRead: inYuan(0.03),
-  // Cached-input storage is free at the list's date, and the vendor has no
-  // per-token write charge to state.
-  cacheWrite: 0,
-  output: inYuan(0.5),
-}
-
-/** GPT-5.6 Sol, from OpenAI's list: $2 input, $0.20 cached, $2.50 written, $10 output. */
-const GPT_SOL: UsageInsightsPriceConfig = {
-  input: inYuan(2),
-  cacheRead: inYuan(0.2),
-  cacheWrite: inYuan(2.5),
-  output: inYuan(10),
-}
-
-/** Grok 4.6, from xAI's list: $2 input, $0.50 cached, $6 output, writes not charged. */
-const GROK: UsageInsightsPriceConfig = {
-  input: inYuan(2),
-  cacheRead: inYuan(0.5),
-  cacheWrite: 0,
-  output: inYuan(6),
-}
-
-/**
- * Shipped defaults: the published card of each model this panel knows, in the
- * currency named above. DeepSeek's own prices are stated in CNY and are exact;
- * every other card is a vendor's USD list price converted at `USD_CNY`.
+ * Shipped defaults: one card per model, matched against the routed model first by
+ * identity and then by substring, in the order listed.
  *
  * A route served through an aggregator or a reseller has to be priced by the
  * operator, and the panel names every route that fell back to the default rather
- * than implying a figure it cannot support. `kimi-k2.8-preview` is such a route:
- * its vendor publishes no K2.8 card, so it falls back until someone prices it.
+ * than implying a figure it cannot support. `kimi-k3-1` states the 5-minute
+ * cache-write tier; the list's 1-hour tier (40) has no field of its own here.
  */
 export const DEFAULT_CONFIG: UsageInsightsConfig = {
   currency: 'CNY',
   models: [
-    {
-      match: 'deepseek-v4-pro',
-      input: 4.5,
-      cacheRead: 0.15,
-      cacheWrite: 4.5,
-      output: 13.5,
-      peak: { input: 9, cacheRead: 0.3, cacheWrite: 9, output: 27 },
-    },
-    // One model, three names: the API's own (`deepseek-flash`) and the two the
-    // vendor kept accepting after renaming it. Each is matched by its own key.
-    { match: 'deepseek-v4.1-flash', ...FLASH_RATE, peak: FLASH_PEAK },
-    { match: 'deepseek-v4-flash', ...FLASH_RATE, peak: FLASH_PEAK },
+    { match: 'deepseek-v4.1-flash', ...V41_FLASH_RATE, peak: V41_FLASH_PEAK },
+    // The peak windows are DeepSeek's: Beijing 09:00–12:00 and 14:00–18:00, weekdays.
+    { match: 'deepseek-v4-pro', ...PRO_RATE, peak: PRO_PEAK },
     { match: 'deepseek-flash', ...FLASH_RATE, peak: FLASH_PEAK },
-    { match: 'glm-5.3-flash', ...GLM_FLASH },
-    { match: 'gpt-5.6-sol', ...GPT_SOL },
-    { match: 'grok-4.6', ...GROK },
+    { match: 'deepseek-v4-flash', ...FLASH_RATE, peak: FLASH_PEAK },
+    { match: 'glm-5.3-flash', input: 0.8, cacheRead: 0.23, cacheWrite: 0.95, output: 2.8 },
+    { match: 'gpt-5.6-sol', input: 28.8, cacheRead: 2.88, cacheWrite: 36, output: 144 },
+    { match: 'grok-4.6', input: 14.4, cacheRead: 3.6, cacheWrite: 0, output: 43.2 },
+    { match: 'kimi-k3-1', input: 20, cacheRead: 2, cacheWrite: 20, output: 100 },
+    { match: 'kimi-k2.8-preview', input: 6.5, cacheRead: 1.7, cacheWrite: 6.5, output: 27 },
   ],
   fallback: { ...FLASH_RATE, peak: FLASH_PEAK },
   peakWindows: ['09:00-12:00', '14:00-18:00'],

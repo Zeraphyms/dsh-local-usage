@@ -89,14 +89,13 @@ export interface UsageInsightsConfig {
     warmupDelayMs: number;
 }
 /**
- * Shipped defaults: the published card of each model this panel knows, in the
- * currency named above. DeepSeek's own prices are stated in CNY and are exact;
- * every other card is a vendor's USD list price converted at `USD_CNY`.
+ * Shipped defaults: one card per model, matched against the routed model first by
+ * identity and then by substring, in the order listed.
  *
  * A route served through an aggregator or a reseller has to be priced by the
  * operator, and the panel names every route that fell back to the default rather
- * than implying a figure it cannot support. `kimi-k2.8-preview` is such a route:
- * its vendor publishes no K2.8 card, so it falls back until someone prices it.
+ * than implying a figure it cannot support. `kimi-k3-1` states the 5-minute
+ * cache-write tier; the list's 1-hour tier (40) has no field of its own here.
  */
 export declare const DEFAULT_CONFIG: UsageInsightsConfig;
 /**
