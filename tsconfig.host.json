@@ -12,6 +12,7 @@
   // supposed to prevent.
   "include": [
     "src/*.ts",
+    "src/host/**/*.ts",
     "tests/*.host.spec.ts"
   ]
 }

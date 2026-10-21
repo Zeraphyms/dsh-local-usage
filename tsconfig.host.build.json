@@ -14,5 +14,5 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src/index.ts", "src/aggregate.ts", "src/pricing.ts", "src/types.ts"]
+  "include": ["src/index.ts", "src/aggregate.ts", "src/pricing.ts", "src/types.ts", "src/host/**/*.ts"]
 }
