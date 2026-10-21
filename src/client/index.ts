@@ -45,14 +45,9 @@ export const NS = 'usage'
 /** The id shared by the sidebar entry and the main panel it opens. */
 export const PANEL_ID = 'usage' as MainPanelId
 
-/** Host route this panel reads its report from. */
-export const REPORT_PATH = '/api/dsh-local-usage/report'
-
-/** Host route this panel writes its per-route rate table to. */
-export const PRICING_PATH = '/api/dsh-local-usage/pricing'
-
-/** Host route this panel asks what a read in flight is doing. */
-export const PROGRESS_PATH = '/api/dsh-local-usage/progress'
+/** Host routes this panel talks to; the call log owns one of them. */
+export { CALLS_PATH, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from './routes.ts'
+import { PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from './routes.ts'
 
 /**
  * How often the panel asks the Host what it is doing.

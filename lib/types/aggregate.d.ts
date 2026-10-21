@@ -23,6 +23,16 @@ export interface UsageSample {
     readonly route: string;
     /** Exact provider-reported buckets for the turn. */
     readonly tokens: UsageTokens;
+    /** Turn this settlement belongs to, when the log states it. */
+    readonly turn?: number;
+    /** Step within the turn, when the log states it. */
+    readonly step?: number;
+    /** Milliseconds from the step's start to its first streamed token. */
+    readonly firstTokenMs?: number;
+    /** Milliseconds from the step's start to the settlement. */
+    readonly durationMs?: number;
+    /** Output tokens per second over the streamed generation window. */
+    readonly outputTps?: number;
 }
 /** One session's inputs to a report, plus what the window keeps of it. */
 export interface SessionUsageInput {

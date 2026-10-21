@@ -35,8 +35,13 @@ import type { ReliabilityDay, UsageSample } from './aggregate.ts'
  * Version of the on-disk document, bumped when its shape *or* the fold's meaning
  * changes: an entry is only reused when the code that wrote it folded the same
  * way this build does.
+ *
+ * 2 adds per-settlement turn, step and timing to the samples. An entry written
+ * by version 1 has the right tokens but no latency, and a call log that silently
+ * stated no latency for every old session would be a different answer from the
+ * one this build gives — so the old document is dropped and the logs read again.
  */
-const DOCUMENT_VERSION = 1
+const DOCUMENT_VERSION = 2
 
 const MS_PER_DAY = 86_400_000
 
@@ -131,6 +136,11 @@ function readCounts(value: unknown): Map<string, number> | undefined {
   return counts
 }
 
+/** Read one optional non-negative finite count, treating an absent field as absent. */
+function optionalCount(value: unknown): number | undefined {
+  return value === undefined ? undefined : readCount(value)
+}
+
 /** Read one sample out of an untrusted document. */
 function readSample(value: unknown): UsageSample | undefined {
   if (typeof value !== 'object' || value === null) return undefined
@@ -147,7 +157,21 @@ function readSample(value: unknown): UsageSample | undefined {
   const cacheWriteTokens = readCount(bucket.cacheWriteTokens)
   if (uncachedInputTokens === undefined || outputTokens === undefined
     || cacheReadTokens === undefined || cacheWriteTokens === undefined) return undefined
-  return { time, route, tokens: { uncachedInputTokens, outputTokens, cacheReadTokens, cacheWriteTokens } }
+  const turn = optionalCount(source.turn)
+  const step = optionalCount(source.step)
+  const firstTokenMs = optionalCount(source.firstTokenMs)
+  const durationMs = optionalCount(source.durationMs)
+  const outputTps = optionalCount(source.outputTps)
+  return {
+    time,
+    route,
+    tokens: { uncachedInputTokens, outputTokens, cacheReadTokens, cacheWriteTokens },
+    ...turn === undefined ? {} : { turn },
+    ...step === undefined ? {} : { step },
+    ...firstTokenMs === undefined ? {} : { firstTokenMs },
+    ...durationMs === undefined ? {} : { durationMs },
+    ...outputTps === undefined ? {} : { outputTps },
+  }
 }
 
 /** Read one reliability day out of an untrusted document. */

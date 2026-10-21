@@ -41,6 +41,19 @@ describe('createProgressTracker', () => {
     expect(progress.read()).toEqual({ phase: 'reading', done: 2, total: 3, startedAt: 1000 })
   })
 
+  it('never counts more folds than the plan it published', () => {
+    const progress = createProgressTracker(handClock(1000).now)
+    progress.begin()
+    progress.plan(2)
+    progress.advance()
+    progress.advance()
+    progress.advance()
+
+    // The panel prints this as "done / total"; 138 / 92 is a contradiction, not
+    // a rounding error, so the cap is part of the contract.
+    expect(progress.read()).toMatchObject({ done: 2, total: 2 })
+  })
+
   it('keeps the read start time across its phases', () => {
     const progress = createProgressTracker(handClock(1000).now)
     progress.begin()

@@ -18,6 +18,15 @@ import type { Context } from '@deepseek-ai/cordis';
 export type * from './types.ts';
 /** Exact route the browser half calls; it sits behind the carrier's trust fence. */
 export declare const REPORT_PATH = "/api/dsh-local-usage/report";
+/**
+ * Exact route the call log reads one page from.
+ *
+ * Separate from the report because a call log is paged and filtered while a
+ * report is one document: folding rows into the report would either cap the log
+ * at whatever the report carried or make every panel read pay for a table it
+ * never draws.
+ */
+export declare const CALLS_PATH = "/api/dsh-local-usage/calls";
 /** Exact route the browser half writes the per-route rate table to. */
 export declare const PRICING_PATH = "/api/dsh-local-usage/pricing";
 /**
@@ -99,7 +108,7 @@ export interface UsageInsightsConfig {
  */
 export declare const DEFAULT_CONFIG: UsageInsightsConfig;
 /**
- * Register the report route.
+ * Register this plugin's Fetch routes and the background fold.
  *
  * Deliberately a named export with no default: the Loader takes a module's
  * default export when it has one, and a default that is the bare `apply`

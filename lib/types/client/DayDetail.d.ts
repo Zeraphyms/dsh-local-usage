@@ -46,10 +46,12 @@ export interface DayDetailProps {
     readonly onRetry: () => void;
     /** Leave the drill-down and return to the calendar. */
     readonly onBack: () => void;
+    /** Open the call log on this day, when the panel offers it. */
+    readonly onOpenCalls?: (day: string) => void;
 }
 /**
  * Render one day's usage, ranked by the directory that produced it.
  * @param props - the day, its report or its absence, the formatters, and the controls.
  * @returns the day view.
  */
-export declare function DayDetail({ day, report, failed, locale, t, formatCost, formatTokens, formatInteger, formatPercent, formatDay, weekdayOf, onRetry, onBack, }: DayDetailProps): ReactNode;
+export declare function DayDetail({ day, report, failed, locale, t, formatCost, formatTokens, formatInteger, formatPercent, formatDay, weekdayOf, onRetry, onBack, onOpenCalls, }: DayDetailProps): ReactNode;

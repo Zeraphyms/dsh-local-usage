@@ -56,6 +56,13 @@ describe('the panel before its report arrives', () => {
     expect(markup).toContain('rangeCustom')
   })
 
+  it('keeps the way into the call log, inert rather than absent', () => {
+    // The call log is a page reached from this header; like the prices beside
+    // it, it waits for the year's report in place rather than disappearing.
+    expect(markup).toContain('callsTitle')
+    expect(markup).toContain('disabled')
+  })
+
   it('keeps the way into the prices, inert rather than absent', () => {
     // Prices live on a page now, reached by this control. It waits for the year's
     // report in place: a control that removes itself for the length of a read is

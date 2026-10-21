@@ -25,6 +25,9 @@ const integerFormatters = new Map<string, Intl.NumberFormat | null>()
 const percentFormatters = new Map<string, Intl.NumberFormat | null>()
 const rateFormatters = new Map<string, Intl.NumberFormat | null>()
 const dayFormatters = new Map<string, Intl.DateTimeFormat | null>()
+const momentFormatters = new Map<string, Intl.DateTimeFormat | null>()
+const secondsFormatters = new Map<string, Intl.NumberFormat | null>()
+const throughputFormatters = new Map<string, Intl.NumberFormat | null>()
 
 /**
  * Build one formatter once, caching a rejected construction as absent.
@@ -244,4 +247,71 @@ export function formatDay(day: string, locale: string): string {
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
   )
   return formatter === undefined ? day : formatter.format(time)
+}
+
+/**
+ * Render one instant as the compact date and clock the call log reads.
+ *
+ * A call log is a time-ordered list, so the time has to be read at a glance and
+ * compared down a column: the month and day carry the row's day, the clock
+ * carries its place in that day, and the year is left to the hover title because
+ * no window the panel can query spans more than one.
+ * @param time - Unix epoch milliseconds.
+ * @param locale - active locale id.
+ * @returns the localized `MM-DD HH:mm:ss`, or the plain date when `Intl` refuses the locale.
+ */
+export function formatMoment(time: number, locale: string): string {
+  const formatter = resolve(
+    momentFormatters,
+    locale,
+    () => new Intl.DateTimeFormat(locale, {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }),
+  )
+  return formatter === undefined ? new Date(time).toLocaleString() : formatter.format(time)
+}
+
+/**
+ * Render one millisecond span as the reader's own short duration.
+ *
+ * `Intl`'s unit style states the unit the way the language writes it — `3.62秒`
+ * in Chinese, `3.62 s` in English — so the figure stays a figure and the unit
+ * stays copy that the runtime already knows.
+ * @param milliseconds - the span.
+ * @param locale - active locale id.
+ * @returns the localized duration, or seconds with an `s` when `Intl` refuses the locale.
+ */
+export function formatSeconds(milliseconds: number, locale: string): string {
+  const seconds = milliseconds / 1000
+  const formatter = resolve(
+    secondsFormatters,
+    locale,
+    () => new Intl.NumberFormat(locale, {
+      style: 'unit',
+      unit: 'second',
+      unitDisplay: 'short',
+      maximumFractionDigits: 2,
+    }),
+  )
+  return formatter === undefined ? `${seconds.toFixed(2)}s` : formatter.format(seconds)
+}
+
+/**
+ * Render one throughput figure with a single fraction digit.
+ * @param value - tokens per second.
+ * @param locale - active locale id.
+ * @returns the localized figure, without a unit (the column head states it).
+ */
+export function formatThroughput(value: number, locale: string): string {
+  const formatter = resolve(
+    throughputFormatters,
+    locale,
+    () => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }),
+  )
+  return formatter === undefined ? value.toFixed(1) : formatter.format(value)
 }

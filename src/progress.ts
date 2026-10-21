@@ -57,7 +57,11 @@ export function createProgressTracker(clock: () => number = Date.now): ProgressT
       state = { phase: 'pricing', done: state.done, total: state.total, startedAt: state.startedAt }
     },
     advance: () => {
-      state = { ...state, done: state.done + 1 }
+      // Capped at the plan: a queued read cannot overrun the one in front of
+      // it any more, but a tracker that can print "138 / 92" is one bad caller
+      // away from doing it again, and a figure that contradicts itself is worse
+      // than one that stops at the total.
+      state = { ...state, done: Math.min(state.done + 1, state.total) }
     },
     finish: () => {
       state = {

@@ -45,6 +45,7 @@ import {
 } from './summary-state.ts'
 import type { SummaryState } from './summary-state.ts'
 import { Tile } from './Tile.tsx'
+import { CallsPage } from './CallsPage.tsx'
 import { PricingPage } from './PricingPage.tsx'
 import { StatsTables } from './StatsTables.tsx'
 import { WaveChart } from './WaveChart.tsx'
@@ -355,6 +356,11 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // The prices live on a page rather than in a hover panel: the reader comes
   // here to type, and a panel that closes on pointer-leave cannot be typed into.
   const [showPricing, setShowPricing] = useState(false)
+  // The call log is a page too, and the window it opens on is optional: a day
+  // page sends its own day, the header sends none and the page falls back to its
+  // default week.
+  const [showCalls, setShowCalls] = useState(false)
+  const [callsRange, setCallsRange] = useState<{ readonly from: number; readonly to: number } | undefined>(undefined)
   const [dayState, setDayState] = useState<DayState>({ status: 'idle' })
   const [dayRequest, setDayRequest] = useState(0)
   // Bumped after a rate write, so every view re-prices against the new table
@@ -571,7 +577,22 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
           <p className={css.status} role="alert">{t('error')}</p>
         )}
       >
-        {selectedDay !== undefined ? (
+        {showCalls && yearReport !== undefined ? (
+          <CallsPage
+            locale={activeLocale}
+            t={t}
+            formatCost={money}
+            formatTokens={tokens}
+            formatInteger={integer}
+            formatPercent={percent}
+            {...callsRange === undefined ? {} : { initialFrom: callsRange.from, initialTo: callsRange.to }}
+            {...callsRange === undefined ? {} : { backLabel: t('backToDay') }}
+            onBack={() => {
+              setShowCalls(false)
+              setCallsRange(undefined)
+            }}
+          />
+        ) : selectedDay !== undefined ? (
           <DayDetail
             day={selectedDay}
             report={dayState.status === 'ready' ? dayState.report : undefined}
@@ -590,6 +611,14 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             onBack={() => {
               setReturnDay(selectedDay)
               setSelectedDay(undefined)
+            }}
+            // The day's own calls, on the page that exists to explain a window:
+            // the query opens on this day rather than on the page's default week.
+            onOpenCalls={(day) => {
+              const start = dayTime(day)
+              if (start === undefined) return
+              setCallsRange({ from: start, to: start + MS_PER_DAY - 1 })
+              setShowCalls(true)
             }}
           />
         ) : showPricing && yearReport !== undefined ? (
@@ -652,6 +681,21 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     : null}
                 </div>
                 <div className={css.tools}>
+                  {/* The call log is a page, not a table under the calendar: it
+                      can page a year of calls, and the front page already carries
+                      a calendar, a wave and two rankings. It waits for the year's
+                      report in place, like the prices beside it. */}
+                  <button
+                    type="button"
+                    className={css.breakout}
+                    disabled={yearReport === undefined}
+                    onClick={() => {
+                      setCallsRange(undefined)
+                      setShowCalls(true)
+                    }}
+                  >
+                    {t('callsTitle')}
+                  </button>
                   {/* Prices are a page, not a hover panel: eight fields per model
                       do not fit a tooltip, and a panel that closes on pointer-leave
                       cannot be typed into. The button waits for the year's report

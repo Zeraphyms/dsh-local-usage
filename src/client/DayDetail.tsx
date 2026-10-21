@@ -57,6 +57,8 @@ export interface DayDetailProps {
   readonly onRetry: () => void
   /** Leave the drill-down and return to the calendar. */
   readonly onBack: () => void
+  /** Open the call log on this day, when the panel offers it. */
+  readonly onOpenCalls?: (day: string) => void
 }
 
 /** Tokens of any token-bearing row. */
@@ -72,7 +74,7 @@ function tokensOf(row: UsageTokens): number {
 export function DayDetail({
   day, report, failed, locale, t,
   formatCost, formatTokens, formatInteger, formatPercent, formatDay, weekdayOf,
-  onRetry, onBack,
+  onRetry, onBack, onOpenCalls,
 }: DayDetailProps): ReactNode {
   const frame = useRef<HTMLElement>(null)
 
@@ -95,6 +97,15 @@ export function DayDetail({
             <Button variant="outline" size="sm" onClick={onBack}>{t('back')}</Button>
             <h2 className={css.dayTitle}>{formatDay(day)}</h2>
             <span className={css.dayWeekday}>{weekdayOf(day)}</span>
+            {onOpenCalls === undefined ? null : (
+              <button
+                type="button"
+                className={css.breakout}
+                onClick={() => { onOpenCalls(day) }}
+              >
+                {t('callsDayOpen')}
+              </button>
+            )}
           </div>
           <p className={css.subtitle}>{t('daySubtitle')}</p>
         </div>

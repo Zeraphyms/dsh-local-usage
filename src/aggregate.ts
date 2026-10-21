@@ -11,7 +11,8 @@
  * @module dsh-local-usage/aggregate
  */
 
-import { lastAssistantStreamChunk } from '@deepseek-ai/dsh-llm/assistant-stream'
+import { assistantStreamFirstTokenTime, lastAssistantStreamChunk } from '@deepseek-ai/dsh-llm/assistant-stream'
+import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
 // Type-only: activates the 'llm/retry-started' variant the retry slot reads.
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
@@ -47,6 +48,16 @@ export interface UsageSample {
   readonly route: string
   /** Exact provider-reported buckets for the turn. */
   readonly tokens: UsageTokens
+  /** Turn this settlement belongs to, when the log states it. */
+  readonly turn?: number
+  /** Step within the turn, when the log states it. */
+  readonly step?: number
+  /** Milliseconds from the step's start to its first streamed token. */
+  readonly firstTokenMs?: number
+  /** Milliseconds from the step's start to the settlement. */
+  readonly durationMs?: number
+  /** Output tokens per second over the streamed generation window. */
+  readonly outputTps?: number
 }
 
 /** One session's inputs to a report, plus what the window keeps of it. */
@@ -137,16 +148,24 @@ export function dayKeyToTime(day: string): number | undefined {
  */
 export function samplesOf(events: readonly SessionEvent[]): UsageSample[] {
   const samples: UsageSample[] = []
+  // The instant each step opened, keyed by `turn:step`. A retry moves the mark
+  // forward: the failed attempt's wait is not the retried call's latency.
+  const stepStarts = new Map<string, number>()
   let route = UNKNOWN_ROUTE
   let last: { turn: number; step: number; index: number } | undefined
 
   for (const event of events) {
+    if (event.type === 'step/start') {
+      stepStarts.set(`${String(event.data.turn)}:${String(event.data.step)}`, event.time)
+      continue
+    }
     if (event.type === 'request/header') {
       const { provider, model } = event.data.header.config
       if (provider.length > 0 && model.length > 0) route = `${provider}/${model}`
       continue
     }
     if (event.type === 'llm/retry-started') {
+      stepStarts.set(`${String(event.data.turn)}:${String(event.data.step)}`, event.time)
       if (last !== undefined
         && last.turn === event.data.turn
         && last.step === event.data.step) {
@@ -166,19 +185,61 @@ export function samplesOf(events: readonly SessionEvent[]): UsageSample[] {
     }
     const { turn, step } = event.data
     const settledRoute = event.type === 'assistant/message' ? sourceRoute(event) ?? route : route
+    const timing = timingOf(event, stepStarts.get(`${String(turn)}:${String(step)}`))
     const slot = last !== undefined && last.turn === turn && last.step === step ? last : undefined
     const previous = slot === undefined ? undefined : samples[slot.index]
 
     if (previous !== undefined && sameTokens(previous.tokens, tokens)) continue
+    const sample: UsageSample = { time: event.time, route: settledRoute, tokens, turn, step, ...timing }
     if (slot === undefined) {
-      samples.push({ time: event.time, route: settledRoute, tokens })
+      samples.push(sample)
       last = { turn, step, index: samples.length - 1 }
     } else {
-      samples[slot.index] = { time: event.time, route: settledRoute, tokens }
+      samples[slot.index] = sample
       last = { turn, step, index: slot.index }
     }
   }
   return samples
+}
+
+/** The first token's instant in one compact stream, or `undefined` when it has none. */
+function firstTokenAt(stream: readonly AssistantStreamRecord[]): number | undefined {
+  try {
+    return assistantStreamFirstTokenTime(stream)
+  } catch {
+    // A stream this build cannot read costs the sample its latency, never the call.
+    return undefined
+  }
+}
+
+/**
+ * The timing facts one settlement carries, measured from its step's start.
+ *
+ * `duration` is what a reader waits for: the step opens, the model is asked,
+ * and the message settles. `firstToken` is the share of that wait before the
+ * first token; the rest is generation, and output tokens over it are the
+ * throughput. A log that predates step timing, or a settlement with no stream,
+ * simply has no timing to state.
+ */
+function timingOf(
+  event: SessionEvent<'assistant/message'> | SessionEvent<'assistant/attempt'>,
+  startedAt: number | undefined,
+): Pick<UsageSample, 'firstTokenMs' | 'durationMs' | 'outputTps'> {
+  if (startedAt === undefined) return {}
+  const durationMs = event.time - startedAt
+  if (!Number.isFinite(durationMs) || durationMs < 0) return {}
+  const firstAt = firstTokenAt(event.data.stream)
+  if (firstAt === undefined) return { durationMs }
+  const firstTokenMs = firstAt - startedAt
+  const generationMs = event.time - firstAt
+  const outputTokens = usageOf(event)?.outputTokens ?? 0
+  return {
+    durationMs,
+    ...firstTokenMs >= 0 ? { firstTokenMs } : {},
+    ...generationMs > 0 && outputTokens > 0
+      ? { outputTps: outputTokens / (generationMs / 1000) }
+      : {},
+  }
 }
 
 /** The usage one settlement reports, from its own field or its embedded stream. */

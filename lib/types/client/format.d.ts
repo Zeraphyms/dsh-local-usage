@@ -104,3 +104,33 @@ export declare function figureRoom(text: string): 'normal' | 'long' | 'overflowi
  * @returns the localized date, or the key itself when it cannot be parsed.
  */
 export declare function formatDay(day: string, locale: string): string;
+/**
+ * Render one instant as the compact date and clock the call log reads.
+ *
+ * A call log is a time-ordered list, so the time has to be read at a glance and
+ * compared down a column: the month and day carry the row's day, the clock
+ * carries its place in that day, and the year is left to the hover title because
+ * no window the panel can query spans more than one.
+ * @param time - Unix epoch milliseconds.
+ * @param locale - active locale id.
+ * @returns the localized `MM-DD HH:mm:ss`, or the plain date when `Intl` refuses the locale.
+ */
+export declare function formatMoment(time: number, locale: string): string;
+/**
+ * Render one millisecond span as the reader's own short duration.
+ *
+ * `Intl`'s unit style states the unit the way the language writes it — `3.62秒`
+ * in Chinese, `3.62 s` in English — so the figure stays a figure and the unit
+ * stays copy that the runtime already knows.
+ * @param milliseconds - the span.
+ * @param locale - active locale id.
+ * @returns the localized duration, or seconds with an `s` when `Intl` refuses the locale.
+ */
+export declare function formatSeconds(milliseconds: number, locale: string): string;
+/**
+ * Render one throughput figure with a single fraction digit.
+ * @param value - tokens per second.
+ * @param locale - active locale id.
+ * @returns the localized figure, without a unit (the column head states it).
+ */
+export declare function formatThroughput(value: number, locale: string): string;

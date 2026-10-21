@@ -66,6 +66,35 @@ describe('createFoldCache', () => {
     expect(hit?.reliability[0]?.toolCalls).toBe(2)
   })
 
+  it('round-trips per-settlement timing and retry metadata', async () => {
+    const path = await cachePath()
+    const cache = createFoldCache(path)
+    const time = Date.now() - MS_PER_DAY
+
+    cache.write('s1', 'rev-1', {
+      ...fold(time),
+      samples: [{
+        time,
+        route: 'p/m',
+        tokens: { uncachedInputTokens: 10, outputTokens: 2, cacheReadTokens: 3, cacheWriteTokens: 4 },
+        turn: 3,
+        step: 2,
+        firstTokenMs: 250,
+        durationMs: 1400,
+        outputTps: 42.5,
+      }],
+    })
+    await cache.flush()
+
+    expect(createFoldCache(path).read('s1', 'rev-1', undefined)?.samples[0]).toMatchObject({
+      turn: 3,
+      step: 2,
+      firstTokenMs: 250,
+      durationMs: 1400,
+      outputTps: 42.5,
+    })
+  })
+
   it('refuses a fold stored under another revision', async () => {
     const path = await cachePath()
     const cache = createFoldCache(path)
@@ -132,7 +161,7 @@ describe('createFoldCache', () => {
     const now = Date.now()
     const good = fold(now - MS_PER_DAY)
     await writeFile(path, JSON.stringify({
-      version: 1,
+      version: 2,
       sessions: {
         good: { revision: 'rev-1', createdAt: good.createdAt, samples: good.samples, reliability: [] },
         // A sample whose token buckets are not numbers: this entry is dropped,

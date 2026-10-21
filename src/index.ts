@@ -26,6 +26,7 @@ import type {} from '@deepseek-ai/dsh-session-persistence'
 import { foldSessionTitle } from '@deepseek-ai/dsh-session-title'
 import { buildReport, reliabilityOf, reliabilityWithin, samplesOf } from './aggregate.ts'
 import type { PricingOptions, ReliabilityDay, SessionUsageInput, UsageSample } from './aggregate.ts'
+import { queryCalls } from './calls.ts'
 import { createFoldCache, foldCacheFilePath } from './fold-cache.ts'
 import type { FoldCache } from './fold-cache.ts'
 import { parsePeakWindow } from './pricing.ts'
@@ -34,12 +35,28 @@ import { createProgressTracker } from './progress.ts'
 import type { ProgressTracker } from './progress.ts'
 import { createRateStore, pricingFilePath, readModelEdit, resolveDshHome } from './rates.ts'
 import type { RateStore } from './rates.ts'
-import type { UsageInsightsReport, UsageModelEdit, UsagePricingUpdate } from './types.ts'
+import type {
+  UsageCallSort,
+  UsageCallsQuery,
+  UsageInsightsReport,
+  UsageModelEdit,
+  UsagePricingUpdate,
+} from './types.ts'
 
 export type * from './types.ts'
 
 /** Exact route the browser half calls; it sits behind the carrier's trust fence. */
 export const REPORT_PATH = '/api/dsh-local-usage/report'
+
+/**
+ * Exact route the call log reads one page from.
+ *
+ * Separate from the report because a call log is paged and filtered while a
+ * report is one document: folding rows into the report would either cap the log
+ * at whatever the report carried or make every panel read pay for a table it
+ * never draws.
+ */
+export const CALLS_PATH = '/api/dsh-local-usage/calls'
 
 /** Exact route the browser half writes the per-route rate table to. */
 export const PRICING_PATH = '/api/dsh-local-usage/pricing'
@@ -361,6 +378,43 @@ function numberParam(params: URLSearchParams, key: string): number | undefined {
   return Number.isFinite(value) ? value : undefined
 }
 
+/** Parse one optional text query parameter, bounded so a URL cannot carry a page of prose. */
+function textParam(params: URLSearchParams, key: string, maxLength: number): string | undefined {
+  const raw = params.get(key)
+  if (raw === null) return undefined
+  const value = raw.trim()
+  return value.length === 0 ? undefined : value.slice(0, maxLength)
+}
+
+/** The sort columns the call log understands, so a typo falls back to the default. */
+const CALL_SORTS: readonly UsageCallSort[] = ['time', 'cost', 'tokens', 'output']
+
+/** Read one call-log query off an untrusted URL. */
+function callsQueryOf(params: URLSearchParams): UsageCallsQuery {
+  const rawSort = params.get('sort')
+  const sort = CALL_SORTS.find(candidate => candidate === rawSort) ?? 'time'
+  const from = numberParam(params, 'from')
+  const to = numberParam(params, 'to')
+  const route = textParam(params, 'route', 200)
+  const model = textParam(params, 'model', 120)
+  const session = textParam(params, 'session', 200)
+  const q = textParam(params, 'q', 200)
+  const offset = numberParam(params, 'offset')
+  const limit = numberParam(params, 'limit')
+  return {
+    ...from === undefined ? {} : { from },
+    ...to === undefined ? {} : { to },
+    ...route === undefined ? {} : { route },
+    ...model === undefined ? {} : { model },
+    ...session === undefined ? {} : { session },
+    ...q === undefined ? {} : { q },
+    sort,
+    dir: params.get('dir') === 'asc' ? 'asc' : 'desc',
+    ...offset === undefined ? {} : { offset },
+    ...limit === undefined ? {} : { limit },
+  }
+}
+
 /** A session log this read has to fold. */
 interface PendingSession {
   readonly id: SessionId
@@ -429,8 +483,21 @@ async function storedRevisions(ctx: Context): Promise<ReadonlyMap<string, string
   }
 }
 
+/** Runs one corpus read after every read queued before it has settled. */
+type SerializedRead = <T>(task: () => Promise<T>) => Promise<T>
+
+/** What one corpus read found: the folds, and what it cost to obtain them. */
+interface CorpusRead {
+  /** Every session in the requested window, with the fold it contributed from. */
+  readonly contributors: readonly Contributor[]
+  /** Sessions whose logs could not be read. */
+  readonly unreadable: number
+  /** Whether every fold came from the caches rather than a fresh read. */
+  readonly cached: boolean
+}
+
 /**
- * Build the priced report over every readable session log.
+ * Read every readable session log into folds, reusing whatever the caches answer.
  *
  * Two read paths, one fold. Sessions whose log carries no inherited prefix go
  * through the engine's batch projection, which hands the fold the events as the
@@ -441,6 +508,158 @@ async function storedRevisions(ctx: Context): Promise<ReadonlyMap<string, string
  * A session neither path has to touch is the point of the durable cache: when the
  * stored log still carries the revision a previous process folded, that fold is
  * reused and the log is never opened.
+ *
+ * Shared by the report and the call log. They ask different questions of the
+ * same folds, so reading once here is what keeps a page of calls from paying for
+ * a second pass over the corpus.
+ *
+ * @param ctx - host context carrying the session query engine.
+ * @param cache - the in-memory fold cache, keyed by session id.
+ * @param folds - the durable fold cache, keyed by session id and log revision.
+ * @param progress - publishes how far this read has got.
+ * @param request - the window the durable cache must still reach, and whether to discard it.
+ * @returns the contributors, the unreadable count and whether the read was cached.
+ */
+async function readCorpus(
+  ctx: Context,
+  cache: Map<string, CachedSession>,
+  folds: FoldCache,
+  progress: ProgressTracker,
+  request: { refresh: boolean; from: number | undefined; to: number | undefined },
+): Promise<CorpusRead> {
+  // A refresh means what it says: every log is read again, so the durable
+  // entries are bypassed rather than merely overwritten.
+  if (request.refresh) cache.clear()
+
+  const records = await ctx.sessionQuery.listSessions()
+  // Every session that contributed, with the fold it contributed from. Kept as
+  // pairs rather than as finished inputs because a window is a filter over
+  // these folds: deriving a second one — the window before this — costs a
+  // re-price, not a second read.
+  const contributors: Contributor[] = []
+  const needy: NeedySession[] = []
+  for (const record of records) {
+    const id = String(record.header.id)
+    const hit = cache.get(id)
+    if (hit !== undefined) {
+      contributors.push({ id, fold: hit })
+      continue
+    }
+    needy.push({ id: id as SessionId, seeded: record.header.isSeeded, live: record.live })
+  }
+
+  // Revisions turn the durable cache into a lookup: the same token means the
+  // bytes on disk are the ones that entry was folded from. They are read even
+  // for a refresh, which bypasses the lookup but still has to replace the entry
+  // it is re-reading past.
+  const asking = needy.some(entry => !entry.live)
+  const revisions = asking ? await storedRevisions(ctx) : new Map<string, string>()
+  const pending: PendingSession[] = []
+  for (const entry of needy) {
+    const revision = entry.live ? undefined : revisions.get(entry.id)
+    if (revision === undefined) {
+      pending.push({ id: entry.id, seeded: entry.seeded })
+      continue
+    }
+    const stored = request.refresh ? undefined : folds.read(entry.id, revision, request.from)
+    if (stored === undefined) {
+      pending.push({ id: entry.id, seeded: entry.seeded, revision })
+      continue
+    }
+    cache.set(entry.id, stored)
+    contributors.push({ id: entry.id, fold: stored })
+  }
+
+  // Every log that still has to be read is one step of this read's progress,
+  // so the count the panel shows is the work it is actually waiting on.
+  progress.plan(pending.length)
+
+  const cached = pending.length === 0
+  const batch = batchProjectionOf(ctx.sessionQuery)
+  const batchable = batch === undefined ? [] : pending.filter(entry => !entry.seeded)
+  const exact = batch === undefined ? pending : pending.filter(entry => entry.seeded)
+
+  let unreadable = 0
+
+  if (batch !== undefined && batchable.length > 0) {
+    // The projection is synchronous and must own everything it keeps. The fold
+    // satisfies that by reading primitives off the events and building fresh
+    // sample objects, so nothing here aliases the borrowed log.
+    const results = await batch(batchable.map(entry => entry.id), source => {
+      const fold = foldSession({
+        events: source.events,
+        createdAt: source.header.createdAt,
+        ...source.header.cwd === undefined ? {} : { cwd: source.header.cwd },
+        // Reached only for a log with no inherited prefix, by construction above.
+        skipBefore: 0,
+      })
+      // Counted inside the projector because that is where a session's fold
+      // actually completes; the projection reports back only when all of them have.
+      progress.advance()
+      return fold
+    })
+    const byId = new Map<string, BatchOutcome<CachedSession>>()
+    for (const outcome of results) byId.set(String(outcome.sessionId), outcome)
+    for (const entry of batchable) {
+      const outcome = byId.get(entry.id)
+      if (outcome === undefined || outcome.status === 'rejected') {
+        unreadable += 1
+        continue
+      }
+      cache.set(entry.id, outcome.value)
+      if (entry.revision !== undefined) folds.write(entry.id, entry.revision, outcome.value)
+      contributors.push({ id: entry.id, fold: outcome.value })
+    }
+  }
+
+  if (exact.length > 0) {
+    const folded = await mapBounded(exact, READ_CONCURRENCY, async (entry) => {
+      try {
+        const snapshot = await ctx.sessionQuery.readSession(entry.id)
+        return foldSession({
+          events: snapshot.events,
+          createdAt: snapshot.session.createdAt,
+          ...snapshot.session.cwd === undefined ? {} : { cwd: snapshot.session.cwd },
+          // A forked session's log begins with the parent's inherited prefix, and
+          // those turns were already billed under the parent. Only the events this
+          // session owns are its own spend.
+          skipBefore: snapshot.inheritedEventCount,
+        })
+      } catch {
+        return undefined
+      } finally {
+        progress.advance()
+      }
+    })
+    for (let index = 0; index < folded.length; index += 1) {
+      const value = folded[index]
+      const entry = exact[index]
+      if (value === undefined || entry === undefined) {
+        unreadable += 1
+        continue
+      }
+      cache.set(entry.id, value)
+      if (entry.revision !== undefined) folds.write(entry.id, entry.revision, value)
+      contributors.push({ id: entry.id, fold: value })
+    }
+  }
+
+  // Awaited, so the read this request just paid for survives a process that
+  // dies before the next one starts. It is one write of a file the size of the
+  // samples, only ever on a read that touched a log, and the panel is already
+  // waiting on that read; a disk that refuses it costs the next cold start and
+  // never this answer.
+  try {
+    await folds.flush()
+  } catch (error: unknown) {
+    ctx.logger.warn(`dsh-local-usage: fold cache write failed: ${describe(error)}`)
+  }
+
+  return { contributors, unreadable, cached }
+}
+
+/**
+ * Build the priced report over every readable session log.
  *
  * @param ctx - host context carrying the session query engine.
  * @param cache - the in-memory fold cache, keyed by session id.
@@ -462,143 +681,16 @@ async function assembleReport(
 ): Promise<UsageInsightsReport> {
   progress.begin()
   try {
-    // A refresh means what it says: every log is read again, so the durable
-    // entries are bypassed rather than merely overwritten.
-    if (request.refresh) cache.clear()
-
-    const records = await ctx.sessionQuery.listSessions()
-    // Every session that contributed, with the fold it contributed from. Kept as
-    // pairs rather than as finished inputs because a window is a filter over
-    // these folds: deriving a second one — the window before this — costs a
-    // re-price, not a second read.
-    const contributors: Contributor[] = []
-    const needy: NeedySession[] = []
-    for (const record of records) {
-      const id = String(record.header.id)
-      const hit = cache.get(id)
-      if (hit !== undefined) {
-        contributors.push({ id, fold: hit })
-        continue
-      }
-      needy.push({ id: id as SessionId, seeded: record.header.isSeeded, live: record.live })
-    }
-
-    // Revisions turn the durable cache into a lookup: the same token means the
-    // bytes on disk are the ones that entry was folded from. They are read even
-    // for a refresh, which bypasses the lookup but still has to replace the entry
-    // it is re-reading past.
-    const asking = needy.some(entry => !entry.live)
-    const revisions = asking ? await storedRevisions(ctx) : new Map<string, string>()
-    const pending: PendingSession[] = []
-    for (const entry of needy) {
-      const revision = entry.live ? undefined : revisions.get(entry.id)
-      if (revision === undefined) {
-        pending.push({ id: entry.id, seeded: entry.seeded })
-        continue
-      }
-      const stored = request.refresh ? undefined : folds.read(entry.id, revision, request.from)
-      if (stored === undefined) {
-        pending.push({ id: entry.id, seeded: entry.seeded, revision })
-        continue
-      }
-      cache.set(entry.id, stored)
-      contributors.push({ id: entry.id, fold: stored })
-    }
-
-    // Every log that still has to be read is one step of this read's progress,
-    // so the count the panel shows is the work it is actually waiting on.
-    progress.plan(pending.length)
-
-    const cached = pending.length === 0
-    const batch = batchProjectionOf(ctx.sessionQuery)
-    const batchable = batch === undefined ? [] : pending.filter(entry => !entry.seeded)
-    const exact = batch === undefined ? pending : pending.filter(entry => entry.seeded)
-
-    let unreadable = 0
-
-    if (batch !== undefined && batchable.length > 0) {
-      // The projection is synchronous and must own everything it keeps. The fold
-      // satisfies that by reading primitives off the events and building fresh
-      // sample objects, so nothing here aliases the borrowed log.
-      const results = await batch(batchable.map(entry => entry.id), source => {
-        const fold = foldSession({
-          events: source.events,
-          createdAt: source.header.createdAt,
-          ...source.header.cwd === undefined ? {} : { cwd: source.header.cwd },
-          // Reached only for a log with no inherited prefix, by construction above.
-          skipBefore: 0,
-        })
-        // Counted inside the projector because that is where a session's fold
-        // actually completes; the projection reports back only when all of them have.
-        progress.advance()
-        return fold
-      })
-      const byId = new Map<string, BatchOutcome<CachedSession>>()
-      for (const outcome of results) byId.set(String(outcome.sessionId), outcome)
-      for (const entry of batchable) {
-        const outcome = byId.get(entry.id)
-        if (outcome === undefined || outcome.status === 'rejected') {
-          unreadable += 1
-          continue
-        }
-        cache.set(entry.id, outcome.value)
-        if (entry.revision !== undefined) folds.write(entry.id, entry.revision, outcome.value)
-        contributors.push({ id: entry.id, fold: outcome.value })
-      }
-    }
-
-    if (exact.length > 0) {
-      const folded = await mapBounded(exact, READ_CONCURRENCY, async (entry) => {
-        try {
-          const snapshot = await ctx.sessionQuery.readSession(entry.id)
-          return foldSession({
-            events: snapshot.events,
-            createdAt: snapshot.session.createdAt,
-            ...snapshot.session.cwd === undefined ? {} : { cwd: snapshot.session.cwd },
-            // A forked session's log begins with the parent's inherited prefix, and
-            // those turns were already billed under the parent. Only the events this
-            // session owns are its own spend.
-            skipBefore: snapshot.inheritedEventCount,
-          })
-        } catch {
-          return undefined
-        } finally {
-          progress.advance()
-        }
-      })
-      for (let index = 0; index < folded.length; index += 1) {
-        const value = folded[index]
-        const entry = exact[index]
-        if (value === undefined || entry === undefined) {
-          unreadable += 1
-          continue
-        }
-        cache.set(entry.id, value)
-        if (entry.revision !== undefined) folds.write(entry.id, entry.revision, value)
-        contributors.push({ id: entry.id, fold: value })
-      }
-    }
-
+    const corpus = await readCorpus(ctx, cache, folds, progress, request)
     progress.pricing()
     // Every contributor in the requested window: the one place a window becomes
     // the inputs a fold prices.
-    const inputs = contributors.map(({ id, fold }) => sessionInputOf(id, fold, request))
-    const report = buildReport(inputs, pricingOptions(config, rates), {
+    const inputs = corpus.contributors.map(({ id, fold }) => sessionInputOf(id, fold, request))
+    return buildReport(inputs, pricingOptions(config, rates), {
       generatedAt: Date.now(),
-      unreadableSessions: unreadable,
-      cached,
+      unreadableSessions: corpus.unreadable,
+      cached: corpus.cached,
     })
-    // Awaited, so the read this report just paid for survives a process that
-    // dies before the next one starts. It is one write of a file the size of the
-    // samples, only ever on a read that touched a log, and the panel is already
-    // waiting on that read; a disk that refuses it costs the next cold start and
-    // never this report.
-    try {
-      await folds.flush()
-    } catch (error: unknown) {
-      ctx.logger.warn(`dsh-local-usage: fold cache write failed: ${describe(error)}`)
-    }
-    return report
   } finally {
     progress.finish()
   }
@@ -679,6 +771,58 @@ function pricingOptions(config: UsageInsightsConfig, rates: RateStore): PricingO
   }
 }
 
+/** Answer one call-log page with JSON, or a described failure. */
+async function handleCalls(
+  ctx: Context,
+  cache: Map<string, CachedSession>,
+  folds: FoldCache,
+  progress: ProgressTracker,
+  config: UsageInsightsConfig,
+  rates: RateStore,
+  serialize: SerializedRead,
+  request: Request,
+  background: () => Promise<void> | undefined,
+): Promise<Response> {
+  const url = new URL(request.url)
+  const query = callsQueryOf(url.searchParams)
+  const headers = { 'cache-control': 'no-store' }
+  try {
+    // The same rule as the report: a background fold already reading this
+    // corpus is the work this request needs, so wait for it instead of starting
+    // a second walk over every log.
+    const pending = background()
+    if (pending !== undefined) await pending
+    const page = await serialize(async () => {
+      progress.begin()
+      try {
+        const corpus = await readCorpus(ctx, cache, folds, progress, {
+          refresh: url.searchParams.get('refresh') === '1',
+          from: query.from,
+          to: query.to,
+        })
+        progress.pricing()
+        const inputs = corpus.contributors.map(({ id, fold }) => sessionInputOf(id, fold, {
+          from: query.from,
+          to: query.to,
+        }))
+        return queryCalls(inputs, pricingOptions(config, rates), query, {
+          generatedAt: Date.now(),
+          scannedSessions: inputs.length,
+          unreadableSessions: corpus.unreadable,
+          cached: corpus.cached,
+        })
+      } finally {
+        progress.finish()
+      }
+    })
+    return Response.json(page, { headers })
+  } catch (error: unknown) {
+    const message = describe(error)
+    ctx.logger.warn(`dsh-local-usage: call log failed: ${message}`)
+    return Response.json({ error: message }, { status: 500, headers })
+  }
+}
+
 /** Answer one report request with JSON, or a described failure. */
 async function handleReport(
   ctx: Context,
@@ -687,6 +831,7 @@ async function handleReport(
   progress: ProgressTracker,
   config: UsageInsightsConfig,
   rates: RateStore,
+  serialize: SerializedRead,
   request: Request,
   background: () => Promise<void> | undefined,
 ): Promise<Response> {
@@ -698,11 +843,11 @@ async function handleReport(
     // and each walk the whole corpus.
     const pending = background()
     if (pending !== undefined) await pending
-    const report = await assembleReport(ctx, cache, folds, progress, config, rates, {
+    const report = await serialize(() => assembleReport(ctx, cache, folds, progress, config, rates, {
       refresh: url.searchParams.get('refresh') === '1',
       from: numberParam(url.searchParams, 'from'),
       to: numberParam(url.searchParams, 'to'),
-    })
+    }))
     return Response.json(report, { headers: { 'cache-control': 'no-store' } })
   } catch (error: unknown) {
     const message = describe(error)
@@ -794,7 +939,7 @@ function connectionOf(ctx: Context): UsageInsightsConnection {
 }
 
 /**
- * Register the report route.
+ * Register this plugin's Fetch routes and the background fold.
  *
  * Deliberately a named export with no default: the Loader takes a module's
  * default export when it has one, and a default that is the bare `apply`
@@ -814,12 +959,22 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
   // Folds keyed by the stored log's own change token, hydrated once here so a
   // restarted process draws the year without re-reading a log it already folded.
   const folds = createFoldCache(foldCacheFilePath(resolveDshHome()))
-  // One read's state, published to the panel through its own route. The panel
-  // serializes its reads, so one object is the whole truth about what is running.
+  // One read's state, published to the panel through its own route. Reads are
+  // serialized below, so one object is the whole truth about what is running.
   const progress = createProgressTracker()
   // The one corpus read in flight, shared by the background fold and whatever
   // request arrives while it runs. See `warm` below and `handleReport`.
   let warming: Promise<void> | undefined
+  // Reads are queued rather than run together: two in flight would each see an
+  // empty cache, each walk every log, and each advance the one progress object
+  // the panel reads — which is how a reader saw 138 of 92. A queued read starts
+  // from the folds the one before it just filled, so it is also cheaper.
+  let reads: Promise<unknown> = Promise.resolve()
+  const serialize: SerializedRead = (task) => {
+    const run = reads.then(task, task)
+    reads = run.then(() => undefined, () => undefined)
+    return run
+  }
   /**
    * Fold the whole corpus now, in the background, so the first request the panel
    * makes is a re-price instead of a cold read.
@@ -831,11 +986,11 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
    */
   const warm = (): void => {
     if (warming !== undefined) return
-    warming = assembleReport(ctx, cache, folds, progress, resolved, rates, {
+    warming = serialize(() => assembleReport(ctx, cache, folds, progress, resolved, rates, {
       refresh: false,
       from: undefined,
       to: undefined,
-    }).then(
+    })).then(
       () => undefined,
       (error: unknown) => {
         // A background fold that fails costs the reader the wait it was meant to
@@ -861,9 +1016,18 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
       path: REPORT_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => handleReport(ctx, cache, folds, progress, resolved, rates, request, () => warming),
+      fetch: request => handleReport(ctx, cache, folds, progress, resolved, rates, serialize, request, () => warming),
     }),
     'dsh-local-usage: report route',
+  )
+  ctx.effect(
+    () => connectionOf(ctx).fetch.register({
+      path: CALLS_PATH,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: request => handleCalls(ctx, cache, folds, progress, resolved, rates, serialize, request, () => warming),
+    }),
+    'dsh-local-usage: calls route',
   )
   // Optional, so a deployment with no persistence backend still mounts: without
   // one there are no revisions, so nothing is ever reused from disk and every

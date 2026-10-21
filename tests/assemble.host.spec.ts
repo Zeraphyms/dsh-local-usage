@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
-import { apply, DEFAULT_CONFIG, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from '../src/index.ts'
+import { apply, CALLS_PATH, DEFAULT_CONFIG, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from '../src/index.ts'
 import type { UsageInsightsConfig } from '../src/index.ts'
 
 // Every test mounts the plugin, which hydrates the rate table from `DSH_HOME`.
@@ -105,6 +105,8 @@ interface MountOptions {
 
 interface Mounted {
   readonly route: { readonly fetch: (request: Request) => Promise<Response> }
+  /** The call-log route the same activation registered. */
+  readonly calls: { readonly fetch: (request: Request) => Promise<Response> }
   /** The rate-table route the same activation registered. */
   readonly pricing: { readonly fetch: (request: Request) => Promise<Response> }
   /** The progress route the same activation registered. */
@@ -198,13 +200,16 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
   })
 
   const route = routes.get(REPORT_PATH)
+  const callsRoute = routes.get(CALLS_PATH)
   const pricing = routes.get(PRICING_PATH)
   const progressRoute = routes.get(PROGRESS_PATH)
   if (route === undefined) throw new Error('apply did not register the report route')
+  if (callsRoute === undefined) throw new Error('apply did not register the call-log route')
   if (pricing === undefined) throw new Error('apply did not register the pricing route')
   if (progressRoute === undefined) throw new Error('apply did not register the progress route')
   return {
     route,
+    calls: callsRoute,
     pricing,
     progress: progressRoute,
     exactReads,
@@ -228,6 +233,18 @@ async function report(
   if (params.to !== undefined) url.searchParams.set('to', String(params.to))
   if (params.refresh === true) url.searchParams.set('refresh', '1')
   const response = await mounted.route.fetch(new Request(url))
+  expect(response.status).toBe(200)
+  return await response.json() as Record<string, unknown>
+}
+
+/** Ask the registered call-log route for one page. */
+async function calls(
+  mounted: Mounted,
+  params: Readonly<Record<string, string>> = {},
+): Promise<Record<string, unknown>> {
+  const url = new URL(CALLS_PATH, 'http://localhost')
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value)
+  const response = await mounted.calls.fetch(new Request(url))
   expect(response.status).toBe(200)
   return await response.json() as Record<string, unknown>
 }
@@ -634,5 +651,62 @@ describe('the pricing route', () => {
     // And nothing was written by any of them.
     const after = await report(mounted)
     expect((after.routeRates as { source: string }[])[0]?.source).toBe('fallback')
+  })
+})
+
+describe('the call-log route', () => {
+  it('pages the folds the report already paid for, without a second read', async () => {
+    const logs = new Map<string, FakeLog>([
+      ['a', { events: log(0, DAY_ONE, 3), cwd: '/work/a' }],
+      ['b', { events: log(0, DAY_TWO, 2), cwd: '/work/b' }],
+    ])
+    const mounted = mount(logs, true)
+
+    // The report's read is the expensive one; the call log must reuse its folds.
+    await report(mounted)
+    const batchesAfterReport = mounted.batches.length
+
+    const page = await calls(mounted, { limit: '2' })
+
+    expect(page.total).toBe(5)
+    expect((page.rows as readonly unknown[]).length).toBe(2)
+    expect(page.scannedSessions).toBe(2)
+    expect(mounted.batches).toHaveLength(batchesAfterReport)
+    expect(mounted.exactReads).toEqual([])
+  })
+
+  it('queues two reads over one corpus, so neither walks a log the other just read', async () => {
+    const logs = new Map<string, FakeLog>([
+      ['a', { events: log(0, DAY_ONE, 2) }],
+      ['b', { events: log(0, DAY_TWO, 2) }],
+    ])
+    const mounted = mount(logs, true)
+
+    const [page, value] = await Promise.all([calls(mounted, { limit: '2' }), report(mounted)])
+
+    expect(page.total).toBe(4)
+    expect(value.scannedSessions).toBe(2)
+    expect(mounted.batches).toEqual([['a', 'b']])
+  })
+
+  it('filters and prices one page without folding the corpus again', async () => {
+    const logs = new Map<string, FakeLog>([
+      ['a', { events: log(0, DAY_ONE, 2), cwd: '/work/a' }],
+      ['b', { events: log(0, DAY_TWO, 2), cwd: '/work/b' }],
+    ])
+    const mounted = mount(logs, true)
+    await report(mounted)
+
+    const page = await calls(mounted, {
+      from: String(DAY_TWO),
+      to: String(DAY_TWO + 10),
+      sort: 'cost',
+      dir: 'desc',
+    })
+
+    expect(page.total).toBe(2)
+    expect(page.sessions).toBe(1)
+    expect(page.projects).toBe(1)
+    expect((page.totals as { calls: number }).calls).toBe(2)
   })
 })

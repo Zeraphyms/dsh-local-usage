@@ -26,12 +26,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export declare const NS = "usage";
 /** The id shared by the sidebar entry and the main panel it opens. */
 export declare const PANEL_ID: MainPanelId;
-/** Host route this panel reads its report from. */
-export declare const REPORT_PATH = "/api/dsh-local-usage/report";
-/** Host route this panel writes its per-route rate table to. */
-export declare const PRICING_PATH = "/api/dsh-local-usage/pricing";
-/** Host route this panel asks what a read in flight is doing. */
-export declare const PROGRESS_PATH = "/api/dsh-local-usage/progress";
+/** Host routes this panel talks to; the call log owns one of them. */
+export { CALLS_PATH, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from './routes.ts';
 /** Services required by the sidebar and main-slot registrations. */
 export declare const inject: string[];
 /**

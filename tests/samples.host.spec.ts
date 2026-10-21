@@ -41,6 +41,8 @@ describe('samplesOf', () => {
       time: 1000,
       route: 'p/m',
       tokens: { uncachedInputTokens: 100, outputTokens: 10, cacheReadTokens: 5, cacheWriteTokens: 1 },
+      turn: 1,
+      step: 1,
     }])
   })
 
@@ -55,6 +57,8 @@ describe('samplesOf', () => {
       time: 2000,
       route: 'p/m',
       tokens: { uncachedInputTokens: 7, outputTokens: 3, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      turn: 1,
+      step: 1,
     })
   })
 
@@ -73,6 +77,42 @@ describe('samplesOf', () => {
     ])
 
     expect(samples.map(sample => sample.tokens.uncachedInputTokens)).toEqual([100, 20])
+  })
+
+  it('measures first token, duration and output throughput from the step start', () => {
+    const samples = samplesOf([
+      event('step/start', 0, 1000, { turn: 1, step: 1 }),
+      event('assistant/message', 1, 1500, {
+        turn: 1,
+        step: 1,
+        message: { source: { provider: 'p', model: 'm' } },
+        usage: { inputTokens: 10, outputTokens: 30 },
+        stream: [
+          { type: 'chunk', time: 1100, chunk: { type: 'block-start', index: 0, blockType: 'text' } },
+          { type: 'text-chunks', time0: 1120, index: 0, dt: [0, 10, 10], texts: ['a', 'b', 'c'] },
+          { type: 'chunk', time: 1500, chunk: { type: 'finish', reason: { kind: 'stop' } } },
+        ],
+      }),
+    ])
+
+    expect(samples[0]).toMatchObject({ turn: 1, step: 1, firstTokenMs: 120, durationMs: 500 })
+    expect(samples[0]?.outputTps).toBeCloseTo(30 / 0.38, 6)
+  })
+
+  it('restarts the clock when a retry begins', () => {
+    const samples = samplesOf([
+      event('step/start', 0, 1000, { turn: 1, step: 1 }),
+      event('llm/retry-started', 1, 4000, { turn: 1, step: 1 }),
+      event('assistant/message', 2, 4500, {
+        turn: 1,
+        step: 1,
+        message: { source: { provider: 'p', model: 'm' } },
+        usage: { inputTokens: 10, outputTokens: 5 },
+        stream: [],
+      }),
+    ])
+
+    expect(samples[0]?.durationMs).toBe(500)
   })
 
   it('keeps slots independent across turns and steps', () => {

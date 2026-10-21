@@ -85,6 +85,118 @@ export interface UsageSessionRow extends UsageCosted {
     readonly updatedAt: number;
 }
 /**
+ * One billed model call, as the durable log recorded its settlement.
+ *
+ * The report folds these away into days, routes, projects and sessions. The call
+ * log is the one surface that keeps them apart, because a question like "which
+ * call paid for that spike" or "was this call served from cache" is answered by
+ * the settlement itself and by nothing above it.
+ */
+export interface UsageCallRow {
+    /** Stable within one session's sample list: the session id and the sample's index. */
+    readonly id: string;
+    /** Settlement time in Unix epoch milliseconds. */
+    readonly time: number;
+    /** Turn this call belonged to, when the log states it. */
+    readonly turn?: number;
+    /** Step within the turn, when the log states it. */
+    readonly step?: number;
+    /** Durable session id the call belongs to. */
+    readonly sessionId: string;
+    /** Folded session title when one is known. */
+    readonly title?: string;
+    /** Session working directory when the header carries one. */
+    readonly cwd?: string;
+    /** `provider/model` exactly as the log recorded it. */
+    readonly route: string;
+    /** The model segment of {@link route}, in the spelling the panel shows. */
+    readonly model: string;
+    /** The provider segment of {@link route}; `unknown` when the route names none. */
+    readonly provider: string;
+    /** Exact provider-reported buckets for this call. */
+    readonly tokens: UsageTokens;
+    /** Milliseconds from the step's start to its first streamed token. */
+    readonly firstTokenMs?: number;
+    /** Milliseconds from the step's start to the settlement. */
+    readonly durationMs?: number;
+    /** Output tokens per second over the streamed generation window. */
+    readonly outputTps?: number;
+    /** Price of this call's tokens in the report's currency. */
+    readonly cost: number;
+    /** Whether a configured card matched the route. */
+    readonly priced: boolean;
+}
+/** One route the query's time window recorded, for the model filter. */
+export interface UsageCallFacet {
+    /** `provider/model`, exactly as the samples spelled it. */
+    readonly route: string;
+    /** The model segment, used to group routes into one model option. */
+    readonly model: string;
+    /** The provider segment, shown beside the model. */
+    readonly provider: string;
+    /** Calls billed on this route in the window. */
+    readonly calls: number;
+    /** Tokens this route carried in the window. */
+    readonly tokens: number;
+    /** Money this route cost in the window. */
+    readonly cost: number;
+}
+/** Which column a call-log query orders by. */
+export type UsageCallSort = 'time' | 'cost' | 'tokens' | 'output';
+/** One call-log query. Every field is optional; the defaults are the newest page. */
+export interface UsageCallsQuery {
+    /** Inclusive lower bound on a call's settlement time, in Unix epoch milliseconds. */
+    readonly from?: number;
+    /** Inclusive upper bound on a call's settlement time, in Unix epoch milliseconds. */
+    readonly to?: number;
+    /** Exact `provider/model` route. */
+    readonly route?: string;
+    /** Model identity: every route whose model shares this spelling's model key. */
+    readonly model?: string;
+    /** Exact durable session id. */
+    readonly session?: string;
+    /** Case-insensitive substring over session title, directory, id and route. */
+    readonly q?: string;
+    readonly sort?: UsageCallSort;
+    readonly dir?: 'asc' | 'desc';
+    /** Rows to skip. Defaults to 0. */
+    readonly offset?: number;
+    /** Rows to answer with. Defaults to 50, capped at 200. */
+    readonly limit?: number;
+}
+/**
+ * One page of the call log.
+ *
+ * `totals` covers every matching call rather than the page, so a reader who has
+ * filtered to one model still reads that model's whole cost while looking at
+ * fifty rows of it.
+ */
+export interface UsageCallsReport {
+    readonly generatedAt: number;
+    readonly currency: string;
+    readonly rows: readonly UsageCallRow[];
+    /** Matching calls in the window, before pagination. */
+    readonly total: number;
+    /** The offset this page was cut at, after clamping. */
+    readonly offset: number;
+    /** The page size this page was cut with, after clamping. */
+    readonly limit: number;
+    /** Totals over every matching call, not just this page. */
+    readonly totals: UsageCosted;
+    /** Routes in the time window, before the route/model filter, so the filter does not narrow itself. */
+    readonly routes: readonly UsageCallFacet[];
+    /** Distinct sessions among the matching calls. */
+    readonly sessions: number;
+    /** Distinct working directories among the matching calls. */
+    readonly projects: number;
+    /** Sessions the query's time window was folded from. */
+    readonly scannedSessions: number;
+    /** Sessions that could not be read. */
+    readonly unreadableSessions: number;
+    /** Whether the answer came from the Host's fold cache rather than a fresh read. */
+    readonly cached: boolean;
+}
+/**
  * One model's prices, in currency units per one million tokens.
  *
  * A card belongs to a model rather than to a route: one model is sold through
