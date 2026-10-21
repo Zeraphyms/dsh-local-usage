@@ -37,14 +37,7 @@ import { PanelSkeleton, SummarySkeleton } from './PanelSkeleton.tsx'
 import { PanelBoundary } from './PanelBoundary.tsx'
 import { RangeControls } from './RangeControls.tsx'
 import { SummaryStrip } from './SummaryStrip.tsx'
-import {
-  summaryFailed,
-  summaryIdle,
-  summarySettled,
-  summarySlow,
-  summaryStarted,
-} from './summary-state.ts'
-import type { SummaryState } from './summary-state.ts'
+import { useUsageReports } from './useUsageReports.ts'
 import { CallsPage } from './CallsPage.tsx'
 import { PricingPage } from './PricingPage.tsx'
 import { StatsTables } from './StatsTables.tsx'
@@ -57,15 +50,6 @@ import { css } from './classes.ts'
 
 /** Weeks the calendar spans: one rolling year of columns ending with this week. */
 const WINDOW_WEEKS = 52
-/**
- * How long a range fold may run before the strip says it is still going.
- *
- * A re-price folds samples already in hand and normally lands inside a frame or
- * two. Dimming the figures for that long would be a flicker rather than a signal,
- * so the admission waits for a wait worth admitting to.
- */
-const STALE_VISIBLE_MS = 180
-
 /** Registration-side face the panel reads its data through. */
 export interface UsagePanelInjected {
   /** Key this panel occupies in the main column, matching the sidebar entry. */
@@ -123,26 +107,6 @@ export type UsagePanelProps =
   PropsRuntime<'main'>
   & PropsLocale<'usage'>
   & InjectFace<UsagePanelInjected>
-
-/**
- * One report fetch's state.
- *
- * The calendar's window and the selected range are two independent reads that
- * happen to share a window, so they keep two of these: a range change then
- * re-prices only the range, while the year already on screen stays where it is.
- */
-type ReportState =
-  | { readonly status: 'idle' }
-  | { readonly status: 'loading' }
-  | { readonly status: 'error' }
-  | { readonly status: 'ready'; readonly report: UsageInsightsReport }
-
-/** The day page's own fold, kept apart from the calendar's so a slow one never blanks the other. */
-type DayState =
-  | { readonly status: 'idle' }
-  | { readonly status: 'loading' }
-  | { readonly status: 'error' }
-  | { readonly status: 'ready'; readonly report: UsageInsightsReport }
 
 /**
  * One report with every figure at zero.
@@ -223,39 +187,13 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // The hand-picked range: kept while another range is selected, so the custom
   // chip comes back to the dates the reader last set rather than to nothing.
   const [customRange, setCustomRange] = useState<CustomRange | undefined>(undefined)
-  const [request, setRequest] = useState(0)
-  // A recount is an event, not a mode: the counter says one refresh is owed,
-  // and the ref records the one already spent so a later re-price or a return
-  // to the panel does not reread every log again.
-  const [refreshNonce, setRefreshNonce] = useState(0)
-  const lastRefresh = useRef(0)
-  // Two reads, two states. The calendar's window is the expensive one — the first
-  // request after a Host restart is what reads every log — and a range change
-  // must not pay for it a second time.
-  const [gridState, setGridState] = useState<ReportState>({ status: 'idle' })
-  // The range's figures, which outlive the fold that replaces them: see
-  // `summary-state.ts` for why the strip is never unmounted to show a wait.
-  const [summaryState, setSummaryState] = useState<SummaryState>({ status: 'idle' })
-  // Retrying the range must not read the year again, so it has its own counter.
-  const [summaryRequest, setSummaryRequest] = useState(0)
-  // The day page: which day is open, that day's own fold, and a retry counter.
+  // The day page, the prices page and the call log are the panel's other pages.
   const [selectedDay, setSelectedDay] = useState<string | undefined>(undefined)
-  // The prices live on a page rather than in a hover panel: the reader comes
-  // here to type, and a panel that closes on pointer-leave cannot be typed into.
   const [showPricing, setShowPricing] = useState(false)
-  // The call log is a page too, and the window it opens on is optional: a day
-  // page sends its own day, the header sends none and the page falls back to its
-  // default week.
   const [showCalls, setShowCalls] = useState(false)
   const [callsRange, setCallsRange] = useState<{ readonly from: number; readonly to: number } | undefined>(undefined)
-  const [dayState, setDayState] = useState<DayState>({ status: 'idle' })
-  const [dayRequest, setDayRequest] = useState(0)
-  // Bumped after a rate write, so every view re-prices against the new table
-  // without discarding the Host's fold cache: the samples did not change.
+  // Bumped after a rate write: every view re-prices without discarding folds.
   const [pricingRevision, setPricingRevision] = useState(0)
-  // What the Host says the read is doing, while it is doing it. Only the year's
-  // own read reports: a re-price is over before a poll could describe it.
-  const [progress, setProgress] = useState<UsageInsightsProgress | undefined>(undefined)
   // Whether the summary strip still owes the reader its entrance. Cleared when
   // the figures land, so a range change afterwards swaps them without replaying
   // the count-up over numbers the reader is already comparing.
@@ -291,6 +229,20 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   const windowFromDay = dayKey(gridFrom)
   const windowToDay = dayKey(gridTo)
 
+  const reports = useUsageReports({
+    active,
+    report,
+    gridFrom,
+    gridTo,
+    rangeFrom,
+    rangeTo,
+    rangeIsWindow,
+    rangeKey,
+    selectedDay,
+    pricingRevision,
+  })
+  const { gridState, summaryState, dayState, progress } = reports
+
   // What the figure may draw. Only a report folded for the range on the selector:
   // during a switch the previous range's series was being re-bucketed under the
   // new range's rule — a single day's rows read as a year of months, one bucket
@@ -299,6 +251,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   const waveSettled = summaryState.status === 'ready' && summaryState.rangeId === rangeKey
   // Held long enough to be a state rather than a flash.
   const waveLoading = useMinimumDwell(!waveSettled, 460)
+
 
   /** Move the date fields of the custom range, clamped to the calendar's window. */
   function setCustomDay(which: 'from' | 'to', value: string): void {
@@ -321,88 +274,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     }
     setRangeId(id)
   }
-
-  // The calendar's window. This is the request that reads the logs, so it is the
-  // only one that follows the window and the refresh counter — not the range.
-  useEffect(() => {
-    // A retained-but-hidden panel must not read logs nobody is looking at.
-    if (!active) return
-    let current = true
-    setGridState({ status: 'loading' })
-    // One click, one bypass: compared against what this effect already spent,
-    // so a later range change, rate write or reactivation does not ask the Host
-    // to discard its folds again.
-    const refresh = refreshNonce > lastRefresh.current
-    lastRefresh.current = refreshNonce
-    // The window read is the one that may have to open every log, so it is the
-    // one that reports what it is doing.
-    void report({
-      refresh,
-      from: gridFrom,
-      to: gridTo,
-      onProgress: (value) => { if (current) setProgress(value) },
-    }).then(
-      value => { if (current) setGridState({ status: 'ready', report: value }) },
-      () => { if (current) setGridState({ status: 'error' }) },
-    )
-    return () => { current = false }
-  }, [active, report, request, refreshNonce, pricingRevision, gridFrom, gridTo])
-
-  // The selected range, folded over the same samples. It waits for the window to
-  // settle rather than racing it: two requests in flight together would each see
-  // an empty Host cache and each read every log, which is the cost this split
-  // exists to avoid. Once the window has been read the range is a re-price.
-  useEffect(() => {
-    if (!active) {
-      setSummaryState(previous => (previous.status === 'idle' ? previous : summaryIdle()))
-      return
-    }
-    if (gridState.status === 'idle' || gridState.status === 'loading') return
-    // A range that is the whole window needs no second read: it is already here.
-    if (rangeIsWindow && gridState.status === 'ready') {
-      setSummaryState(summarySettled(gridState.report, rangeKey))
-      return
-    }
-    let current = true
-    // The figures already on screen stay through the fold. They keep naming the
-    // range they were folded for, which is what makes them safe to leave up.
-    setSummaryState(summaryStarted)
-    const slow = setTimeout(() => { if (current) setSummaryState(summarySlow) }, STALE_VISIBLE_MS)
-    // Compared, because the detail view reads the window before this one; the
-    // front page ignores it, and the fold it costs is a re-price of samples
-    // already in hand.
-    void report({ from: rangeFrom, to: rangeTo, compare: true }).then(
-      value => { if (current) setSummaryState(summarySettled(value, rangeKey)) },
-      () => { if (current) setSummaryState(summaryFailed()) },
-    )
-    return () => { current = false; clearTimeout(slow) }
-  }, [active, report, rangeFrom, rangeTo, rangeIsWindow, summaryRequest, pricingRevision, gridState, rangeKey])
-
-  // The day page's own fold. Cheap by construction: the samples behind it are
-  // already in the Host's memory, so narrowing the window to one day re-prices
-  // them instead of walking the logs again.
-  useEffect(() => {
-    // Closing the page — or sitting on another panel — must not leave a stale
-    // fold behind for the next open to render for a moment.
-    if (!active || selectedDay === undefined) {
-      setDayState(previous => (previous.status === 'idle' ? previous : { status: 'idle' }))
-      return
-    }
-    const start = dayTime(selectedDay)
-    // Unreachable through the calendar, whose keys are always well formed; a
-    // key with no day behind it is reported rather than guessed at.
-    if (start === undefined) {
-      setDayState({ status: 'error' })
-      return
-    }
-    let current = true
-    setDayState({ status: 'loading' })
-    void report({ from: start, to: nextDayStart(start) - 1 }).then(
-      value => { if (current) setDayState({ status: 'ready', report: value }) },
-      () => { if (current) setDayState({ status: 'error' }) },
-    )
-    return () => { current = false }
-  }, [active, dayRequest, report, pricingRevision, selectedDay])
 
   // Read per render, never memoized: the locale id is an input to every figure
   // below, and the panel re-renders on a locale switch because its dictionary
@@ -497,7 +368,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             formatPercent={percent}
             formatDay={dateText}
             weekdayOf={weekdayOf}
-            onRetry={() => { setDayRequest(value => value + 1) }}
+            onRetry={reports.retryDay}
             // Leaving remembers the cell, so the calendar can hand focus back to
             // the day the reader opened rather than dropping them at the top.
             onBack={() => {
@@ -569,7 +440,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     {t('pricingTitle')}
                   </button>
                   {/* Recount: discard the Host's folds and read every log again. */}
-                  <Button variant="outline" size="sm" onClick={() => { setRefreshNonce(value => value + 1) }}>
+                  <Button variant="outline" size="sm" onClick={reports.recount}>
                     {t('refresh')}
                   </Button>
                 </div>
@@ -579,7 +450,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             {gridState.status === 'error' ? (
               <div className={css.failure}>
                 <p role="alert">{t('error')}</p>
-                <Button variant="outline" size="sm" onClick={() => { setRequest(value => value + 1) }}>
+                <Button variant="outline" size="sm" onClick={reports.retryGrid}>
                   {t('retry')}
                 </Button>
               </div>
@@ -632,7 +503,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => { setSummaryRequest(value => value + 1) }}
+                          onClick={reports.retrySummary}
                         >
                           {t('retry')}
                         </Button>
