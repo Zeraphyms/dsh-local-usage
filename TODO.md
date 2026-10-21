@@ -11,7 +11,7 @@
 ## 本轮复核（2026-10-21）
 
 - 已逐项对照当前源码与测试复核。BUG-01～11 均不是过期条目；其中 BUG-01～08、BUG-10、BUG-11 已在本分支修复并补回归测试，BUG-09 的日期工具与日边界已改（测试已在 Asia/Shanghai、UTC、America/New_York 三时区通过；浏览器级验证留给 TEST-02/03）。
-- 已完成的修复见各条目下的「本轮结果」；REF-01/03/06、DOC-01/02、ENG-01/02/04、PERF-01 已完成；REF-02/04/05 与 TEST-02/03 已推进但仍有剩余子项。
+- 已完成的修复见各条目下的「本轮结果」；REF-01～06、DOC-01/02、ENG-01/02/04、PERF-01 已完成；仅 TEST-02/03 仍有少量浏览器级/往返交互子项。
 - 验证：`pnpm typecheck`、`pnpm test`（297 个测试）、`pnpm build` 通过；调用明细原有功能保持。
 
 ## 推荐执行顺序
@@ -194,7 +194,9 @@
 
 ### REF-02：拆开 UsagePanel 的视图、范围逻辑和请求编排
 
-- [ ] 按以下顺序提取当前约 900 行的面板。
+- [x] 按以下顺序提取当前约 900 行的面板。
+
+> 本轮结果：已提取 `range.ts`、`SummaryStrip`、`RangeControls`、`PanelBoundary`、`useUsageReports.ts`，并用 `PanelPage` 联合类型收敛 calendar/day/pricing/calls 四个页面；`UsagePanel` 现在主要表达页面组合与导航。
 
 > 本轮推进：已提取 `range.ts`、`SummaryStrip`、`RangeControls`、`PanelBoundary`；`useUsageReports` 与页面联合类型仍待续。
 
@@ -221,7 +223,9 @@
 
 ### REF-04：分离日历计算、交互和悬浮卡
 
-- [ ] 扩展现有 `heatmap-grid.ts` / `heatmap-measure.ts`，承接纯网格生成与色阶计算；在确有独立职责时提取悬浮卡或交互逻辑。
+- [x] 扩展现有 `heatmap-grid.ts` / `heatmap-measure.ts`，承接纯网格生成与色阶计算；在确有独立职责时提取悬浮卡或交互逻辑。
+
+> 本轮结果：已提取 `heatmap-shade.ts` 与 `CalendarTooltip.tsx`；网格计算、着色、悬浮卡与交互状态分属独立模块，现有键盘/返回焦点测试通过。
 
 > 本轮推进：已提取 `heatmap-shade.ts`（token 汇总、分位数阈值、着色等级）并补测试；悬浮卡/交互仍留在 CalendarHeatmap。
 
@@ -233,7 +237,9 @@
 
 ### REF-05：分离费率编辑状态与表格渲染
 
-- [ ] 在 BUG-04、BUG-06 修复后，提取编辑状态管理与 `RateGroup`，让 `RateEditor` 主要负责表格组合。
+- [x] 在 BUG-04、BUG-06 修复后，提取编辑状态管理与 `RateGroup`，让 `RateEditor` 主要负责表格组合。
+
+> 本轮结果：已提取 `useRateEditor.ts` 与 `RateGroup.tsx`/`rate-row.ts`；`RateEditor` 只保留表格组合，编辑状态、当前模型校验、保存/丢弃/焦点恢复在 hook 中。
 
 > 本轮推进：已拆分 `RateRow`、`RateGroup`、`FIELD_KEYS` 到独立模块；编辑状态 hook 仍待提取。
 
