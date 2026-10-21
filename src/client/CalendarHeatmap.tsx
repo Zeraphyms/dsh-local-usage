@@ -33,7 +33,6 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { createPortal } from 'react-dom'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageDayRow } from '../types.ts'
 import { WEEKDAY_KEYS, addDays, dayDiff, dayKey, dayTime, heatmapColumns, midnight, monthMarkers } from './heatmap-grid.ts'
@@ -41,6 +40,8 @@ import { CELL_GAP, LABEL_WIDTH, useResponsiveGrid } from './heatmap-measure.ts'
 import { shadeLevel, shadeLevels, tokensOf } from './heatmap-shade.ts'
 import type { ShadeLevels } from './heatmap-shade.ts'
 import { css } from './classes.ts'
+import { CalendarTooltip } from './CalendarTooltip.tsx'
+import type { Hover } from './CalendarTooltip.tsx'
 
 const WEEKDAY_ROWS = 7
 /** Tooltip clamp so a card on an edge column stays on screen. */
@@ -53,17 +54,6 @@ const WEEKDAY_SHORT_KEYS = ['wdShort.0', 'wdShort.1', 'wdShort.2', 'wdShort.3', 
 
 /** One day of the grid: the report row, or `undefined` for a day with no usage. */
 type HeatCell = { readonly day: string; readonly row: UsageDayRow | undefined }
-
-/** The hovered cell and where its card is pinned. */
-interface Hover {
-  readonly key: string
-  readonly weekday: number
-  readonly row: UsageDayRow | undefined
-  readonly level: number
-  readonly x: number
-  readonly y: number
-  readonly placement: 'above' | 'below'
-}
 
 /** Everything the calendar renders, resolved by the panel that owns the data. */
 export interface CalendarHeatmapProps {
@@ -489,55 +479,15 @@ export function CalendarHeatmap({
           </span>
         )}
       </div>
-      {hover === undefined ? null : createPortal(
-        // Portalled to the document: any ancestor with a filter or transform
-        // would otherwise become the containing block for this fixed card and
-        // offset it by that ancestor's origin.
-        <div
-          className={css.tooltip}
-          role="tooltip"
-          data-placement={hover.placement}
-          style={{ left: hover.x, top: hover.placement === 'above' ? hover.y : hover.y + cellSize + 8 }}
-        >
-          <div className={css.tooltipHead}>
-            <span className={css.tooltipDate}>{formatDay(hover.key)}</span>
-            <span className={css.tooltipWeekday}>{t(WEEKDAY_KEYS[hover.weekday] ?? 'wd.0')}</span>
-          </div>
-          {hover.row === undefined ? (
-            <p className={css.tooltipEmpty}>{t('noUsageDay')}</p>
-          ) : (
-            <>
-              <div className={css.tooltipHero}>
-                <span className={css.tooltipDot} data-level={hover.level} aria-hidden="true" />
-                <span className={css.tooltipHeroLabel}>{t('cost')}</span>
-                <span className={css.tooltipHeroValue}>{formatCost(hover.row.cost)}</span>
-              </div>
-              <dl className={css.tooltipRows}>
-                <div>
-                  <dt>{t('totalTokens')}</dt>
-                  <dd>{formatInteger(tokensOf(hover.row))}</dd>
-                </div>
-                <div>
-                  <dt>{t('inputTokens')}</dt>
-                  <dd>{formatInteger(hover.row.uncachedInputTokens)}</dd>
-                </div>
-                <div>
-                  <dt>{t('outputTokens')}</dt>
-                  <dd>{formatInteger(hover.row.outputTokens)}</dd>
-                </div>
-                <div>
-                  <dt>{t('cacheRead')}</dt>
-                  <dd>{formatInteger(hover.row.cacheReadTokens)}</dd>
-                </div>
-                <div>
-                  <dt>{t('calls')}</dt>
-                  <dd>{formatInteger(hover.row.calls)}</dd>
-                </div>
-              </dl>
-            </>
-          )}
-        </div>,
-        document.body,
+      {hover === undefined ? null : (
+        <CalendarTooltip
+          hover={hover}
+          cellSize={cellSize}
+          t={t}
+          formatCost={formatCost}
+          formatInteger={formatInteger}
+          formatDay={formatDay}
+        />
       )}
     </figure>
   )

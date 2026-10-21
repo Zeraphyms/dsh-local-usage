@@ -102,6 +102,13 @@ export interface UsagePanelReportRequest {
   readonly onProgress?: (progress: UsageInsightsProgress) => void
 }
 
+/** The panel's one visible page at a time. */
+type PanelPage =
+  | { readonly kind: 'calendar' }
+  | { readonly kind: 'day'; readonly day: string }
+  | { readonly kind: 'pricing' }
+  | { readonly kind: 'calls'; readonly range?: { readonly from: number; readonly to: number }; readonly returnDay?: string }
+
 /** Full component props assembled by the main slot renderer. */
 export type UsagePanelProps =
   PropsRuntime<'main'>
@@ -188,10 +195,11 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // chip comes back to the dates the reader last set rather than to nothing.
   const [customRange, setCustomRange] = useState<CustomRange | undefined>(undefined)
   // The day page, the prices page and the call log are the panel's other pages.
-  const [selectedDay, setSelectedDay] = useState<string | undefined>(undefined)
-  const [showPricing, setShowPricing] = useState(false)
-  const [showCalls, setShowCalls] = useState(false)
-  const [callsRange, setCallsRange] = useState<{ readonly from: number; readonly to: number } | undefined>(undefined)
+  const [page, setPage] = useState<PanelPage>({ kind: 'calendar' })
+  const selectedDay = page.kind === 'day' ? page.day : undefined
+  const showPricing = page.kind === 'pricing'
+  const showCalls = page.kind === 'calls'
+  const callsRange = page.kind === 'calls' ? page.range : undefined
   // Bumped after a rate write: every view re-prices without discarding folds.
   const [pricingRevision, setPricingRevision] = useState(0)
   // Whether the summary strip still owes the reader its entrance. Cleared when
@@ -351,8 +359,9 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             {...callsRange === undefined ? {} : { initialFrom: callsRange.from, initialTo: callsRange.to }}
             {...callsRange === undefined ? {} : { backLabel: t('backToDay') }}
             onBack={() => {
-              setShowCalls(false)
-              setCallsRange(undefined)
+              setPage(page.kind === 'calls' && page.returnDay !== undefined
+                ? { kind: 'day', day: page.returnDay }
+                : { kind: 'calendar' })
             }}
           />
         ) : selectedDay !== undefined ? (
@@ -373,15 +382,18 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             // the day the reader opened rather than dropping them at the top.
             onBack={() => {
               setReturnDay(selectedDay)
-              setSelectedDay(undefined)
+              setPage({ kind: 'calendar' })
             }}
             // The day's own calls, on the page that exists to explain a window:
             // the query opens on this day rather than on the page's default week.
             onOpenCalls={(day) => {
               const start = dayTime(day)
               if (start === undefined) return
-              setCallsRange({ from: start, to: nextDayStart(start) - 1 })
-              setShowCalls(true)
+              setPage({
+                kind: 'calls',
+                range: { from: start, to: nextDayStart(start) - 1 },
+                returnDay: day,
+              })
             }}
           />
         ) : showPricing && yearReport !== undefined ? (
@@ -392,7 +404,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             t={t}
             formatCost={money}
             onSaveRates={saveRateTable}
-            onBack={() => { setShowPricing(false) }}
+            onBack={() => { setPage({ kind: 'calendar' }) }}
           />
         ) : (
           <>
@@ -421,8 +433,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     className={css.breakout}
                     disabled={yearReport === undefined}
                     onClick={() => {
-                      setCallsRange(undefined)
-                      setShowCalls(true)
+                      setPage({ kind: 'calls' })
                     }}
                   >
                     {t('callsTitle')}
@@ -435,7 +446,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     type="button"
                     className={css.breakout}
                     disabled={yearReport === undefined}
-                    onClick={() => { setShowPricing(true) }}
+                    onClick={() => { setPage({ kind: 'pricing' }) }}
                   >
                     {t('pricingTitle')}
                   </button>
@@ -526,7 +537,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   formatCost={money}
                   formatInteger={integer}
                   formatDay={dateText}
-                  onSelectDay={setSelectedDay}
+                  onSelectDay={(day) => { setPage({ kind: 'day', day }) }}
                   {...returnDay === undefined ? {} : { focusDayOnMount: returnDay }}
                 />
 

@@ -21,24 +21,15 @@
  * @module dsh-local-usage/client/RateEditor
  */
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsagePricingUpdate } from '../types.ts'
-import {
-  RATE_FIELDS,
-  draftsFrom,
-  pendingUpdate,
-  type ModelDrafts,
-  type PriceSet,
-  type RateField,
-} from './rate-draft.ts'
+import { RATE_FIELDS } from './rate-draft.ts'
 import { css } from './classes.ts'
-import { RateGroup, rateSignature } from './RateGroup.tsx'
+import { RateGroup } from './RateGroup.tsx'
+import { useRateEditor } from './useRateEditor.ts'
 import { FIELD_KEYS } from './rate-row.ts'
 import type { RateRow } from './rate-row.ts'
-
-/** How long the saved confirmation stays up. */
-const CONFIRMATION_MS = 2200
 
 /** Props for the price sheet. */
 export interface RateEditorProps {
@@ -61,117 +52,11 @@ export interface RateEditorProps {
  */
 export function RateEditor({ rows, currency, formatCost, t, onSave }: RateEditorProps): ReactNode {
   const models = rows.map(row => row.card)
-  const [drafts, setDrafts] = useState<ModelDrafts>(() => draftsFrom(models))
-  /** The model whose prices are open for editing, if any. */
-  const [editing, setEditing] = useState<string | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [failure, setFailure] = useState<string | undefined>(undefined)
-  /** The sheet's own element, so focus can be taken back after a row closes. */
   const table = useRef<HTMLTableElement>(null)
-  /** The model whose fields were last open, to return the caret to its word. */
-  const lastOpen = useRef<string | undefined>(undefined)
-
-  // A new report re-seeds the fields: after a save the values in effect are the
-  // ones just written, and a configuration change brings new cards. The rows are
-  // rebuilt on every render of the page, so the identity to watch is the price
-  // configuration they carry — not the array around it, which would re-seed the
-  // drafts on every keystroke's parent render and drop what was being typed.
-  const signature = models
-    .map(card => `${card.match}\u0000${String(card.peakEnabled)}\u0000${rateSignature(card.offPeak)}\u0000${rateSignature(card.peak)}`)
-    .join('\u0001')
-  useEffect(() => { setDrafts(draftsFrom(models)) }, [signature])
-
-  useEffect(() => {
-    if (!saved) return
-    const timer = setTimeout(() => { setSaved(false) }, CONFIRMATION_MS)
-    return () => { clearTimeout(timer) }
-  }, [saved])
-
-  // Opening a row unmounts the word that was pressed, and closing it unmounts
-  // the fields: without this the caret falls to the document and a keyboard
-  // reader loses their place in the sheet.
-  useEffect(() => {
-    const previous = lastOpen.current
-    lastOpen.current = editing
-    const scope = table.current
-    if (previous === editing || scope === null) return
-    if (editing !== undefined) {
-      scope.querySelector<HTMLInputElement>(`[data-rate-field="${CSS.escape(editing)}"]`)?.focus()
-    } else if (previous !== undefined) {
-      scope.querySelector<HTMLButtonElement>(`[data-rate-edit="${CSS.escape(previous)}"]`)?.focus()
-    }
-  }, [editing])
-
-  const pending = pendingUpdate(drafts, models, editing)
-
-  /** Write one field of one model as typed. */
-  function write(model: string, set: PriceSet, field: RateField, value: string): void {
-    setSaved(false)
-    setFailure(undefined)
-    setDrafts(current => {
-      const draft = current[model]
-      if (draft === undefined) return current
-      return { ...current, [model]: { ...draft, [set]: { ...draft[set], [field]: value } } }
-    })
-  }
-
-  /** Turn one model's peak pricing on or off. */
-  function switchPeak(model: string, peakEnabled: boolean): void {
-    setSaved(false)
-    setFailure(undefined)
-    setDrafts(current => {
-      const draft = current[model]
-      return draft === undefined ? current : { ...current, [model]: { ...draft, peakEnabled } }
-    })
-  }
-
-  /** Open one card, discarding the previous card's unsaved draft. */
-  function openEditor(model: string): void {
-    if (editing !== undefined && editing !== model) {
-      const previous = models.find(candidate => candidate.match === editing)
-      const reset = previous === undefined ? undefined : draftsFrom([previous])[editing]
-      if (reset !== undefined) {
-        setDrafts(current => ({ ...current, [editing]: reset }))
-      }
-    }
-    setSaved(false)
-    setFailure(undefined)
-    setEditing(model)
-  }
-
-  /** Throw the open model's edits away and close it. */
-  function discard(): void {
-    if (editing !== undefined) {
-      const card = models.find(candidate => candidate.match === editing)
-      const reset = card === undefined ? undefined : draftsFrom([card])[editing]
-      if (reset !== undefined) {
-        setDrafts(current => ({ ...current, [editing]: reset }))
-      }
-    }
-    setFailure(undefined)
-    setEditing(undefined)
-  }
-
-  /** Save the open model, or close it when it was left untouched. */
-  async function commit(): Promise<void> {
-    if (pending.status === 'empty') {
-      setEditing(undefined)
-      return
-    }
-    if (pending.status !== 'ready') return
-    setBusy(true)
-    setFailure(undefined)
-    try {
-      await onSave(pending.update)
-      setSaved(true)
-      setEditing(undefined)
-    } catch (error: unknown) {
-      setFailure(error instanceof Error ? error.message : String(error))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const {
+    drafts, editing, busy, saved, failure, pending,
+    write, switchPeak, openEditor, discard, commit,
+  } = useRateEditor({ models, onSave, table })
 
   // Stated rather than omitted: an empty table reads as an editor that was
   // removed, not as a window with nothing to price.
