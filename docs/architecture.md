@@ -59,4 +59,6 @@ UsagePanel / DayDetail / PricingPage / CallsPage
 
 `pnpm run build` starts by removing `lib/` (`scripts/clean-lib.mjs`), then bundles both halves with `tsdown` and emits declarations with the two `tsconfig.*.build.json` programs. `lib/` is committed because the package is distributed from git; a source change must be followed by a build so the shipped JS and declarations stay in step.
 
+The host baseline is the checkout `pnpm link:host` prints (name@version plus git commit); CI takes the same commit as its `dsh_ref` input, so a verification can be repeated against an exact revision.
+
 `tsconfig.host.json` includes `src/*.ts` and `src/host/**/*.ts`; `tsconfig.client.json` includes `src/client/**/*`. Keep the two programs separate: the halves merge different services under the same Cordis `Context` keys.
