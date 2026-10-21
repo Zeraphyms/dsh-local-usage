@@ -278,7 +278,7 @@ pnpm run link:host -- --src /path/to/deepseek-harness
 
 ### 开发者备注
 
-模块边界、读取/计价/时区契约与产物构建见 [docs/architecture.md](docs/architecture.md)；调用明细的实测性能见 [docs/performance.md](docs/performance.md)。
+模块边界、读取/计价/时区契约与产物构建见 [docs/architecture.md](docs/architecture.md)；调用明细的实测性能见 [docs/performance.md](docs/performance.md)；布局/主题检查见 [docs/layout-check.md](docs/layout-check.md)。
 
 <details>
 <summary>面向维护者的工作上下文 —— 点击展开</summary>

@@ -280,7 +280,7 @@ There is deliberately **no `prepare` script**. `lib/` is committed, and a build 
 
 ### Dev Note
 
-Module boundaries, the read/pricing/timezone contracts and the artifact build are documented in [docs/architecture.md](docs/architecture.md); call-log measurements are in [docs/performance.md](docs/performance.md).
+Module boundaries, the read/pricing/timezone contracts and the artifact build are documented in [docs/architecture.md](docs/architecture.md); call-log measurements are in [docs/performance.md](docs/performance.md); the layout/theme pass is in [docs/layout-check.md](docs/layout-check.md).
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>
