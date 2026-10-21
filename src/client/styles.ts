@@ -90,7 +90,9 @@ export const styles = String.raw`
    * chips and the buttons move onto a second line as the panel narrows. */
   min-inline-size: 0;
   gap: 10px;
-  align-items: center;
+  /* Top-aligned, not centred: the range block can be two rows tall when a custom
+   * range is open, and a centred button row would float between its lines. */
+  align-items: flex-start;
 }
 
 /* The chips, and the two date fields a hand-picked range opens beneath them. */
