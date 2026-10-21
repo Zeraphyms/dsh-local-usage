@@ -198,7 +198,7 @@
 
 > 本轮结果：已提取 `range.ts`、`SummaryStrip`、`RangeControls`、`PanelBoundary`、`useUsageReports.ts`，并用 `PanelPage` 联合类型收敛 calendar/day/pricing/calls 四个页面；`UsagePanel` 现在主要表达页面组合与导航。
 
-> 本轮推进：已提取 `range.ts`、`SummaryStrip`、`RangeControls`、`PanelBoundary`；`useUsageReports` 与页面联合类型仍待续。
+
 
 | 顺序 | 候选模块 | 负责 |
 | --- | --- | --- |
@@ -227,7 +227,7 @@
 
 > 本轮结果：已提取 `heatmap-shade.ts` 与 `CalendarTooltip.tsx`；网格计算、着色、悬浮卡与交互状态分属独立模块，现有键盘/返回焦点测试通过。
 
-> 本轮推进：已提取 `heatmap-shade.ts`（token 汇总、分位数阈值、着色等级）并补测试；悬浮卡/交互仍留在 CalendarHeatmap。
+
 
 位置：[src/client/CalendarHeatmap.tsx](src/client/CalendarHeatmap.tsx)。
 
@@ -239,9 +239,9 @@
 
 - [x] 在 BUG-04、BUG-06 修复后，提取编辑状态管理与 `RateGroup`，让 `RateEditor` 主要负责表格组合。
 
-> 本轮结果：已提取 `useRateEditor.ts` 与 `RateGroup.tsx`/`rate-row.ts`；`RateEditor` 只保留表格组合，编辑状态、当前模型校验、保存/丢弃/焦点恢复在 hook 中。
+> 本轮结果：已提取 `useRateEditor.ts`、`RateGroup.tsx`、`rate-row.ts`；`RateEditor` 只保留表格组合，编辑状态/当前模型校验/保存丢弃/焦点恢复在 hook 中。
 
-> 本轮推进：已拆分 `RateRow`、`RateGroup`、`FIELD_KEYS` 到独立模块；编辑状态 hook 仍待提取。
+
 
 继续复用 `rate-draft.ts` 的解析和差异计算；纯金额格式化只在确有复用时合并到既有格式化模块。让草稿初始化、当前模型校验、保存状态和焦点恢复的依赖清楚可见。
 
@@ -273,9 +273,9 @@ Host 当前使用 `src/*.ts`，应将 `src/host/**/*.ts` 显式纳入 include，
 
 - [x] 为范围切换、编辑模型切行、保存失败、刷新后改价、当天与调用明细往返增加交互测试；覆盖子串匹配、fallback、同模型不同卡片的价格展示与局部编辑，核对页面与 Host 计价的一致性。
 
-> 本轮结果：已提取 `range.ts`、`SummaryStrip`、`RangeControls`、`PanelBoundary`、`useUsageReports.ts`，并用 `PanelPage` 联合类型收敛 calendar/day/pricing/calls 四个页面；`UsagePanel` 现在主要表达页面组合与导航。
+> 本轮结果：已加入 jsdom 交互测试：费率编辑只保存当前模型、面板 recount 不污染后续读取、范围切换、调用明细筛选/页大小、当天 → 调用明细 → 返回当天。
 
-> 本轮推进：已加入 jsdom 交互测试：费率编辑只保存当前模型、面板 recount 不污染后续读取、调用明细筛选/页大小走 Host 查询；范围切换与当天↔调用明细往返仍待补。
+
 
 保留已有 SSR 测试用于检查初始结构；交互测试使用可控网络响应制造乱序、失败和延迟。优先按用户行为断言，不只检查源码或 CSS 是否包含某个字符串。
 
@@ -283,11 +283,11 @@ Host 当前使用 `src/*.ts`，应将 `src/host/**/*.ts` 显式纳入 include，
 
 ### TEST-03：增加关键布局与样式解析检查
 
-- [x] 在样式拆分前检查完整 CSS 能被正确解析，再增加少量关键页面的浏览器验证。
-
-> 本轮结果：已提取 `heatmap-shade.ts` 与 `CalendarTooltip.tsx`；网格计算、着色、悬浮卡与交互状态分属独立模块，现有键盘/返回焦点测试通过。
+- [ ] 在样式拆分前检查完整 CSS 能被正确解析，再增加少量关键页面的浏览器验证。
 
 > 本轮推进：已加入组装样式表结构测试并修复尾部孤立声明；宽窄布局/主题的浏览器级检查仍待补。
+
+
 
 当前 `styles.ts` 尾部 reduced-motion 附近可见孤立的 `opacity: 1` 与可疑括号，需先解析定位，确认对后续规则的影响；TypeScript 构建成功无法证明字符串内 CSS 合法。
 
