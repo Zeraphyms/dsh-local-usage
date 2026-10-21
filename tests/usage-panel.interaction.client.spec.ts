@@ -12,11 +12,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { UsagePanel } from '../src/client/UsagePanel.tsx'
 import type { UsagePanelProps } from '../src/client/UsagePanel.tsx'
-import type { UsageInsightsReport } from '../src/types.ts'
+import type { UsageCallsReport, UsageDayRow, UsageInsightsReport } from '../src/types.ts'
 import { NO_RELIABILITY } from '../src/types.ts'
+import { dayKey } from '../src/client/heatmap-grid.ts'
 
 const t = ((key: string): string => key) as never
 
@@ -52,12 +53,84 @@ describe('UsagePanel interaction', () => {
     vi.stubGlobal('ResizeObserver', TestResizeObserver)
   })
   afterEach(() => {
+    cleanup()
     vi.unstubAllGlobals()
   })
 
+  it('asks for the newly selected range without recounting the corpus', async () => {
+    const requests: { refresh?: boolean; from: number; to: number; compare?: boolean }[] = []
+    const report = vi.fn(async (request: { refresh?: boolean; from: number; to: number; compare?: boolean }) => {
+      requests.push(request)
+      return emptyReport()
+    })
+    const props = {
+      panelId: 'usage',
+      locale: () => 'en',
+      report,
+      saveRates: () => Promise.resolve({ models: {} }),
+      t,
+      usePanelInfo: (select: (info: { activePanelId: string }) => unknown) => select({ activePanelId: 'usage' }),
+    } as unknown as UsagePanelProps
+
+    render(createElement(UsagePanel, props))
+    await waitFor(() => { expect(report).toHaveBeenCalled() })
+    const before = requests.length
+    fireEvent.click(screen.getByText('range7'))
+
+    await waitFor(() => {
+      // The range fold is the compare request; it must use the new window and
+      // must not be a recount.
+      expect(requests.slice(before).some(request => request.compare === true && request.refresh !== true)).toBe(true)
+    })
+  })
+
+  it('goes from a day to that day\'s call log and back to the day', async () => {
+    const today = dayKey(Date.now())
+    const dayRow: UsageDayRow = {
+      day: today, cost: 1, calls: 1, sessions: 1,
+      uncachedInputTokens: 10, outputTokens: 2, cacheReadTokens: 3, cacheWriteTokens: 0,
+    }
+    const report = vi.fn(async () => ({ ...emptyReport(), days: [dayRow] }))
+    const callsPage: UsageCallsReport = {
+      generatedAt: 1, currency: 'CNY', rows: [], total: 0, offset: 0, limit: 50,
+      totals: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0, calls: 0 },
+      routes: [], sessions: 0, projects: 0, scannedSessions: 0, unreadableSessions: 0, cached: true,
+    }
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(callsPage), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const props = {
+      panelId: 'usage',
+      locale: () => 'en',
+      report,
+      saveRates: () => Promise.resolve({ models: {} }),
+      t,
+      usePanelInfo: (select: (info: { activePanelId: string }) => unknown) => select({ activePanelId: 'usage' }),
+    } as unknown as UsagePanelProps
+    const view = render(createElement(UsagePanel, props))
+
+    await waitFor(() => {
+      expect(view.container.querySelector(`[data-day="${today}"]`)).not.toBeNull()
+    })
+    const cell = view.container.querySelector<HTMLButtonElement>(`[data-day="${today}"]`)
+    if (cell === null) throw new Error('calendar cell for today missing')
+    fireEvent.click(cell)
+    const openCalls = await screen.findByText('callsDayOpen')
+    fireEvent.click(openCalls)
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls as unknown as [URL][]
+      expect(calls.some(([url]) => String(url).includes('/api/dsh-local-usage/calls'))).toBe(true)
+    })
+    fireEvent.click(screen.getByText('backToDay'))
+    expect(await screen.findByText('daySubtitle')).toBeTruthy()
+  })
+
   it('refreshes once, and later range changes are ordinary reads', async () => {
-    const requests: { refresh?: boolean; from: number; to: number }[] = []
-    const report = vi.fn(async (request: { refresh?: boolean; from: number; to: number }) => {
+    const requests: { refresh?: boolean; from: number; to: number; compare?: boolean }[] = []
+    const report = vi.fn(async (request: { refresh?: boolean; from: number; to: number; compare?: boolean }) => {
       requests.push(request)
       return emptyReport()
     })
