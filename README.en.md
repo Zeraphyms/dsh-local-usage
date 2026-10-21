@@ -268,7 +268,8 @@ pnpm run link:host -- --src /path/to/deepseek-harness
 | `pnpm test` | the vitest suites of both halves |
 | `pnpm run typecheck` | typechecks the two halves as two programs |
 | `pnpm run build` | bundles `lib/*.js`, then emits `lib/types` |
-| `pnpm run check` | typecheck plus the full suite (the CI command) |
+| `pnpm run check` | typecheck, lint and the full suite (the CI command) |
+| `pnpm run lint` | oxlint, with warnings treated as failures |
 | `pnpm run check:build` | clean build, then require `lib/` to match the source |
 | `pnpm run check:css` | structural check of the assembled stylesheet |
 

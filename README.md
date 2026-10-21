@@ -266,7 +266,8 @@ pnpm run link:host -- --src /path/to/deepseek-harness
 | `pnpm test` | 运行两半的 vitest 套件 |
 | `pnpm run typecheck` | 以两个程序分别类型检查两半 |
 | `pnpm run build` | 打包 `lib/*.js`，并产出 `lib/types` |
-| `pnpm run check` | 类型检查 + 完整测试（CI 的同一条命令） |
+| `pnpm run check` | 类型检查 + lint + 完整测试（CI 的同一条命令） |
+| `pnpm run lint` | oxlint（警告即失败） |
 | `pnpm run check:build` | 干净构建后要求 `lib/` 与源码一致 |
 | `pnpm run check:css` | 组装后的样式表结构检查 |
 

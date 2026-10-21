@@ -62,9 +62,10 @@
     "watch": "tsdown --watch",
     "typecheck": "tsc -p tsconfig.host.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "test": "vitest run",
-    "check": "pnpm run typecheck && pnpm test",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm test",
     "check:build": "pnpm run build && git diff --exit-code -- lib",
-    "check:css": "vitest run tests/styles.client.spec.ts"
+    "check:css": "vitest run tests/styles.client.spec.ts",
+    "lint": "oxlint --deny-warnings src tests"
   },
   "peerDependencies": {
     "react": "^18.2.0",
@@ -77,6 +78,7 @@
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
     "jsdom": "^30.1.3",
+    "oxlint": "^1.89.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tsdown": "^0.22.2",
