@@ -49,13 +49,12 @@ import { CallsPage } from './CallsPage.tsx'
 import { PricingPage } from './PricingPage.tsx'
 import { StatsTables } from './StatsTables.tsx'
 import { WaveChart } from './WaveChart.tsx'
-import { dayKey, dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
+import { addDays, dayDiff, dayKey, dayTime, heatmapWindow, nextDayStart, weekdayKey } from './heatmap-grid.ts'
 import { tokensOf } from './tokens.ts'
 import { figureRoom, formatCost, formatDay, formatInteger, formatPercent, formatTokens } from './format.ts'
 import type { UsageInsightsLocaleKey } from './locales.ts'
 import { css } from './classes.ts'
 
-const MS_PER_DAY = 86_400_000
 /** Weeks the calendar spans: one rolling year of columns ending with this week. */
 const WINDOW_WEEKS = 52
 /**
@@ -101,7 +100,7 @@ function clampDay(day: string, from: string, to: string): string {
  */
 function waveRangeOf(rangeId: string, from: number, to: number): string {
   if (rangeId !== 'custom') return rangeId
-  const days = Math.round((to - from + 1) / MS_PER_DAY)
+  const days = dayDiff(from, to) + 1
   if (days <= 1) return 'day'
   if (days <= 45) return 'month'
   if (days <= 120) return 'quarter'
@@ -221,15 +220,15 @@ function startOfYear(time: number): number {
  */
 function rangeBounds(id: string, now: number, custom?: CustomRange): readonly [number, number] {
   const today = startOfDay(now)
-  const end = today + MS_PER_DAY - 1
+  const end = nextDayStart(today) - 1
   if (id === 'custom') {
     const from = custom === undefined ? today : dayTime(custom.from)
     const to = custom === undefined ? today : dayTime(custom.to)
-    if (from !== undefined && to !== undefined && to >= from) return [from, to + MS_PER_DAY - 1]
+    if (from !== undefined && to !== undefined && to >= from) return [from, nextDayStart(to) - 1]
     return [today, end]
   }
   if (id === 'day') return [today, end]
-  if (id === 'week') return [today - 6 * MS_PER_DAY, end]
+  if (id === 'week') return [addDays(today, -6), end]
   if (id === 'month') return [startOfMonth(now), end]
   if (id === 'quarter') return [startOfQuarter(now), end]
   return [startOfYear(now), end]
@@ -342,6 +341,11 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // chip comes back to the dates the reader last set rather than to nothing.
   const [customRange, setCustomRange] = useState<CustomRange | undefined>(undefined)
   const [request, setRequest] = useState(0)
+  // A recount is an event, not a mode: the counter says one refresh is owed,
+  // and the ref records the one already spent so a later re-price or a return
+  // to the panel does not reread every log again.
+  const [refreshNonce, setRefreshNonce] = useState(0)
+  const lastRefresh = useRef(0)
   // Two reads, two states. The calendar's window is the expensive one — the first
   // request after a Host restart is what reads every log — and a range change
   // must not pay for it a second time.
@@ -442,10 +446,15 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     if (!active) return
     let current = true
     setGridState({ status: 'loading' })
+    // One click, one bypass: compared against what this effect already spent,
+    // so a later range change, rate write or reactivation does not ask the Host
+    // to discard its folds again.
+    const refresh = refreshNonce > lastRefresh.current
+    lastRefresh.current = refreshNonce
     // The window read is the one that may have to open every log, so it is the
     // one that reports what it is doing.
     void report({
-      refresh: request > 0,
+      refresh,
       from: gridFrom,
       to: gridTo,
       onProgress: (value) => { if (current) setProgress(value) },
@@ -454,7 +463,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
       () => { if (current) setGridState({ status: 'error' }) },
     )
     return () => { current = false }
-  }, [active, report, request, pricingRevision, gridFrom, gridTo])
+  }, [active, report, request, refreshNonce, pricingRevision, gridFrom, gridTo])
 
   // The selected range, folded over the same samples. It waits for the window to
   // settle rather than racing it: two requests in flight together would each see
@@ -505,7 +514,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     }
     let current = true
     setDayState({ status: 'loading' })
-    void report({ from: start, to: start + MS_PER_DAY - 1 }).then(
+    void report({ from: start, to: nextDayStart(start) - 1 }).then(
       value => { if (current) setDayState({ status: 'ready', report: value }) },
       () => { if (current) setDayState({ status: 'error' }) },
     )
@@ -617,7 +626,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             onOpenCalls={(day) => {
               const start = dayTime(day)
               if (start === undefined) return
-              setCallsRange({ from: start, to: start + MS_PER_DAY - 1 })
+              setCallsRange({ from: start, to: nextDayStart(start) - 1 })
               setShowCalls(true)
             }}
           />
@@ -709,7 +718,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     {t('pricingTitle')}
                   </button>
                   {/* Recount: discard the Host's folds and read every log again. */}
-                  <Button variant="outline" size="sm" onClick={() => { setRequest(value => value + 1) }}>
+                  <Button variant="outline" size="sm" onClick={() => { setRefreshNonce(value => value + 1) }}>
                     {t('refresh')}
                   </Button>
                 </div>
@@ -808,6 +817,8 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     days: waveSettled ? summaryState.report.days : [],
                     slices: waveSettled ? summaryState.report.slices : [],
                     range: waveRange,
+                    from: dayKey(rangeFrom),
+                    to: dayKey(rangeTo),
                   }}
                   caption={rangeCaption}
                   loading={waveLoading}

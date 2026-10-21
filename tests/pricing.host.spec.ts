@@ -56,12 +56,23 @@ describe('parsePeakWindow', () => {
     expect(parsePeakWindow(' 14:00 - 18:30 ')).toEqual({ start: 840, end: 1110 })
   })
 
-  it('rejects malformed, empty, and inverted windows', () => {
+  it('rejects malformed and empty windows', () => {
     expect(parsePeakWindow('09:00')).toBeUndefined()
     expect(parsePeakWindow('noon')).toBeUndefined()
-    expect(parsePeakWindow('12:00-09:00')).toBeUndefined()
+    expect(parsePeakWindow('12:00-09:00')).toEqual({ start: 720, end: 540 })
     expect(parsePeakWindow('09:00-09:00')).toBeUndefined()
     expect(parsePeakWindow('25:00-26:00')).toBeUndefined()
+    expect(parsePeakWindow('09:90-12:00')).toBeUndefined()
+    expect(parsePeakWindow('09:00-12:60')).toBeUndefined()
+  })
+
+  it('accepts a midnight end but never a midnight start', () => {
+    expect(parsePeakWindow('09:00-24:00')).toEqual({ start: 540, end: 1440 })
+    expect(parsePeakWindow('24:00-24:30')).toBeUndefined()
+  })
+
+  it('keeps a window that crosses midnight as one window', () => {
+    expect(parsePeakWindow('22:00-02:00')).toEqual({ start: 1320, end: 120 })
   })
 })
 
@@ -88,6 +99,16 @@ describe('isPeakTime', () => {
     expect(isPeakTime(SUNDAY_PEAK, WINDOWS, false)).toBe(true)
   })
 
+  it('reads a window that crosses midnight on both sides of it', () => {
+    const overnight = [{ start: 22 * 60, end: 2 * 60 }]
+    // 23:00 and 01:00 Beijing on a Tuesday.
+    const late = Date.UTC(2026, 8, 21, 15, 0, 0)
+    const early = Date.UTC(2026, 8, 21, 17, 0, 0)
+    expect(isPeakTime(late, overnight, false)).toBe(true)
+    expect(isPeakTime(early, overnight, false)).toBe(true)
+    expect(isPeakTime(MONDAY_GAP, overnight, false)).toBe(false)
+  })
+
   it('is never peak without a window, even on a weekday', () => {
     expect(isPeakTime(MONDAY_PEAK, [], true)).toBe(false)
   })
@@ -108,6 +129,21 @@ describe('selectRate', () => {
       model: 'v4-pro',
       peakApplied: false,
     })
+  })
+
+  it('lets a per-route card outrank a model card that also claims the route', () => {
+    const scoped: ModelPrice = {
+      match: 'vendor/deepseek-v4.1-flash',
+      route: 'vendor/deepseek-v4.1-flash',
+      peakEnabled: false,
+      offPeak: { input: 9, cacheRead: 0.9, cacheWrite: 9, output: 99 },
+      peak: { input: 9, cacheRead: 0.9, cacheWrite: 9, output: 99 },
+    }
+
+    expect(selectRate([...CARDS, scoped], FALLBACK, 'vendor/deepseek-v4.1-flash', false).rate)
+      .toEqual(scoped.offPeak)
+    expect(selectRate([...CARDS, scoped], FALLBACK, 'vendor/deepseek-v4.1-flash', false).model)
+      .toBe('vendor/deepseek-v4.1-flash')
   })
 
   it('claims a vendor route by the model inside it', () => {

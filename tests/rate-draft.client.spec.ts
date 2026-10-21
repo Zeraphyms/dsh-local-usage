@@ -106,6 +106,29 @@ describe('pendingUpdate', () => {
     })
   })
 
+  it('writes only the model the open editor names', () => {
+    const drafts = edit('flash', 'offPeak', 'output', '5')
+    ;(drafts['strict-model'] as ModelDraft).offPeak.output = '99'
+
+    const result = pendingUpdate(drafts, CARDS, 'strict-model')
+
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(Object.keys(result.update.models)).toEqual(['strict-model'])
+    expect(result.update.models['strict-model']).toMatchObject({ offPeak: { output: 99 } })
+  })
+
+  it('does not let another model draft block the open one', () => {
+    const drafts = edit('strict-model', 'offPeak', 'output', '7')
+    ;(drafts.flash as ModelDraft).offPeak.input = 'not a price'
+
+    const result = pendingUpdate(drafts, CARDS, 'strict-model')
+
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(Object.keys(result.update.models)).toEqual(['strict-model'])
+  })
+
   it('does not validate the peak set of a model that does not price peak', () => {
     // The switch is off, so those four fields are not read at all — a stray
     // character there must not block a save that has nothing to do with them.

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addDays,
+  dayDiff,
   dayKey,
   dayTime,
   heatmapColumns,
   heatmapWindow,
   midnight,
   monthMarkers,
+  nextDayStart,
   weekdayKey,
 } from '../src/client/heatmap-grid.ts'
 
@@ -40,6 +43,25 @@ describe('heatmapWindow', () => {
     const [from, to] = heatmapWindow(now, 52)
     expect(dayKey(to)).toBe('2026-03-01')
     expect(heatmapColumns(from, to)).toBe(52)
+  })
+})
+
+describe('calendar arithmetic', () => {
+  it('walks days by calendar date, even across a daylight-saving change', () => {
+    // 2026-03-08 is the spring-forward day in America/New_York. The assertions
+    // are true in every zone; running this suite under that TZ pins the 23-hour
+    // day, where adding 86,400,000ms would land on 01:00 of the same date.
+    const start = new Date(2026, 2, 7).getTime()
+    expect(dayKey(nextDayStart(start))).toBe('2026-03-08')
+    expect(dayKey(addDays(nextDayStart(start), 1))).toBe('2026-03-09')
+    expect(dayDiff(start, addDays(start, 2))).toBe(2)
+  })
+
+  it('keeps a 52-column window across the autumn change', () => {
+    const now = noon(2026, 11, 10)
+    const [from, to] = heatmapWindow(now, 52)
+    expect(heatmapColumns(from, to)).toBe(52)
+    expect(dayKey(to)).toBe('2026-11-10')
   })
 })
 

@@ -20,8 +20,8 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageInsightsReport, UsagePricingUpdate } from '../types.ts'
 import { DataSourceNotes } from './DataSourceNotes.tsx'
 import { RateEditor, type RateRow } from './RateEditor.tsx'
-import { groupRouteUsage } from './route-models.ts'
-import { modelKey } from '../model-name.ts'
+import { displayModel, modelOf } from '../model-name.ts'
+import { matchModel } from '../pricing.ts'
 import { css } from './classes.ts'
 
 /** Props for the pricing page. */
@@ -49,26 +49,60 @@ export interface PricingPageProps {
 export function PricingPage({
   report, weeks, locale, t, formatCost, onSaveRates, onBack,
 }: PricingPageProps): ReactNode {
-  // Every model the window recorded, with the card that prices it: a configured
-  // one, an edited one, or the fallback standing in until the reader writes their
-  // own. One list, because the question is "what does this model cost" — not
-  // "which of the two tables do I read".
-  const configured = report.prices
-  // Every route's own cost, so a model's spend is the money its routes were
-  // billed rather than a figure derived from their tokens: at these prices
-  // those are not the same quantity.
+  // Group by the card that actually priced each route, not by the model name
+  // the route spells. A substring card named `flash` is the card in effect for
+  // `vendor/deepseek-v4-flash`; looking it up by full model name found nothing
+  // and showed the fallback's prices beside money the Host had priced otherwise.
   const costByRoute = new Map(report.models.map(row => [row.route, row.cost]))
-  const grouped = groupRouteUsage(report.routeRates, route => costByRoute.get(route) ?? 0)
-  const rows: RateRow[] = grouped.map(group => {
-    const card = configured.find(candidate => modelKey(candidate.match) === group.key)
-    return {
-      card: card ?? { ...report.fallbackPrice, match: group.model },
-      tokens: group.tokens,
-      cost: group.cost,
-      routes: group.routes.length,
-      inherited: card === undefined,
+  const groups = new Map<string, {
+    readonly card: (typeof report.prices)[number]
+    readonly names: Set<string>
+    tokens: number
+    cost: number
+    routes: number
+  }>()
+  for (const route of report.routeRates) {
+    const match = route.model ?? ''
+    const card = match.length === 0
+      ? matchModel(report.prices, report.fallbackPrice, route.route).card
+      : report.prices.find(candidate => candidate.match === match) ?? report.fallbackPrice
+    const key = card.match
+    const group = groups.get(key)
+    const name = route.detected !== undefined && route.detected.length > 0
+      ? route.detected
+      : modelOf(route.route)
+    if (group === undefined) {
+      groups.set(key, {
+        card,
+        names: new Set([name]),
+        tokens: route.tokens,
+        cost: costByRoute.get(route.route) ?? 0,
+        routes: 1,
+      })
+    } else {
+      group.names.add(name)
+      group.tokens += route.tokens
+      group.cost += costByRoute.get(route.route) ?? 0
+      group.routes += 1
     }
-  })
+  }
+  const rows: RateRow[] = [...groups.values()]
+    .map(group => {
+      const names = [...group.names]
+      return {
+        card: group.card,
+        // A card that prices several models is named by its own match; one
+        // model's card keeps the model's cleanest spelling.
+        ...names.length === 1 && group.card.match !== ''
+          ? { name: displayModel(names) }
+          : {},
+        tokens: group.tokens,
+        cost: group.cost,
+        routes: group.routes,
+        inherited: group.card.match === '',
+      }
+    })
+    .sort((left, right) => right.cost - left.cost || right.tokens - left.tokens)
 
   return (
     <section className={css.pricingPage} aria-label={t('pricingTitle')}>

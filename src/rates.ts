@@ -22,7 +22,7 @@
  */
 
 import { readFileSync } from 'node:fs'
-import { mkdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { UsageModelEdit, UsagePricingUpdate, UsageRate } from './types.ts'
@@ -102,7 +102,14 @@ export function readModelEdit(value: unknown): UsageModelEdit | undefined {
   const peak = readRate(source.peak)
   const offPeak = readRate(source.offPeak)
   if (peak === undefined || offPeak === undefined) return undefined
-  return { peakEnabled: source.peakEnabled, peak, offPeak }
+  const route = source.route
+  if (route !== undefined && (typeof route !== 'string' || route.length === 0)) return undefined
+  return {
+    peakEnabled: source.peakEnabled,
+    peak,
+    offPeak,
+    ...route === undefined ? {} : { route },
+  }
 }
 
 /** Read one model map out of an untrusted document, dropping entries it cannot vouch for. */
@@ -136,6 +143,7 @@ function migrateRoutes(value: unknown): Map<string, UsageModelEdit> {
     const rate = readRate(candidate)
     if (route.length === 0 || rate === undefined) continue
     edits.set(route, {
+      route,
       peakEnabled: true,
       peak: {
         input: rate.input * LEGACY_PEAK_MULTIPLIER,
@@ -173,7 +181,7 @@ export interface RateStore {
  * @returns the store.
  */
 export function createRateStore(path: string): RateStore {
-  const models = new Map<string, UsageModelEdit>()
+  let models = new Map<string, UsageModelEdit>()
   try {
     const document = JSON.parse(readFileSync(path, 'utf8')) as {
       version?: unknown
@@ -194,21 +202,44 @@ export function createRateStore(path: string): RateStore {
     // No table yet: start empty.
   }
 
-  const snapshot = (): Record<string, UsageModelEdit> => Object.fromEntries(models)
+  // Writes are queued: each one applies its delta to the table the one before
+  // it committed, so two pages editing two models both keep their changes and
+  // neither shares a temporary file with the other.
+  let queue: Promise<unknown> = Promise.resolve()
+  let sequence = 0
 
   return {
     read: () => models,
-    write: async (update) => {
-      for (const [match, edit] of Object.entries(update.models)) {
-        if (edit === null) models.delete(match)
-        else models.set(match, edit)
-      }
-      const document = `${JSON.stringify({ version: DOCUMENT_VERSION, models: snapshot() }, null, 2)}\n`
-      await mkdir(dirname(path), { recursive: true })
-      const temporary = `${path}.${String(process.pid)}.tmp`
-      await writeFile(temporary, document, 'utf8')
-      await rename(temporary, path)
-      return snapshot()
+    write: (update) => {
+      const run = queue.then(async () => {
+        // Build a candidate table first. The live table is replaced only after
+        // the rename has landed, so a failed write leaves the prices in effect
+        // exactly where they were — in memory and on disk.
+        const candidate = new Map(models)
+        for (const [match, edit] of Object.entries(update.models)) {
+          if (edit === null) candidate.delete(match)
+          else candidate.set(match, edit)
+        }
+        const document = `${JSON.stringify({ version: DOCUMENT_VERSION, models: Object.fromEntries(candidate) }, null, 2)}\n`
+        await mkdir(dirname(path), { recursive: true })
+        sequence += 1
+        const temporary = `${path}.${String(process.pid)}.${String(sequence)}.tmp`
+        try {
+          await writeFile(temporary, document, 'utf8')
+          await rename(temporary, path)
+        } catch (error: unknown) {
+          // A failed write must not leave its temporary sibling behind for the
+          // next attempt to trip over.
+          await rm(temporary, { force: true }).catch(() => {})
+          throw error
+        }
+        models = candidate
+        return Object.fromEntries(candidate)
+      })
+      // The queue swallows a failure for its own continuity only; the caller
+      // still sees the rejection from the run this call returns.
+      queue = run.then(() => undefined, () => undefined)
+      return run
     },
   }
 }

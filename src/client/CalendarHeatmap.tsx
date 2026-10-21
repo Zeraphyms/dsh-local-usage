@@ -36,11 +36,10 @@ import {
 import { createPortal } from 'react-dom'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageDayRow } from '../types.ts'
-import { WEEKDAY_KEYS, dayKey, dayTime, heatmapColumns, midnight, monthMarkers } from './heatmap-grid.ts'
+import { WEEKDAY_KEYS, addDays, dayDiff, dayKey, dayTime, heatmapColumns, midnight, monthMarkers } from './heatmap-grid.ts'
 import { CELL_GAP, LABEL_WIDTH, useResponsiveGrid } from './heatmap-measure.ts'
 import { css } from './classes.ts'
 
-const MS_PER_DAY = 86_400_000
 const WEEKDAY_ROWS = 7
 /** Tooltip clamp so a card on an edge column stays on screen. */
 const TOOLTIP_HALF_WIDTH = 150
@@ -181,8 +180,8 @@ const CalendarCells = memo(function CalendarCells({
     // A week trimmed off the left of a narrow panel means the range opens before
     // the grid: the band then starts at the first visible Sunday.
     const lastIndex = grid.length * WEEKDAY_ROWS - 1
-    const startIndex = Math.max(0, Math.round((start - origin) / MS_PER_DAY))
-    const endIndex = Math.min(lastIndex, Math.round((end - origin) / MS_PER_DAY))
+    const startIndex = Math.max(0, dayDiff(origin, start))
+    const endIndex = Math.min(lastIndex, dayDiff(origin, end))
     if (endIndex < 0 || startIndex > lastIndex) return undefined
 
     const pitch = cellSize + CELL_GAP
@@ -317,7 +316,7 @@ export function CalendarHeatmap({
     for (let column = 0; column < totalColumns; column += 1) {
       const week: (HeatCell | null)[] = []
       for (let row = 0; row < WEEKDAY_ROWS; row += 1) {
-        const time = first + (column * WEEKDAY_ROWS + row) * MS_PER_DAY
+        const time = addDays(first, column * WEEKDAY_ROWS + row)
         if (time > last) {
           week.push(null)
           continue
@@ -344,7 +343,7 @@ export function CalendarHeatmap({
   const visible = useMemo(() => grid.slice(-visibleColumns), [grid, visibleColumns])
   // `first` is a Sunday, so dropping whole leading weeks keeps every remaining
   // column week-aligned; positions and markers both read from this start.
-  const visibleStart = first + (totalColumns - visibleColumns) * WEEKDAY_ROWS * MS_PER_DAY
+  const visibleStart = addDays(first, (totalColumns - visibleColumns) * WEEKDAY_ROWS)
 
   // Roving focus: the grid is a single tab stop and the arrow keys move within
   // it, so exactly one cell is tabbable at a time. Navigation is expressed as

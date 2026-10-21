@@ -206,8 +206,10 @@ describe('buildReport', () => {
       session('a', [[PEAK, 'x/flash', tokens(1_000_000)], [OFF_PEAK, 'x/flash', tokens(1_000_000)]]),
     ], OPTIONS, META)
 
-    expect(report.days).toHaveLength(1)
-    expect(report.days[0]?.cost).toBeCloseTo(3, 10)
+    // The two instants are one Beijing afternoon, but a local day is the
+    // reader's day: a zone west of Beijing may put them on two dates.
+    expect(report.days).toHaveLength(new Set([localDayKey(PEAK), localDayKey(OFF_PEAK)]).size)
+    expect(report.days.reduce((sum, day) => sum + day.cost, 0)).toBeCloseTo(3, 10)
     expect(report.totals.cost).toBeCloseTo(3, 10)
   })
 })

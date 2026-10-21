@@ -21,7 +21,7 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageCallRow, UsageCallsReport, UsageCallSort, UsageTokens } from '../types.ts'
 import { cacheHitRate } from './cache-rate.ts'
-import { dayKey, dayTime, midnight } from './heatmap-grid.ts'
+import { addDays, dayKey, dayTime, midnight, nextDayStart } from './heatmap-grid.ts'
 import { displayModel, modelKey } from '../model-name.ts'
 import { projectName } from './paths.ts'
 import { CALLS_PATH } from './routes.ts'
@@ -29,8 +29,6 @@ import { formatMoment, formatSeconds, formatThroughput } from './format.ts'
 import { normalizeCallsReport } from './wire-calls.ts'
 import type { UsageInsightsLocaleKey } from './locales.ts'
 import { css } from './classes.ts'
-
-const MS_PER_DAY = 86_400_000
 
 /** Ranges the page offers, in selection order. */
 type RangeId = 'today' | 'week' | 'month' | 'all' | 'custom'
@@ -90,10 +88,10 @@ function boundsOf(id: RangeId, now: number, custom: CustomRange | undefined): {
   readonly to?: number
 } {
   const today = midnight(now)
-  const end = today + MS_PER_DAY - 1
+  const end = nextDayStart(today) - 1
   if (id === 'all') return {}
   if (id === 'today') return { from: today, to: end }
-  if (id === 'week') return { from: today - 6 * MS_PER_DAY, to: end }
+  if (id === 'week') return { from: addDays(today, -6), to: end }
   if (id === 'month') {
     const date = new Date(now)
     return { from: new Date(date.getFullYear(), date.getMonth(), 1).getTime(), to: end }
@@ -101,7 +99,7 @@ function boundsOf(id: RangeId, now: number, custom: CustomRange | undefined): {
   if (id === 'custom' && custom !== undefined) {
     const from = dayTime(custom.from)
     const to = dayTime(custom.to)
-    if (from !== undefined && to !== undefined && to >= from) return { from, to: to + MS_PER_DAY - 1 }
+    if (from !== undefined && to !== undefined && to >= from) return { from, to: nextDayStart(to) - 1 }
   }
   return { from: today, to: end }
 }

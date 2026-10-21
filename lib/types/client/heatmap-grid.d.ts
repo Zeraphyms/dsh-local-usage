@@ -15,6 +15,21 @@ export declare const WEEKDAY_KEYS: readonly ["wd.0", "wd.1", "wd.2", "wd.3", "wd
 export type WeekdayKey = typeof WEEKDAY_KEYS[number];
 /** Local midnight of one instant. */
 export declare function midnight(time: number): number;
+/** Local midnight of an instant moved by a whole number of calendar days. */
+export declare function addDays(time: number, days: number): number;
+/** Local midnight of the day after the one containing `time`. */
+export declare function nextDayStart(time: number): number;
+/**
+ * Whole calendar days between two instants' local midnights.
+ *
+ * Measured through UTC date parts rather than by dividing an epoch difference:
+ * a local day is 23 or 25 hours twice a year, and a calendar cell is a date, not
+ * a duration.
+ * @param from - first instant.
+ * @param to - second instant.
+ * @returns the signed day count.
+ */
+export declare function dayDiff(from: number, to: number): number;
 /** Local `YYYY-MM-DD` key for one instant. */
 export declare function dayKey(time: number): string;
 /**

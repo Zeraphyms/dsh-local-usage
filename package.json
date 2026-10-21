@@ -56,7 +56,7 @@
     "cordis.patch.yml"
   ],
   "scripts": {
-    "build": "tsdown && npm run build:types",
+    "build": "node scripts/clean-lib.mjs && tsdown && npm run build:types",
     "build:types": "tsc -p tsconfig.host.build.json && tsc -p tsconfig.client.build.json",
     "link:host": "node scripts/link-host-packages.mjs",
     "watch": "tsdown --watch",

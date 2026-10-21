@@ -217,6 +217,8 @@ export interface UsageCallsReport {
  * Consumption stays per route — see {@link UsageRouteRate}.
  */
 export interface UsageModelPrice {
+  /** The exact route this card is scoped to, when it came from a per-route edit. */
+  readonly route?: string
   /** Case-insensitive substring matched against `provider/model`; empty for the fallback card. */
   readonly match: string
   /** Whether {@link peak} applies inside the configured windows. */
@@ -279,6 +281,8 @@ export interface UsageRouteRate {
 
 /** A reader's edit to one model card. */
 export interface UsageModelEdit {
+  /** The exact route this edit is scoped to, for a migrated per-route card. */
+  readonly route?: string
   /** Whether the model prices peak separately. */
   readonly peakEnabled: boolean
   /** Prices inside a peak window. */

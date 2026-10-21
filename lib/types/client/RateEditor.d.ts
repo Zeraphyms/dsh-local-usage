@@ -27,6 +27,8 @@ import type { UsageModelPrice, UsagePricingUpdate } from '../types.ts';
 export interface RateRow {
     /** The card that prices the model — configured, edited, or the fallback's. */
     readonly card: UsageModelPrice;
+    /** The model spelling to show, when the card's own match is a substring rule. */
+    readonly name?: string;
     /** Tokens the model spent in the window. */
     readonly tokens: number;
     /** How many routes of the model the window recorded. */

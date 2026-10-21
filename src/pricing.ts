@@ -43,6 +43,8 @@ export type PriceRate = UsageRate
  * to be equal.
  */
 export interface ModelPrice {
+  /** The exact route this card is scoped to, when it came from a per-route edit. */
+  readonly route?: string
   /**
    * Case-insensitive substring matched against the route, in configuration order.
    *
@@ -78,9 +80,19 @@ const WINDOW_PATTERN = /^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/
 export function parsePeakWindow(spec: string): PeakWindow | undefined {
   const matched = WINDOW_PATTERN.exec(spec.trim())
   if (matched === null) return undefined
-  const start = Number(matched[1]) * 60 + Number(matched[2])
-  const end = Number(matched[3]) * 60 + Number(matched[4])
-  if (start >= MINUTES_PER_DAY || end > MINUTES_PER_DAY || start >= end) return undefined
+  const startHour = Number(matched[1])
+  const startMinute = Number(matched[2])
+  const endHour = Number(matched[3])
+  const endMinute = Number(matched[4])
+  // `09:90` is not a time, and normalising it to 10:30 would silently move the
+  // peak window the operator wrote. Minutes are a field of their own, not a
+  // second hour.
+  if (startMinute > 59 || endMinute > 59) return undefined
+  const start = startHour * 60 + startMinute
+  const end = endHour * 60 + endMinute
+  if (start >= MINUTES_PER_DAY || end > MINUTES_PER_DAY || start === end) return undefined
+  // `start > end` is a window that crosses midnight; it is kept as written
+  // rather than split, so the schedule remains one operator statement.
   return { start, end }
 }
 
@@ -115,7 +127,9 @@ export function isPeakClock(
 ): boolean {
   if (windows.length === 0) return false
   if (weekdaysOnly && (clock.weekday === 0 || clock.weekday === 6)) return false
-  return windows.some(window => clock.minutes >= window.start && clock.minutes < window.end)
+  return windows.some(window => window.start <= window.end
+    ? clock.minutes >= window.start && clock.minutes < window.end
+    : clock.minutes >= window.start || clock.minutes < window.end)
 }
 
 /**
@@ -161,7 +175,12 @@ export function matchModel(
   fallback: ModelPrice,
   route: string,
 ): ModelMatch {
-  // The route's own model first: one identity per model, so every vendor prefix
+  // A card written for this exact route wins before any model rule: a migrated
+  // per-route price is the narrowest statement the reader made, and a model card
+  // that happens to claim the same route must not silently replace it.
+  const scoped = models.find(candidate => candidate.route !== undefined && candidate.route === route)
+  if (scoped !== undefined) return { card: scoped, source: 'model' }
+  // The route's own model next: one identity per model, so every vendor prefix
   // and every `-fast` tier of it lands on the same card without configuration.
   const model = modelOf(route)
   const key = modelKey(model)

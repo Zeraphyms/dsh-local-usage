@@ -420,6 +420,8 @@ interface PendingSession {
   readonly id: SessionId
   /** Whether the log carries a fork-inherited prefix, which the batch read cannot skip. */
   readonly seeded: boolean
+  /** The session's invalidation generation when this read captured it. */
+  readonly generation: number
   /**
    * Revision of the stored log this read folds, when one is known.
    *
@@ -526,6 +528,7 @@ async function readCorpus(
   folds: FoldCache,
   progress: ProgressTracker,
   request: { refresh: boolean; from: number | undefined; to: number | undefined },
+  generations: ReadonlyMap<string, number>,
 ): Promise<CorpusRead> {
   // A refresh means what it says: every log is read again, so the durable
   // entries are bypassed rather than merely overwritten.
@@ -558,12 +561,17 @@ async function readCorpus(
   for (const entry of needy) {
     const revision = entry.live ? undefined : revisions.get(entry.id)
     if (revision === undefined) {
-      pending.push({ id: entry.id, seeded: entry.seeded })
+      pending.push({ id: entry.id, seeded: entry.seeded, generation: generations.get(entry.id) ?? 0 })
       continue
     }
     const stored = request.refresh ? undefined : folds.read(entry.id, revision, request.from)
     if (stored === undefined) {
-      pending.push({ id: entry.id, seeded: entry.seeded, revision })
+      pending.push({
+        id: entry.id,
+        seeded: entry.seeded,
+        revision,
+        generation: generations.get(entry.id) ?? 0,
+      })
       continue
     }
     cache.set(entry.id, stored)
@@ -606,8 +614,14 @@ async function readCorpus(
         unreadable += 1
         continue
       }
-      cache.set(entry.id, outcome.value)
-      if (entry.revision !== undefined) folds.write(entry.id, entry.revision, outcome.value)
+      // The event that invalidated this session while it was being folded has
+      // already deleted the cache entry; writing the fold back would resurrect
+      // the value that event exists to retire. The fold still answers this
+      // request as a snapshot, but it does not become the next request's truth.
+      if ((generations.get(entry.id) ?? 0) === entry.generation) {
+        cache.set(entry.id, outcome.value)
+        if (entry.revision !== undefined) folds.write(entry.id, entry.revision, outcome.value)
+      }
       contributors.push({ id: entry.id, fold: outcome.value })
     }
   }
@@ -638,8 +652,10 @@ async function readCorpus(
         unreadable += 1
         continue
       }
-      cache.set(entry.id, value)
-      if (entry.revision !== undefined) folds.write(entry.id, entry.revision, value)
+      if ((generations.get(entry.id) ?? 0) === entry.generation) {
+        cache.set(entry.id, value)
+        if (entry.revision !== undefined) folds.write(entry.id, entry.revision, value)
+      }
       contributors.push({ id: entry.id, fold: value })
     }
   }
@@ -678,10 +694,11 @@ async function assembleReport(
   config: UsageInsightsConfig,
   rates: RateStore,
   request: { refresh: boolean; from: number | undefined; to: number | undefined },
+  generations: ReadonlyMap<string, number>,
 ): Promise<UsageInsightsReport> {
   progress.begin()
   try {
-    const corpus = await readCorpus(ctx, cache, folds, progress, request)
+    const corpus = await readCorpus(ctx, cache, folds, progress, request, generations)
     progress.pricing()
     // Every contributor in the requested window: the one place a window becomes
     // the inputs a fold prices.
@@ -748,14 +765,22 @@ function pricingOptions(config: UsageInsightsConfig, rates: RateStore): PricingO
   const models: ModelPrice[] = config.models.map(model => {
     const card = cardOf(model, model.match)
     const edit = edits.get(card.match)
-    return edit === undefined ? card : { match: card.match, ...edit }
+    // A route-scoped edit is not a model edit even if its route string happens
+    // to equal a card's match; it is appended below with its own scope.
+    return edit === undefined || edit.route !== undefined ? card : { match: card.match, ...edit }
   })
   // An edit for a model the configuration does not name is still an edit, and it
   // claims its own routes: this is what makes a migrated per-route price take
   // effect, and what lets a reader price a model that ships without a card.
   const named = new Set(models.map(card => card.match))
   for (const [match, edit] of edits) {
-    if (match.length > 0 && !named.has(match)) models.push({ match, ...edit })
+    if (match.length === 0) continue
+    if (edit.route !== undefined) {
+      // A migrated row keeps its route scope and is checked before model rules.
+      models.push({ match: edit.route, route: edit.route, ...edit })
+    } else if (!named.has(match)) {
+      models.push({ match, ...edit })
+    }
   }
   const configured = cardOf(config.fallback, '')
   const fallbackEdit = edits.get('')
@@ -780,6 +805,7 @@ async function handleCalls(
   config: UsageInsightsConfig,
   rates: RateStore,
   serialize: SerializedRead,
+  generations: ReadonlyMap<string, number>,
   request: Request,
   background: () => Promise<void> | undefined,
 ): Promise<Response> {
@@ -799,7 +825,7 @@ async function handleCalls(
           refresh: url.searchParams.get('refresh') === '1',
           from: query.from,
           to: query.to,
-        })
+        }, generations)
         progress.pricing()
         const inputs = corpus.contributors.map(({ id, fold }) => sessionInputOf(id, fold, {
           from: query.from,
@@ -832,6 +858,7 @@ async function handleReport(
   config: UsageInsightsConfig,
   rates: RateStore,
   serialize: SerializedRead,
+  generations: ReadonlyMap<string, number>,
   request: Request,
   background: () => Promise<void> | undefined,
 ): Promise<Response> {
@@ -847,7 +874,7 @@ async function handleReport(
       refresh: url.searchParams.get('refresh') === '1',
       from: numberParam(url.searchParams, 'from'),
       to: numberParam(url.searchParams, 'to'),
-    }))
+    }, generations))
     return Response.json(report, { headers: { 'cache-control': 'no-store' } })
   } catch (error: unknown) {
     const message = describe(error)
@@ -953,6 +980,10 @@ function connectionOf(ctx: Context): UsageInsightsConnection {
 export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG): void {
   const resolved = resolveConfig(config)
   const cache = new Map<string, CachedSession>()
+  // Each session's invalidation generation. A read captures it with the id and
+  // checks it again before writing a fold back: an event that landed mid-read
+  // must not let the read resurrect the fold that event retired.
+  const generations = new Map<string, number>()
   // The reader's own rate corrections, hydrated once here and mirrored to disk
   // on every write.
   const rates = createRateStore(pricingFilePath(resolveDshHome()))
@@ -990,7 +1021,7 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
       refresh: false,
       from: undefined,
       to: undefined,
-    })).then(
+    }, generations)).then(
       () => undefined,
       (error: unknown) => {
         // A background fold that fails costs the reader the wait it was meant to
@@ -1003,6 +1034,7 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
   // The durable entry is left alone: it is keyed by the log's revision, so the
   // append that invalidates the memory copy also invalidates that entry.
   ctx.on('session/event', (session) => {
+    generations.set(session.id, (generations.get(session.id) ?? 0) + 1)
     cache.delete(session.id)
   })
   if (resolved.warmup) {
@@ -1016,7 +1048,7 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
       path: REPORT_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => handleReport(ctx, cache, folds, progress, resolved, rates, serialize, request, () => warming),
+      fetch: request => handleReport(ctx, cache, folds, progress, resolved, rates, serialize, generations, request, () => warming),
     }),
     'dsh-local-usage: report route',
   )
@@ -1025,7 +1057,7 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
       path: CALLS_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => handleCalls(ctx, cache, folds, progress, resolved, rates, serialize, request, () => warming),
+      fetch: request => handleCalls(ctx, cache, folds, progress, resolved, rates, serialize, generations, request, () => warming),
     }),
     'dsh-local-usage: calls route',
   )

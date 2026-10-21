@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -46,11 +46,49 @@ describe('createRateStore', () => {
     // The old row becomes a card keyed by the route it was written for, so the
     // migration never has to guess which part of a route is the model.
     expect(store.read().get('vendor/cn:model-a')).toEqual({
+      route: 'vendor/cn:model-a',
       peakEnabled: true,
       // The legacy rows were billed at the shipped multiplier of two.
       peak: { input: 3, cacheRead: 0.1, cacheWrite: 3, output: 12 },
       offPeak: RATE,
     })
+  })
+
+  it('keeps the old table when the disk write fails, and retries cleanly', async () => {
+    const path = join(dir, 'pricing.json')
+    const store = createRateStore(path)
+    await store.write({ models: { old: { peakEnabled: false, peak: RATE, offPeak: RATE } } })
+
+    // Replace the target with a directory: the rename cannot land, so the
+    // candidate table must never become the one in effect.
+    await rm(path, { force: true })
+    await mkdir(path)
+    await expect(store.write({
+      models: { next: { peakEnabled: false, peak: RATE, offPeak: RATE } },
+    })).rejects.toThrow()
+    expect(store.read().has('old')).toBe(true)
+    expect(store.read().has('next')).toBe(false)
+
+    await rm(path, { recursive: true, force: true })
+    await store.write({ models: { next: { peakEnabled: false, peak: RATE, offPeak: RATE } } })
+    expect(store.read().has('old')).toBe(true)
+    expect(store.read().has('next')).toBe(true)
+  })
+
+  it('serializes concurrent writes so neither page loses the other model\'s edit', async () => {
+    const path = join(dir, 'pricing.json')
+    const store = createRateStore(path)
+    const a = { peakEnabled: false, peak: RATE, offPeak: { ...RATE, output: 1 } }
+    const b = { peakEnabled: false, peak: RATE, offPeak: { ...RATE, output: 2 } }
+
+    await Promise.all([
+      store.write({ models: { a } }),
+      store.write({ models: { b } }),
+    ])
+
+    const reopened = createRateStore(path).read()
+    expect(reopened.get('a')?.offPeak.output).toBe(1)
+    expect(reopened.get('b')?.offPeak.output).toBe(2)
   })
 
   it('writes the migrated table back as a v2 document on the next save', async () => {

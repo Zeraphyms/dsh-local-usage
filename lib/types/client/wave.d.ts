@@ -28,6 +28,10 @@ export interface WaveInput {
     readonly slices: readonly UsageDaySlice[];
     /** Range id: `day`, `week`, `month`, `quarter` or `year`. */
     readonly range: string;
+    /** First local day of the window, when empty days should be drawn too. */
+    readonly from?: string;
+    /** Last local day of the window, inclusive. */
+    readonly to?: string;
 }
 /**
  * Bucket a range's usage into the wave's points.

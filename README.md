@@ -190,7 +190,7 @@ Host 半通过 `ctx.sessionQuery.listSessions()` 枚举会话，该调用不读�
 
 报告除了按天、按路由、按目录、按会话的行，还带三份从同一批样本折出来的读数：高峰与空闲各自花了多少、倍率的**溢价**是多少；缓存读 token 按输入价与实付价之差算出的**节省**；以及按北京时间小时的分布。另有一个可选字段：`?compare=1` 会让 Host 把**紧邻的等长窗口**也算一遍，只回它的 totals——折叠与窗口无关，所以这只是一次重新计价，不是第二次读取。
 
-到达这次折叠的有三条路由：`GET /api/dsh-local-usage/report` 按窗口给出报告，`GET /api/dsh-local-usage/progress` 给出正在进行的读取的进度，`POST /api/dsh-local-usage/pricing` 写入按路由的覆盖表。写入在落盘前逐字段校验，因为它落到的那个文件正是之后每一份报告的计价依据。进度单独成一条路由而不是把报告做成流式，是因为报告是浏览器整体解析的一份 JSON 文档，而缓冲了流式响应体的载体丢掉的恰恰就是正在推的进度。
+到达这次折叠的有四条路由：`GET /api/dsh-local-usage/report` 按窗口给出报告，`GET /api/dsh-local-usage/calls` 按筛选与分页给出逐条调用，`GET /api/dsh-local-usage/progress` 给出正在进行的读取的进度，`POST /api/dsh-local-usage/pricing` 写入按路由的覆盖表。写入在落盘前逐字段校验，因为它落到的那个文件正是之后每一份报告的计价依据。进度单独成一条路由而不是把报告做成流式，是因为报告是浏览器整体解析的一份 JSON 文档，而缓冲了流式响应体的载体丢掉的恰恰就是正在推的进度。
 
 fork 会话的日志以父会话的继承前缀开头，而那些 Turn 已在父会话计费，因此只折叠 `inheritedEventCount` 及其之后的事件。会话标题仍从完整日志折叠（含继承前缀），因为标题是关于对话本身的事实，而非关于计费。
 
@@ -288,4 +288,4 @@ Host 半边与浏览器半边都会在相同的 key 上合并 Cordis `Context`�
 
 </details>
 
-**Runtime invariant:** Host 半边拥有三条 HTTP 路由——折叠报告、进行中读取的进度、以及费率表写入——和两层样本缓存：一层以会话 id 为键存在内存里，一层以「会话 id + 日志 revision」为键存在磁盘上。浏览器半边注册一个本地化的侧栏条目及其对应的 `main` 面板，并且只通过这些路由访问 Host。不发布 companion，两半都不自行发出 Cordis 事件。
+**Runtime invariant:** Host 半边拥有四条 HTTP 路由——折叠报告、调用明细查询、进行中读取的进度、以及费率表写入——和两层样本缓存：一层以会话 id 为键存在内存里，一层以「会话 id + 日志 revision」为键存在磁盘上。浏览器半边注册一个本地化的侧栏条目及其对应的 `main` 面板，并且只通过这些路由访问 Host。不发布 companion，两半都不自行发出 Cordis 事件。

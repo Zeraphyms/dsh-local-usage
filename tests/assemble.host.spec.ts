@@ -13,15 +13,16 @@
  * @module dsh-local-usage/tests/assemble
  */
 
-import { mkdtemp } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
 import { apply, CALLS_PATH, DEFAULT_CONFIG, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from '../src/index.ts'
 import type { UsageInsightsConfig } from '../src/index.ts'
+import { pricingFilePath } from '../src/rates.ts'
 
 // Every test mounts the plugin, which hydrates the rate table from `DSH_HOME`.
 // Pointing that at a fresh directory keeps the suite off the developer's real
@@ -101,6 +102,8 @@ interface MountOptions {
   readonly gate?: Promise<void>
   /** Configuration overrides; the warm-up is off unless a test asks for it. */
   readonly config?: Partial<UsageInsightsConfig>
+  /** Holds the exact read open after it captured its snapshot, so an event can land mid-read. */
+  readonly exactGate?: Promise<void>
 }
 
 interface Mounted {
@@ -147,11 +150,14 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
       exactReads.push(id)
       const entry = logs.get(id)
       if (entry === undefined || entry.broken === true) return Promise.reject(new Error('unreadable'))
-      return Promise.resolve({
+      const snapshot = {
         session: { id, createdAt: DAY_ONE, ...entry.cwd === undefined ? {} : { cwd: entry.cwd } },
         inheritedEventCount: entry.inheritedEventCount ?? 0,
-        events: entry.events,
-      })
+        // A gated read captures the log as it was when the read began; the test
+        // then appends to the live log and lets the stale snapshot settle.
+        events: options.exactGate === undefined ? entry.events : [...entry.events],
+      }
+      return options.exactGate === undefined ? Promise.resolve(snapshot) : options.exactGate.then(() => snapshot)
     },
   }
   if (offersBatch) {
@@ -708,5 +714,64 @@ describe('the call-log route', () => {
     expect(page.sessions).toBe(1)
     expect(page.projects).toBe(1)
     expect((page.totals as { calls: number }).calls).toBe(2)
+  })
+})
+
+
+describe('cache invalidation during a read', () => {
+  it('does not write a fold back when its session invalidated mid-read', async () => {
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const logs = new Map<string, FakeLog>([
+      ['a', { events: log(0, DAY_ONE, 1), seeded: true }],
+    ])
+    const mounted = mount(logs, false, { exactGate: gate })
+
+    const first = report(mounted)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const entry = logs.get('a')
+    if (entry === undefined) throw new Error('fixture session missing')
+    ;(entry.events as SessionEvent[]).push(...log(1, DAY_ONE + 1000, 1, 2))
+    mounted.emit('a')
+    release?.()
+    const firstValue = await first
+
+    // The in-flight read is allowed to answer this request from its snapshot...
+    expect(firstValue.totals).toMatchObject({ calls: 1 })
+    // ...but the next request must not hit the fold that event retired.
+    const secondValue = await report(mounted)
+    expect(secondValue.totals).toMatchObject({ calls: 2 })
+    expect(mounted.exactReads).toEqual(['a', 'a'])
+  })
+})
+
+
+describe('a migrated per-route price', () => {
+  it('outranks a model card that also claims the route', async () => {
+    const path = pricingFilePath(process.env.DSH_HOME ?? '')
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, JSON.stringify({
+      version: 1,
+      routes: { 'p/m': { input: 7, cacheRead: 0.7, cacheWrite: 7, output: 14 } },
+    }))
+
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 1) }]])
+    const mounted = mount(logs, true, {
+      config: {
+        models: [{
+          match: 'm',
+          input: 1,
+          cacheRead: 0.1,
+          cacheWrite: 1,
+          output: 2,
+        }],
+      },
+    })
+
+    const value = await report(mounted)
+    expect((value.routeRates as { route: string; source: string; offPeak: { input: number } }[])[0])
+      .toMatchObject({ route: 'p/m', source: 'model', offPeak: { input: 7 } })
+    // 100 input at 7/M plus 10 output at 14/M.
+    expect((value.totals as { cost: number }).cost).toBeCloseTo((100 * 7 + 10 * 14) / 1_000_000, 12)
   })
 })

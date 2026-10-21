@@ -2856,10 +2856,8 @@ export const styles = String.raw`
     opacity: 0.85;
   }
 
+  .dlu-wavePlot {
     opacity: 1;
-  }
-
-    .dlu-wavePlot {
     animation: none;
   }
 

@@ -38,6 +38,8 @@ export type PriceRate = UsageRate;
  * to be equal.
  */
 export interface ModelPrice {
+    /** The exact route this card is scoped to, when it came from a per-route edit. */
+    readonly route?: string;
     /**
      * Case-insensitive substring matched against the route, in configuration order.
      *

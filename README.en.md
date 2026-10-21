@@ -290,4 +290,4 @@ Both halves export **named members only** — never `export default apply`. A mo
 
 </details>
 
-**Runtime invariant:** The Host half owns three HTTP routes — the folded report, the progress of a read in flight, and the rate-table write — plus two sample caches: one in memory keyed by session id, one on disk keyed by session id and the stored log's revision. The browser half registers one localized sidebar entry and the matching `main` panel, and reaches the Host only over those routes. No companion is published, and neither half emits a Cordis event of its own.
+**Runtime invariant:** The Host half owns four HTTP routes — the folded report, the paged call-log query, the progress of a read in flight, and the rate-table write — plus two sample caches: one in memory keyed by session id, one on disk keyed by session id and the stored log's revision. The browser half registers one localized sidebar entry and the matching `main` panel, and reaches the Host only over those routes. No companion is published, and neither half emits a Cordis event of its own.

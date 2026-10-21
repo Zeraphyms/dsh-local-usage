@@ -50,6 +50,8 @@ const FIELD_KEYS: Record<RateField, 'pricingColumnInput' | 'pricingColumnCacheRe
 export interface RateRow {
   /** The card that prices the model — configured, edited, or the fallback's. */
   readonly card: UsageModelPrice
+  /** The model spelling to show, when the card's own match is a substring rule. */
+  readonly name?: string
   /** Tokens the model spent in the window. */
   readonly tokens: number
   /** How many routes of the model the window recorded. */
@@ -129,7 +131,7 @@ export function RateEditor({ rows, currency, formatCost, t, onSave }: RateEditor
     }
   }, [editing])
 
-  const pending = pendingUpdate(drafts, models)
+  const pending = pendingUpdate(drafts, models, editing)
 
   /** Write one field of one model as typed. */
   function write(model: string, set: PriceSet, field: RateField, value: string): void {
@@ -152,9 +154,29 @@ export function RateEditor({ rows, currency, formatCost, t, onSave }: RateEditor
     })
   }
 
+  /** Open one card, discarding the previous card's unsaved draft. */
+  function openEditor(model: string): void {
+    if (editing !== undefined && editing !== model) {
+      const previous = models.find(candidate => candidate.match === editing)
+      const reset = previous === undefined ? undefined : draftsFrom([previous])[editing]
+      if (reset !== undefined) {
+        setDrafts(current => ({ ...current, [editing]: reset }))
+      }
+    }
+    setSaved(false)
+    setFailure(undefined)
+    setEditing(model)
+  }
+
   /** Throw the open model's edits away and close it. */
   function discard(): void {
-    setDrafts(draftsFrom(models))
+    if (editing !== undefined) {
+      const card = models.find(candidate => candidate.match === editing)
+      const reset = card === undefined ? undefined : draftsFrom([card])[editing]
+      if (reset !== undefined) {
+        setDrafts(current => ({ ...current, [editing]: reset }))
+      }
+    }
     setFailure(undefined)
     setEditing(undefined)
   }
@@ -242,11 +264,7 @@ export function RateEditor({ rows, currency, formatCost, t, onSave }: RateEditor
                   busy={busy}
                   t={t}
                   formatCost={formatCost}
-                  onEdit={() => {
-                    setSaved(false)
-                    setFailure(undefined)
-                    setEditing(card.match)
-                  }}
+                  onEdit={() => { openEditor(card.match) }}
                   onCancel={discard}
                   onSave={() => { void commit() }}
                   onPeak={enabled => { switchPeak(card.match, enabled) }}
@@ -307,7 +325,7 @@ function RateGroup({
 }: RateGroupProps): ReactNode {
   const card = row.card
   const editing = open && draft !== undefined
-  const name = card.match === '' ? t('pricingFallback') : card.match
+  const name = row.name ?? (card.match === '' ? t('pricingFallback') : card.match)
   const sets = priceSets(card, draft, editing, t)
   const volume = t('pricingVolumeLine', {
     tokens: formatCompact(row.tokens),

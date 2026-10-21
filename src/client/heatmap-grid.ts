@@ -25,6 +25,35 @@ export function midnight(time: number): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 }
 
+/** Local midnight of an instant moved by a whole number of calendar days. */
+export function addDays(time: number, days: number): number {
+  const date = new Date(time)
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days).getTime()
+}
+
+/** Local midnight of the day after the one containing `time`. */
+export function nextDayStart(time: number): number {
+  return addDays(midnight(time), 1)
+}
+
+/**
+ * Whole calendar days between two instants' local midnights.
+ *
+ * Measured through UTC date parts rather than by dividing an epoch difference:
+ * a local day is 23 or 25 hours twice a year, and a calendar cell is a date, not
+ * a duration.
+ * @param from - first instant.
+ * @param to - second instant.
+ * @returns the signed day count.
+ */
+export function dayDiff(from: number, to: number): number {
+  const left = new Date(from)
+  const right = new Date(to)
+  const leftDay = Date.UTC(left.getFullYear(), left.getMonth(), left.getDate())
+  const rightDay = Date.UTC(right.getFullYear(), right.getMonth(), right.getDate())
+  return Math.round((rightDay - leftDay) / MS_PER_DAY)
+}
+
 /** Local `YYYY-MM-DD` key for one instant. */
 export function dayKey(time: number): string {
   const date = new Date(time)
@@ -72,8 +101,8 @@ export function weekdayKey(time: number): WeekdayKey {
 export function heatmapWindow(now: number, weeks: number): readonly [number, number] {
   const today = midnight(now)
   const elapsed = new Date(today).getDay()
-  const from = today - ((weeks - 1) * DAYS_PER_WEEK + elapsed) * MS_PER_DAY
-  return [from, today + MS_PER_DAY - 1]
+  const from = addDays(today, -((weeks - 1) * DAYS_PER_WEEK + elapsed))
+  return [from, nextDayStart(today) - 1]
 }
 
 /**
@@ -84,7 +113,7 @@ export function heatmapWindow(now: number, weeks: number): readonly [number, num
  */
 export function heatmapColumns(from: number, to: number): number {
   // Inclusive range: one day spans one column, so the span is `diff + 1`.
-  const days = (midnight(to) - midnight(from)) / MS_PER_DAY + 1
+  const days = dayDiff(midnight(from), midnight(to)) + 1
   return Math.max(1, Math.ceil(days / DAYS_PER_WEEK))
 }
 
@@ -111,7 +140,7 @@ export function monthMarkers(windowStart: number, to: number, columns: number): 
   const end = new Date(midnight(to))
   for (let back = 11; back >= 0; back -= 1) {
     const month = new Date(end.getFullYear(), end.getMonth() - back, 1)
-    const index = Math.floor((midnight(month.getTime()) - windowStart) / MS_PER_DAY / DAYS_PER_WEEK)
+    const index = Math.floor(dayDiff(windowStart, midnight(month.getTime())) / DAYS_PER_WEEK)
     if (index < 0 || index >= columns || used.has(index)) continue
     used.add(index)
     markers.push({

@@ -31,6 +31,10 @@ export interface WaveInput {
   readonly slices: readonly UsageDaySlice[]
   /** Range id: `day`, `week`, `month`, `quarter` or `year`. */
   readonly range: string
+  /** First local day of the window, when empty days should be drawn too. */
+  readonly from?: string
+  /** Last local day of the window, inclusive. */
+  readonly to?: string
 }
 
 /** `HH:mm` for minutes after midnight, the label a day's axis carries. */
@@ -72,6 +76,58 @@ function weekStartOf(day: string): number {
   return Math.floor((time - weekday * 86_400_000) / 86_400_000)
 }
 
+/** The UTC day number of a `YYYY-MM-DD` key, or `undefined` when malformed. */
+function dayNumber(day: string): number | undefined {
+  const matched = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
+  if (matched === null) return undefined
+  return Date.UTC(Number(matched[1]), Number(matched[2]) - 1, Number(matched[3])) / 86_400_000
+}
+
+/** The `YYYY-MM-DD` key of a UTC day number. */
+function dayKeyOf(number: number): string {
+  const date = new Date(number * 86_400_000)
+  return `${String(date.getUTCFullYear())}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`
+}
+
+/** Every day key from `from` to `to`, inclusive, both well formed. */
+function daysBetween(from: string, to: string): string[] {
+  const start = dayNumber(from)
+  const end = dayNumber(to)
+  if (start === undefined || end === undefined || end < start) return []
+  return Array.from({ length: end - start + 1 }, (_, offset) => dayKeyOf(start + offset))
+}
+
+/** The `YYYY-MM` key of a day key. */
+function monthKeyOf(day: string): string | undefined {
+  const matched = /^(\d{4})-(\d{2})-\d{2}$/.exec(day)
+  return matched === null ? undefined : `${matched[1]}-${matched[2]}`
+}
+
+/** Every `YYYY-MM` key touching a day range, inclusive. */
+function monthsBetween(from: string, to: string): string[] {
+  const start = monthKeyOf(from)
+  const end = monthKeyOf(to)
+  if (start === undefined || end === undefined) return []
+  const startDate = new Date(`${start}-01T00:00:00Z`)
+  const endDate = new Date(`${end}-01T00:00:00Z`)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return []
+  const keys: string[] = []
+  const cursor = new Date(startDate)
+  while (cursor.getTime() <= endDate.getTime()) {
+    keys.push(`${String(cursor.getUTCFullYear())}-${pad(cursor.getUTCMonth() + 1)}`)
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+  }
+  return keys
+}
+
+/** `YYYY-MM` as the axis label, with the year only when the window crosses one. */
+function monthKeyLabel(key: string, crossYear: boolean, zh: boolean): string {
+  const matched = /^(\d{4})-(\d{2})$/.exec(key)
+  if (matched === null) return key
+  const month = Number(matched[2])
+  return crossYear ? `${matched[1]}-${matched[2]}` : monthLabel(month, zh)
+}
+
 /**
  * Bucket a range's usage into the wave's points.
  *
@@ -87,29 +143,47 @@ export function waveSeries(input: WaveInput, zh: boolean): WavePoint[] {
     return (input.slices ?? []).map(row => ({ label: clockLabel(row.minutes), cost: row.cost }))
   }
   if (input.range === 'year') {
-    const byMonth = new Map<number, number>()
+    const byMonth = new Map<string, number>()
     for (const day of input.days) {
-      const parts = partsOf(day.day)
-      if (parts === undefined) continue
-      byMonth.set(parts.month, (byMonth.get(parts.month) ?? 0) + day.cost)
+      const key = monthKeyOf(day.day)
+      if (key === undefined) continue
+      byMonth.set(key, (byMonth.get(key) ?? 0) + day.cost)
     }
-    return [...byMonth.entries()]
-      .sort((left, right) => left[0] - right[0])
-      .map(([month, cost]) => ({ label: monthLabel(month, zh), cost }))
+    // The key carries the year: October 2025 and October 2026 are two points,
+    // not one bucket that quietly adds two years together.
+    const keys = input.from !== undefined && input.to !== undefined
+      ? monthsBetween(input.from, input.to)
+      : [...byMonth.keys()].sort()
+    const crossYear = keys.length > 0
+      && keys[0]?.slice(0, 4) !== keys[keys.length - 1]?.slice(0, 4)
+    return keys.map(key => ({
+      label: monthKeyLabel(key, crossYear, zh),
+      cost: byMonth.get(key) ?? 0,
+    }))
   }
   if (input.range === 'quarter') {
     const byWeek = new Map<number, { label: string; cost: number }>()
     for (const day of input.days) {
       const start = weekStartOf(day.day)
       const bucket = byWeek.get(start)
-      if (bucket === undefined) byWeek.set(start, { label: dayLabel(day.day), cost: day.cost })
+      if (bucket === undefined) byWeek.set(start, { label: dayLabel(dayKeyOf(start)), cost: day.cost })
       else byWeek.set(start, { label: bucket.label, cost: bucket.cost + day.cost })
     }
-    return [...byWeek.entries()]
-      .sort((left, right) => left[0] - right[0])
-      .map(([, bucket]) => bucket)
+    // With a window, every week it touches is drawn, quiet ones included; the
+    // gaps between active weeks are elapsed time, not a shorter axis.
+    const starts = input.from !== undefined && input.to !== undefined
+      ? [...new Set(daysBetween(input.from, input.to).map(weekStartOf))].sort((left, right) => left - right)
+      : [...byWeek.keys()].sort((left, right) => left - right)
+    return starts.map(start => byWeek.get(start) ?? { label: dayLabel(dayKeyOf(start)), cost: 0 })
   }
   // A week or a month: a point a day, which is the resolution both are read at.
+  if (input.from !== undefined && input.to !== undefined) {
+    const byDay = new Map(input.days.map(day => [day.day, day.cost]))
+    return daysBetween(input.from, input.to).map(key => ({
+      label: dayLabel(key),
+      cost: byDay.get(key) ?? 0,
+    }))
+  }
   return input.days.map(day => ({ label: dayLabel(day.day), cost: day.cost }))
 }
 

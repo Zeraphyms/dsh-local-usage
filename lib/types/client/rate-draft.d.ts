@@ -75,6 +75,8 @@ export declare function draftsFrom(models: readonly UsageModelPrice[]): ModelDra
  *
  * @param drafts - the fields as typed.
  * @param models - the cards and the prices currently in effect.
+ * @param only - when given, the one model the open editor is saving; other
+ *   drafts are left alone even when they differ or are invalid.
  * @returns nothing to do, the first invalid field, or the update to send.
  */
-export declare function pendingUpdate(drafts: ModelDrafts, models: readonly UsageModelPrice[]): RateDraftResult;
+export declare function pendingUpdate(drafts: ModelDrafts, models: readonly UsageModelPrice[], only?: string): RateDraftResult;

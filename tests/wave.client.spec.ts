@@ -68,6 +68,46 @@ describe('waveSeries', () => {
     expect(waveSeries({ days, slices: [], range: 'year' }, false)[0]?.label).toBe('1')
   })
 
+  it('keeps same-numbered months of different years apart', () => {
+    const days = [day('2025-10-05', 2), day('2026-10-05', 3)]
+    const points = waveSeries({ days, slices: [], range: 'year' }, true)
+
+    expect(points).toEqual([
+      { label: '2025-10', cost: 2 },
+      { label: '2026-10', cost: 3 },
+    ])
+  })
+
+  it('draws the quiet days between active ones when the window is stated', () => {
+    const days = [day('2026-10-01', 1), day('2026-10-20', 2), day('2026-10-21', 3)]
+    const points = waveSeries({
+      days,
+      slices: [],
+      range: 'month',
+      from: '2026-10-01',
+      to: '2026-10-21',
+    }, false)
+
+    expect(points).toHaveLength(21)
+    expect(points[0]).toEqual({ label: '10-01', cost: 1 })
+    expect(points[1]).toEqual({ label: '10-02', cost: 0 })
+    expect(points[19]).toEqual({ label: '10-20', cost: 2 })
+    expect(points[20]).toEqual({ label: '10-21', cost: 3 })
+  })
+
+  it('fills quiet weeks in a quarter before and between active ones', () => {
+    const points = waveSeries({
+      days: [day('2026-09-23', 2), day('2026-10-14', 4)],
+      slices: [],
+      range: 'quarter',
+      from: '2026-09-21',
+      to: '2026-10-18',
+    }, false)
+
+    expect(points.map(point => point.label)).toEqual(['09-21', '09-28', '10-05', '10-12'])
+    expect(points.map(point => point.cost)).toEqual([2, 0, 0, 4])
+  })
+
   it('answers nothing for a window that recorded nothing', () => {
     expect(waveSeries({ days: [], slices: [], range: 'year' }, false)).toEqual([])
     expect(waveSeries({ days: [], slices: [], range: 'day' }, false)).toEqual([])
