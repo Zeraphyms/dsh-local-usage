@@ -19,13 +19,13 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { UsagePanel } from '../src/client/UsagePanel.tsx'
 import type { UsagePanelProps } from '../src/client/UsagePanel.tsx'
 import { DayDetail } from '../src/client/DayDetail.tsx'
 import { RateEditor } from '../src/client/RateEditor.tsx'
+import { styles } from '../src/client/styles.ts'
 import type { UsageModelPrice } from '../src/types.ts'
 import type { UsageInsightsReport } from '../src/types.ts'
 
@@ -142,7 +142,7 @@ describe('a day whose total is large', () => {
 })
 
 describe('the stylesheet keeps the layout a function of the panel, not of the data', () => {
-  const css = readFileSync('src/client/styles.ts', 'utf8')
+  const css = styles
 
   it('measures the panel so its contents can be laid out by its width', () => {
     expect(css).toContain('container-type: inline-size')

@@ -38,6 +38,8 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageDayRow } from '../types.ts'
 import { WEEKDAY_KEYS, addDays, dayDiff, dayKey, dayTime, heatmapColumns, midnight, monthMarkers } from './heatmap-grid.ts'
 import { CELL_GAP, LABEL_WIDTH, useResponsiveGrid } from './heatmap-measure.ts'
+import { shadeLevel, shadeLevels, tokensOf } from './heatmap-shade.ts'
+import type { ShadeLevels } from './heatmap-shade.ts'
 import { css } from './classes.ts'
 
 const WEEKDAY_ROWS = 7
@@ -97,28 +99,6 @@ export interface CalendarHeatmapProps {
    * stealing focus would be an interruption rather than a restoration.
    */
   readonly focusDayOnMount?: string
-}
-
-/** Tokens of one day row. */
-function tokensOf(row: UsageDayRow): number {
-  return row.uncachedInputTokens + row.outputTokens + row.cacheReadTokens + row.cacheWriteTokens
-}
-
-/** Linear-interpolated quantile of an ascending, non-empty sample. */
-function quantile(sorted: readonly number[], q: number): number {
-  if (sorted.length === 0) return 0
-  const position = (sorted.length - 1) * q
-  const base = Math.floor(position)
-  const left = sorted[base] ?? 0
-  const right = sorted[Math.min(sorted.length - 1, base + 1)] ?? left
-  return left + (right - left) * (position - base)
-}
-
-/** Shading thresholds over the window's active days. */
-interface ShadeLevels {
-  readonly t1: number
-  readonly t2: number
-  readonly t3: number
 }
 
 /** Everything the year of cells draws from. */
@@ -245,9 +225,7 @@ const CalendarCells = memo(function CalendarCells({
             const cell = week[row]
             if (cell === undefined || cell === null) return null
             const tokens = cell.row === undefined ? 0 : tokensOf(cell.row)
-            const level = tokens <= 0
-              ? 0
-              : tokens <= levels.t1 ? 1 : tokens <= levels.t2 ? 2 : tokens <= levels.t3 ? 3 : 4
+            const level = shadeLevel(tokens, levels)
             // The grid opens on a Sunday and fills one row per weekday, so the
             // row index *is* the weekday.
             const label = t('dayLabel', {
@@ -331,10 +309,7 @@ export function CalendarHeatmap({
 
   // Quantile thresholds over the window's active days: a scale that adapts to
   // how this profile spends rather than assuming a distribution.
-  const levels = useMemo(() => {
-    const active = days.map(row => tokensOf(row)).filter(value => value > 0).sort((a, b) => a - b)
-    return { t1: quantile(active, 0.5), t2: quantile(active, 0.75), t3: quantile(active, 0.9) }
-  }, [days])
+  const levels = useMemo(() => shadeLevels(days), [days])
 
   const { containerRef, cellSize, columns: visibleColumns } = useResponsiveGrid(totalColumns)
   // Held by identity, not recomputed per render: it is a prop of the memoized

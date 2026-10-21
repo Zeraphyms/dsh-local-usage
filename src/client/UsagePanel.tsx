@@ -20,7 +20,7 @@
  * @module dsh-local-usage/client/UsagePanel
  */
 
-import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -32,10 +32,11 @@ import type {
   UsagePricingUpdate,
 } from '../types.ts'
 import { CalendarHeatmap } from './CalendarHeatmap.tsx'
-import { cacheHitRate } from './cache-rate.ts'
-import { useEntrance } from './count-up.ts'
 import { DayDetail } from './DayDetail.tsx'
 import { PanelSkeleton, SummarySkeleton } from './PanelSkeleton.tsx'
+import { PanelBoundary } from './PanelBoundary.tsx'
+import { RangeControls } from './RangeControls.tsx'
+import { SummaryStrip } from './SummaryStrip.tsx'
 import {
   summaryFailed,
   summaryIdle,
@@ -44,7 +45,6 @@ import {
   summaryStarted,
 } from './summary-state.ts'
 import type { SummaryState } from './summary-state.ts'
-import { Tile } from './Tile.tsx'
 import { CallsPage } from './CallsPage.tsx'
 import { PricingPage } from './PricingPage.tsx'
 import { StatsTables } from './StatsTables.tsx'
@@ -52,8 +52,7 @@ import { WaveChart } from './WaveChart.tsx'
 import { dayKey, dayTime, heatmapWindow, nextDayStart, weekdayKey } from './heatmap-grid.ts'
 import { RANGES, clampDay, rangeBounds, waveRangeOf } from './range.ts'
 import type { CustomRange } from './range.ts'
-import { tokensOf } from './tokens.ts'
-import { figureRoom, formatCost, formatDay, formatInteger, formatPercent, formatTokens } from './format.ts'
+import { formatCost, formatDay, formatInteger, formatPercent, formatTokens } from './format.ts'
 import { css } from './classes.ts'
 
 /** Weeks the calendar spans: one rolling year of columns ending with this week. */
@@ -125,8 +124,6 @@ export type UsagePanelProps =
   & PropsLocale<'usage'>
   & InjectFace<UsagePanelInjected>
 
-type Translate = UsagePanelProps['t']
-
 /**
  * One report fetch's state.
  *
@@ -146,33 +143,6 @@ type DayState =
   | { readonly status: 'loading' }
   | { readonly status: 'error' }
   | { readonly status: 'ready'; readonly report: UsageInsightsReport }
-
-/**
- * Contain a render failure to this panel.
- *
- * The slot renderer already keeps a crashing occupant from unmounting the app,
- * but its crash face is an empty element — indistinguishable from a blank page.
- * This boundary inside the panel turns any failure into the panel's own error
- * message with its own retry, so a bug here costs the reader a sentence.
- */
-class PanelBoundary extends Component<
-  { readonly fallback: ReactNode; readonly children: ReactNode },
-  { failed: boolean }
-> {
-  override state = { failed: false }
-
-  static getDerivedStateFromError(): { failed: boolean } {
-    return { failed: true }
-  }
-
-  override componentDidCatch(error: unknown): void {
-    console.error('usage panel crashed:', error)
-  }
-
-  override render(): ReactNode {
-    return this.state.failed ? this.props.fallback : this.props.children
-  }
-}
 
 /**
  * One report with every figure at zero.
@@ -561,47 +531,15 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                 <p className={css.subtitle}>{t('subtitle')}</p>
               </div>
               <div className={css.controls}>
-                <div className={css.rangeBlock}>
-                  <div className={css.ranges} role="group" aria-label={t('rangeLabel')}>
-                    {RANGES.map(candidate => (
-                      <button
-                        key={candidate.id}
-                        type="button"
-                        className={css.range}
-                        aria-pressed={candidate.id === rangeId}
-                        onClick={() => { selectRange(candidate.id) }}
-                      >
-                        {t(candidate.key)}
-                      </button>
-                    ))}
-                  </div>
-                  {rangeId === 'custom' && customRange !== undefined
-                    ? (
-                      <div className={css.rangeCustom}>
-                        <label className={css.rangeField}>
-                          <span>{t('rangeFrom')}</span>
-                          <input
-                            type="date"
-                            value={customRange.from}
-                            min={windowFromDay}
-                            max={windowToDay}
-                            onChange={event => { setCustomDay('from', event.target.value) }}
-                          />
-                        </label>
-                        <label className={css.rangeField}>
-                          <span>{t('rangeTo')}</span>
-                          <input
-                            type="date"
-                            value={customRange.to}
-                            min={windowFromDay}
-                            max={windowToDay}
-                            onChange={event => { setCustomDay('to', event.target.value) }}
-                          />
-                        </label>
-                      </div>
-                    )
-                    : null}
-                </div>
+                <RangeControls
+                  rangeId={rangeId}
+                  customRange={customRange}
+                  windowFromDay={windowFromDay}
+                  windowToDay={windowToDay}
+                  t={t}
+                  onSelect={selectRange}
+                  onCustomDay={setCustomDay}
+                />
                 <div className={css.tools}>
                   {/* The call log is a page, not a table under the calendar: it
                       can page a year of calls, and the front page already carries
@@ -763,77 +701,3 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   )
 }
 
-/**
- * The selected range's figures: one hero number, then the supporting tiles.
- *
- * Every figure here is scaled by one entrance share, so the strip fills in as a
- * single thing. `animate` is false for every render after the first read, which
- * is what makes a range switch swap the numbers rather than replay them.
- *
- * `stale` marks figures the reader is still looking at after the selection moved
- * on. They stay mounted and keep their own range's meaning — the strip is only
- * dimmed, never emptied, so a switch that takes a moment does not move the page.
- */
-function SummaryStrip({ report, animate, stale, onEntranceEnd, t, money, tokens, integer, percent }: {
-  readonly report: UsageInsightsReport
-  /** Whether these figures owe the reader their count-up entrance. */
-  readonly animate: boolean
-  /** Whether a fold for another range is under way behind these figures. */
-  readonly stale: boolean
-  /** Called once the entrance has landed, or immediately when it is refused. */
-  readonly onEntranceEnd: () => void
-  readonly t: Translate
-  readonly money: (value: number) => string
-  readonly tokens: (value: number) => string
-  readonly integer: (value: number) => string
-  readonly percent: (value: number) => string
-}): ReactNode {
-  const { totals } = report
-  const rangeTokens = report.days.reduce((sum, day) => sum + tokensOf(day), 0)
-  const hitRate = cacheHitRate(totals)
-  // One share for the whole strip rather than one clock per figure: eight
-  // independent count-ups would read as eight things arriving, not one.
-  const share = useEntrance(animate, onEntranceEnd)
-  // Bucketed from the figure the entrance lands on, never from the value part-way
-  // through it: a type size that changed as the digits grew would be a wobble of
-  // its own, in the one place this panel is trying not to have one.
-  const cost = money(totals.cost)
-  return (
-    <section
-      className={css.summary}
-      aria-label={t('rangeLabel')}
-      aria-busy={stale}
-      data-stale={stale}
-    >
-      <div className={css.hero}>
-        <span className={css.heroLabel}>{t('totalCost')}</span>
-        <span className={css.heroValue} data-room={figureRoom(cost)}>
-          {money(totals.cost * share)}
-        </span>
-        {report.prices.some(card => card.peakEnabled) || report.fallbackPrice.peakEnabled
-          ? <span className={css.heroDetail}>{t('peakNoteSeparate')}</span>
-          : null}
-      </div>
-      <div className={css.tiles}>
-        <Tile value={tokens(rangeTokens * share)} label={t('totalTokens')} />
-        <Tile value={tokens(totals.uncachedInputTokens * share)} label={t('inputTokens')} />
-        <Tile value={tokens(totals.outputTokens * share)} label={t('outputTokens')} />
-        <Tile
-          value={tokens(totals.cacheReadTokens * share)}
-          label={t('cacheRead')}
-          detail={`${t('cacheWrite')} ${tokens(totals.cacheWriteTokens * share)}`}
-        />
-        {/* A window with no prompt tokens has no rate; the dash says so rather
-            than printing a zero the reader would compare against real rates. */}
-        <Tile
-          value={hitRate === undefined ? '—' : percent(hitRate * share)}
-          label={t('cacheHitRate')}
-          detail={t('cacheHitRateBasis')}
-        />
-        <Tile value={integer(totals.calls * share)} label={t('calls')} />
-        <Tile value={integer(totals.sessions * share)} label={t('sessions')} />
-      </div>
-      {totals.calls === 0 ? <p className={css.empty}>{t('noUsage')}</p> : null}
-    </section>
-  )
-}

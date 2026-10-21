@@ -23,50 +23,22 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { UsageModelPrice, UsageRate, UsagePricingUpdate } from '../types.ts'
+import type { UsagePricingUpdate } from '../types.ts'
 import {
   RATE_FIELDS,
   draftsFrom,
   pendingUpdate,
-  type ModelDraft,
   type ModelDrafts,
   type PriceSet,
   type RateField,
 } from './rate-draft.ts'
 import { css } from './classes.ts'
+import { RateGroup, rateSignature } from './RateGroup.tsx'
+import { FIELD_KEYS } from './rate-row.ts'
+import type { RateRow } from './rate-row.ts'
 
 /** How long the saved confirmation stays up. */
 const CONFIRMATION_MS = 2200
-
-/** The dictionary key of each bucket's column label. */
-const FIELD_KEYS: Record<RateField, 'pricingColumnInput' | 'pricingColumnCacheRead' | 'pricingColumnCacheWrite' | 'pricingColumnOutput'> = {
-  input: 'pricingColumnInput',
-  cacheRead: 'pricingColumnCacheRead',
-  cacheWrite: 'pricingColumnCacheWrite',
-  output: 'pricingColumnOutput',
-}
-
-/** One row of the price sheet: a model, what it spent, and the rates it is on. */
-export interface RateRow {
-  /** The card that prices the model — configured, edited, or the fallback's. */
-  readonly card: UsageModelPrice
-  /** The model spelling to show, when the card's own match is a substring rule. */
-  readonly name?: string
-  /** Tokens the model spent in the window. */
-  readonly tokens: number
-  /** How many routes of the model the window recorded. */
-  readonly routes: number
-  /** What the model cost over the window, shown beside its volume. */
-  readonly cost: number
-  /**
-   * Whether a card of its own prices the model, or the default rate does.
-   *
-   * A row that inherits the default is not stating this model's price — it is
-   * stating the price that will be used until someone writes one — and a table
-   * that shows the two identically is telling the reader something untrue.
-   */
-  readonly inherited: boolean
-}
 
 /** Props for the price sheet. */
 export interface RateEditorProps {
@@ -284,210 +256,3 @@ export function RateEditor({ rows, currency, formatCost, t, onSave }: RateEditor
   )
 }
 
-/** The price fields a group shows, one row per set, in reading order. */
-interface PriceSetRow {
-  readonly set: PriceSet
-  readonly label: string
-  readonly rate: UsageRate
-}
-
-/** Props for one model's block of rows. */
-interface RateGroupProps {
-  readonly row: RateRow
-  /** The draft being edited, present only while this group is open. */
-  readonly draft: ModelDraft | undefined
-  readonly open: boolean
-  /** The field that holds something which is not a price, when it is here. */
-  readonly invalid: { readonly set: PriceSet; readonly field: RateField } | undefined
-  readonly busy: boolean
-  readonly t: PropsLocale<'usage'>['t']
-  readonly formatCost: (value: number) => string
-  readonly onEdit: () => void
-  readonly onCancel: () => void
-  readonly onSave: () => void
-  readonly onPeak: (enabled: boolean) => void
-  readonly onWrite: (set: PriceSet, field: RateField, value: string) => void
-}
-
-/**
- * Render one model: its rate rows, its volume, and — while it is open — its
- * switch and actions in a footer row.
- *
- * The footer is a row of the table rather than a cell inside one of the rate
- * rows: the switches come after every field in the tab order, and the footer can
- * hold both actions at the width the other rows use.
- *
- * @param props - one row's card, its draft, and the editor's handlers.
- * @returns a table body, one group per model.
- */
-function RateGroup({
-  row, draft, open, invalid, busy, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite,
-}: RateGroupProps): ReactNode {
-  const card = row.card
-  const editing = open && draft !== undefined
-  const name = row.name ?? (card.match === '' ? t('pricingFallback') : card.match)
-  const sets = priceSets(card, draft, editing, t)
-  const volume = t('pricingVolumeLine', {
-    tokens: formatCompact(row.tokens),
-    // English needs the singular; Chinese does not, and states the same string.
-    routes: t(row.routes === 1 ? 'pricingRouteCountOne' : 'pricingRouteCount', {
-      count: String(row.routes),
-    }),
-  })
-
-  return (
-    <tbody className={css.rateGroup} data-open={open}>
-      {sets.map((entry, index) => (
-        <tr key={entry.set}>
-          {index === 0
-            ? (
-              <th scope="rowgroup" rowSpan={sets.length} className={css.rateModel}>
-                <span className={css.rateModelLine}>
-                  <code className={css.priceMatch} title={name}>{name}</code>
-                  {row.inherited
-                    ? <span className={css.rateDefaultTag}>{t('pricingInherited')}</span>
-                    : null}
-                </span>
-                {/* Below the fold the usage column is gone, and with it the
-                  * only place the cost is stated: it rides under the name. */}
-                <span className={css.rateModelMeta}>
-                  {t('pricingModelMeta', { cost: formatCost(row.cost), volume })}
-                </span>
-              </th>
-            )
-            : null}
-          <td className={css.rateSet}>{entry.label}</td>
-          {RATE_FIELDS.map(field => (
-            <td key={field} className={css.numeric}>
-              {editing
-                ? (
-                  <input
-                    className={`${css.editorField} ${css.rateField}`}
-                    type="text"
-                    inputMode="decimal"
-                    aria-label={`${name} ${entry.label} ${t(FIELD_KEYS[field])}`}
-                    aria-invalid={invalid?.set === entry.set && invalid.field === field}
-                    data-rate-field={card.match}
-                    value={draft[entry.set][field]}
-                    disabled={busy}
-                    onChange={event => { onWrite(entry.set, field, event.target.value) }}
-                  />
-                )
-                : formatPrice(entry.rate[field])}
-            </td>
-          ))}
-          {index === 0
-            ? (
-              <td rowSpan={sets.length} className={`${css.numeric} ${css.rateUsage}`}>
-                <span className={css.rateCost}>{formatCost(row.cost)}</span>
-                <span className={css.rateVolume} title={volume}>{volume}</span>
-              </td>
-            )
-            : null}
-          {index === 0
-            ? (
-              // Held open while the model is edited, empty: the column keeps its
-              // place, and the block's right edge stays a filled edge instead of
-              // ending where the last figure happens to stop.
-              <td rowSpan={sets.length} className={css.rateActions}>
-                {editing
-                  ? null
-                  : (
-                    <button
-                      type="button"
-                      className={css.rateAction}
-                      data-rate-edit={card.match}
-                      onClick={onEdit}
-                    >
-                      {t('pricingEdit')}
-                    </button>
-                  )}
-              </td>
-            )
-            : null}
-        </tr>
-      ))}
-
-      {editing
-        ? (
-          <tr>
-            <td colSpan={8} className={css.rateEditorCell}>
-              <div className={css.rateToolbar}>
-                <label className={css.editorToggle}>
-                  <input
-                    type="checkbox"
-                    checked={draft.peakEnabled}
-                    disabled={busy}
-                    onChange={event => { onPeak(event.target.checked) }}
-                  />
-                  <span>{t('pricingPeakEnabled')}</span>
-                </label>
-                <span className={css.rateEditorActions}>
-                  <button type="button" className={css.rateAction} disabled={busy} onClick={onCancel}>
-                    {t('pricingCancel')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`${css.rateAction} ${css.rateCommit}`}
-                    disabled={busy}
-                    onClick={onSave}
-                  >
-                    {t('pricingSaveOne')}
-                  </button>
-                </span>
-              </div>
-            </td>
-          </tr>
-        )
-        : null}
-    </tbody>
-  )
-}
-
-/**
- * The price sets one model bills at, in the order the sheet lists them.
- *
- * While the model is open the draft's switch decides, so turning peak pricing
- * off takes the peak row away with it — the reader is choosing the shape of the
- * card they are writing, not just a number in it.
- *
- * @param card - the card in effect.
- * @param draft - the open draft, when this model is being edited.
- * @param editing - whether the draft governs the card's shape.
- * @param t - dictionary lookup, for the row labels.
- * @returns one entry per set, peak first.
- */
-function priceSets(
-  card: UsageModelPrice,
-  draft: ModelDraft | undefined,
-  editing: boolean,
-  t: PropsLocale<'usage'>['t'],
-): PriceSetRow[] {
-  const peakEnabled = editing && draft !== undefined ? draft.peakEnabled : card.peakEnabled
-  const offPeak: PriceSetRow = {
-    set: 'offPeak',
-    label: peakEnabled ? t('rateSetOffPeak') : t('rateSetFlat'),
-    rate: card.offPeak,
-  }
-  return peakEnabled
-    ? [{ set: 'peak', label: t('rateSetPeak'), rate: card.peak }, offPeak]
-    : [offPeak]
-}
-
-/** A price set reduced to what tells two configurations apart. */
-function rateSignature(rate: UsageRate): string {
-  return RATE_FIELDS.map(field => String(rate[field])).join(',')
-}
-
-/** A token count as the row's volume: thousands, millions, billions. */
-function formatCompact(value: number): string {
-  if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`
-  if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`
-  if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`
-  return String(value)
-}
-
-/** A price as it reads in the table: the number as typed, without grouping. */
-function formatPrice(value: number): string {
-  return Number.isFinite(value) ? String(value) : '—'
-}
