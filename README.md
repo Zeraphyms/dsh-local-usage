@@ -269,6 +269,8 @@ pnpm run link:host -- --src /path/to/deepseek-harness
 | `pnpm run check` | 类型检查 + 完整测试（CI 的同一条命令） |
 | `pnpm run check:build` | 干净构建后要求 `lib/` 与源码一致 |
 | `pnpm run check:css` | 组装后的样式表结构检查 |
+
+`.github/workflows/ci.yml` 是同一条 `check` / `check:build` 门禁；它把 Harness 检出作为 `workflow_dispatch` 输入，因为 `@deepseek-ai/*` 不在 npm 上。
 | `pnpm run watch` | 只重建打包产物，用于热重载循环 |
 
 这里刻意**不提供 `prepare` 脚本**。`lib/` 已入库，而 git 依赖上的构建脚本恰恰会迫使每个安装者授予该包「在安装期执行代码」的权限；去掉它，安装才能直接使用入库产物、不索取任何权限。改动 `src/` 后请自行运行 `pnpm run build` 并提交产物。

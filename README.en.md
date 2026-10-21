@@ -271,6 +271,8 @@ pnpm run link:host -- --src /path/to/deepseek-harness
 | `pnpm run check` | typecheck plus the full suite (the CI command) |
 | `pnpm run check:build` | clean build, then require `lib/` to match the source |
 | `pnpm run check:css` | structural check of the assembled stylesheet |
+
+`.github/workflows/ci.yml` runs the same `check` / `check:build` gate; it takes the harness checkout as a `workflow_dispatch` input because `@deepseek-ai/*` is not on npm.
 | `pnpm run watch` | rebuilds the bundles only, for a reload loop |
 
 There is deliberately **no `prepare` script**. `lib/` is committed, and a build script on a git dependency is exactly what forces every installer to grant the package permission to execute code at install time; dropping it is what lets an install use the committed artifact and ask for nothing. Run `pnpm run build` yourself after changing `src/` and commit the result.

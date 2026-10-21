@@ -1,0 +1,52 @@
+# Host-aware CI.
+#
+# The plugin compiles against DeepSeek Harness workspace packages that are not on
+# npm, so the workflow needs a harness checkout beside this one. The checkout is
+# an explicit input rather than a hard-coded repository: deployments that mirror
+# the harness elsewhere can run the same gate without editing this file.
+name: ci
+
+on:
+  workflow_dispatch:
+    inputs:
+      dsh_repository:
+        description: Repository containing the DeepSeek Harness checkout
+        required: true
+        default: deepseek-ai/deepseek-harness
+      dsh_ref:
+        description: Harness branch, tag or commit
+        required: true
+        default: main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.dsh_repository }}
+          ref: ${{ inputs.dsh_ref }}
+          path: dsh-src
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Link the harness hosts
+        run: pnpm run link:host -- --src dsh-src
+
+      - name: Typecheck and test
+        run: pnpm run check
+
+      - name: Build and require committed artifacts
+        run: pnpm run check:build
