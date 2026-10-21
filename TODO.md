@@ -176,7 +176,7 @@
 
 - [x] 按现有职责提取模块，保留 `src/index.ts` 作为 `name`、`inject`、公开导出和 `apply` 的入口。
 
-> 本轮结果：已将 Host 入口拆成 `host/config.ts`、`host/session-fold.ts`、`host/corpus-reader.ts`、`host/usage-service.ts`、`host/http-routes.ts`；`src/index.ts` 只保留常量、公开导出、激活、缓存、失效订阅、读取队列与路由装配。现有 279 个测试通过。
+> 本轮结果：已将 Host 入口拆成 `host/config.ts`、`host/session-fold.ts`、`host/corpus-reader.ts`、`host/usage-service.ts`、`host/http-routes.ts`；`src/index.ts` 只保留常量、公开导出、激活、缓存、失效订阅、读取队列与路由装配。现有 286 个测试通过。
 
 当前入口约 1,000 行，混合配置、会话读取、缓存、计价选项、查询参数和 HTTP 处理。建议边界如下，文件名可随实现调整，避免把每个小函数都拆成独立文件。
 
