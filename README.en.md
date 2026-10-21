@@ -259,7 +259,7 @@ pnpm run link:host -- --src /path/to/deepseek-harness
 # or: DSH_SRC=/path/to/deepseek-harness pnpm run link:host
 ```
 
-`link:host` points this repo's `node_modules/@deepseek-ai/*` at that checkout — the harness version it linked from is printed — and its list of packages lives in `scripts/link-host-packages.mjs`. Add an entry there when a new host import appears. The links are development-only state: nothing about them is committed, and `lib/` resolves the same packages from the host process at runtime.
+`link:host` points this repo's `node_modules/@deepseek-ai/*` at that checkout — the harness version and git commit it linked from are printed — and its list of packages lives in `scripts/link-host-packages.mjs`. Add an entry there when a new host import appears. The links are development-only state: nothing about them is committed, and `lib/` resolves the same packages from the host process at runtime.
 
 ### Commands
 

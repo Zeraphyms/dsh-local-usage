@@ -22,6 +22,7 @@
  * @module dsh-local-usage/scripts/link-host-packages
  */
 
+import { execFileSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -97,6 +98,18 @@ function checkoutVersion(root) {
   return `${manifest.name ?? 'unknown'}@${manifest.version ?? 'unknown'}`
 }
 
+/** The checkout's git revision, when it has one, so a baseline can be repeated. */
+function checkoutCommit(root) {
+  try {
+    return execFileSync('git', ['-C', root, 'rev-parse', '--short=12', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return undefined
+  }
+}
+
 function main() {
   const requested = sourceRootFromEnv()
   if (requested === undefined) {
@@ -128,8 +141,10 @@ function main() {
     console.log(`linked @deepseek-ai/${name} -> ${target}`)
   }
 
+  const commit = checkoutCommit(root)
   console.log(
     `\n${Object.keys(HOST_PACKAGES).length} host packages linked from ${checkoutVersion(root)}`
+      + `${commit === undefined ? '' : ` (${commit})`}`
       + `\n${root}\n\nRe-run after any \`pnpm install\`; that prunes these links.`,
   )
 }

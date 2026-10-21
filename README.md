@@ -257,7 +257,7 @@ pnpm run link:host -- --src /path/to/deepseek-harness
 # 或者：DSH_SRC=/path/to/deepseek-harness pnpm run link:host
 ```
 
-`link:host` 会把本仓库的 `node_modules/@deepseek-ai/*` 指向该检出（并打印链接来源的 Harness 版本），包清单在 `scripts/link-host-packages.mjs`；新增宿主 import 时在其中补一条即可。这些链接只是开发期状态：不会被提交，而 `lib/` 在运行期从宿主进程解析同样的包。
+`link:host` 会把本仓库的 `node_modules/@deepseek-ai/*` 指向该检出（并打印链接来源的 Harness 版本与 git commit），包清单在 `scripts/link-host-packages.mjs`；新增宿主 import 时在其中补一条即可。这些链接只是开发期状态：不会被提交，而 `lib/` 在运行期从宿主进程解析同样的包。
 
 ### 常用命令
 
