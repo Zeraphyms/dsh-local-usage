@@ -64,7 +64,9 @@ export function PricingPage({
   for (const route of report.routeRates) {
     const match = route.model ?? ''
     const card = match.length === 0
-      ? matchModel(report.prices, report.fallbackPrice, route.route).card
+      ? route.source === 'fallback'
+        ? report.fallbackPrice
+        : matchModel(report.prices, report.fallbackPrice, route.route).card
       : report.prices.find(candidate => candidate.match === match) ?? report.fallbackPrice
     const key = card.match
     const group = groups.get(key)
