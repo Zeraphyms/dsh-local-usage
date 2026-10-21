@@ -68,6 +68,8 @@ describe('the calendar and the selected range', () => {
     expect(markup).toContain('data-in-range="true"')
     expect(markup).toContain('data-in-range="false"')
     expect(markup).toContain('calendarRangeSelected')
+    // One ribbon around the band, not a ring on every day.
+    expect(markup).toContain('dlu-rangeBand')
   })
 
   it('leaves no mark when the range covers the window it sits in', () => {
@@ -88,6 +90,7 @@ describe('the calendar and the selected range', () => {
 
     expect(markup).not.toContain('data-range=')
     expect(markup).not.toContain('calendarRangeSelected')
+    expect(markup).not.toContain('dlu-rangeBand')
   })
 
   it('names a one-day range once, not twice', () => {

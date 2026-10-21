@@ -175,6 +175,7 @@ export const css = {
   projectToggleHint: 'dlu-projectToggleHint',
   sessionInTable: 'dlu-sessionInTable',
   range: 'dlu-range',
+  rangeBand: 'dlu-rangeBand',
   rangeBlock: 'dlu-rangeBlock',
   rangeCustom: 'dlu-rangeCustom',
   rangeField: 'dlu-rangeField',

@@ -1418,18 +1418,28 @@ export const styles = String.raw`
   display: grid;
 }
 
-/* The selected range: days outside it recede, so the band the figures were
- * folded over can be read off the year at a glance. */
-.dlu-cells[data-range='true'] .dlu-cell {
-  transition: opacity 140ms ease-out;
+.dlu-cells {
+  position: relative;
 }
 
-/* Inside it, a ring on each day: the year keeps its shading — the calendar is
- * still read for its shape — and the band the figures were folded over is drawn
- * on top of it rather than by fading the rest away. */
-.dlu-cells[data-range='true'] .dlu-cell[data-in-range='true'] {
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-link);
+/* The selected range, drawn over the cells as one ribbon: a hairline frame and a
+ * barely-there wash, so the year keeps every shade it had and the band is read
+ * from its outline rather than from a ring around each day. */
+.dlu-rangeBand {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  overflow: visible;
+  pointer-events: none;
 }
+
+.dlu-rangeBand path {
+  fill: color-mix(in oklab, var(--dsw-alias-link) 5%, transparent);
+  stroke: color-mix(in oklab, var(--dsw-alias-link) 60%, transparent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
 
 /* The row wrappers exist for the accessibility tree and for explicit cell
  * placement, not for layout: a box of their own would become a grid item and

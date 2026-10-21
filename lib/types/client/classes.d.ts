@@ -171,6 +171,7 @@ export declare const css: {
     readonly projectToggleHint: "dlu-projectToggleHint";
     readonly sessionInTable: "dlu-sessionInTable";
     readonly range: "dlu-range";
+    readonly rangeBand: "dlu-rangeBand";
     readonly rangeBlock: "dlu-rangeBlock";
     readonly rangeCustom: "dlu-rangeCustom";
     readonly rangeField: "dlu-rangeField";

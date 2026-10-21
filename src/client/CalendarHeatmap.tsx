@@ -36,7 +36,7 @@ import {
 import { createPortal } from 'react-dom'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageDayRow } from '../types.ts'
-import { WEEKDAY_KEYS, dayKey, heatmapColumns, midnight, monthMarkers } from './heatmap-grid.ts'
+import { WEEKDAY_KEYS, dayKey, dayTime, heatmapColumns, midnight, monthMarkers } from './heatmap-grid.ts'
 import { CELL_GAP, LABEL_WIDTH, useResponsiveGrid } from './heatmap-measure.ts'
 import { css } from './classes.ts'
 
@@ -130,7 +130,7 @@ interface CalendarCellsProps {
   readonly rangeStart: string | undefined
   /** Last day of the selected range, or undefined when it covers the window. */
   readonly rangeEnd: string | undefined
-  /** Cell edge in pixels. */
+  /** Cell edge in pixels; the band's outline is drawn against it. */
   readonly cellSize: number
   /** Shading thresholds. */
   readonly levels: ShadeLevels
@@ -167,6 +167,52 @@ const CalendarCells = memo(function CalendarCells({
   formatCost, formatInteger, formatDay, cellsRef,
   onSelectDay, onEnter, onLeave, onFocusCell, onKey,
 }: CalendarCellsProps): ReactNode {
+  // The selected range drawn as one ribbon: a frame around the band rather than a
+  // ring on every day, which read as a second grid laid over the first. The band
+  // runs down each week it touches and steps sideways where the range starts or
+  // ends, so its outline is the shape of the days themselves.
+  const band = useMemo(() => {
+    if (rangeStart === undefined || rangeEnd === undefined) return undefined
+    const firstDay = grid[0]?.[0]?.day
+    const start = dayTime(rangeStart)
+    const end = dayTime(rangeEnd)
+    const origin = firstDay === undefined ? undefined : dayTime(firstDay)
+    if (start === undefined || end === undefined || origin === undefined) return undefined
+    // A week trimmed off the left of a narrow panel means the range opens before
+    // the grid: the band then starts at the first visible Sunday.
+    const lastIndex = grid.length * WEEKDAY_ROWS - 1
+    const startIndex = Math.max(0, Math.round((start - origin) / MS_PER_DAY))
+    const endIndex = Math.min(lastIndex, Math.round((end - origin) / MS_PER_DAY))
+    if (endIndex < 0 || startIndex > lastIndex) return undefined
+
+    const pitch = cellSize + CELL_GAP
+    // Half a gap of margin: adjacent days' frames would otherwise part at every
+    // cell edge, and the stroke would trace each square separately.
+    const margin = 2
+    const left = (column: number): number => column * pitch - margin
+    const right = (column: number): number => column * pitch + cellSize + margin
+    const top = (row: number): number => row * pitch - margin
+    const bottom = (row: number): number => row * pitch + cellSize + margin
+
+    const startColumn = Math.floor(startIndex / WEEKDAY_ROWS)
+    const startRow = startIndex % WEEKDAY_ROWS
+    const endColumn = Math.floor(endIndex / WEEKDAY_ROWS)
+    const endRow = endIndex % WEEKDAY_ROWS
+    const path = startColumn === endColumn
+      ? `M ${String(left(startColumn))} ${String(top(startRow))} H ${String(right(endColumn))} `
+        + `V ${String(bottom(endRow))} H ${String(left(startColumn))} Z`
+      // More than one week: the frame follows the first week down to its last
+      // day, then the full weeks, then the last week down to the range's end.
+      : `M ${String(left(startColumn))} ${String(top(startRow))} H ${String(left(startColumn + 1))} `
+        + `V ${String(top(0))} H ${String(right(endColumn))} V ${String(bottom(endRow))} `
+        + `H ${String(left(endColumn))} V ${String(bottom(WEEKDAY_ROWS - 1))} H ${String(left(startColumn))} Z`
+    return {
+      path,
+      width: grid.length * pitch - CELL_GAP,
+      height: WEEKDAY_ROWS * pitch - CELL_GAP,
+    }
+  }, [cellSize, grid, rangeEnd, rangeStart])
+
   return (
     <div
       ref={cellsRef}
@@ -185,6 +231,11 @@ const CalendarCells = memo(function CalendarCells({
         gap: CELL_GAP,
       }}
     >
+      {band === undefined ? null : (
+        <svg className={css.rangeBand} width={band.width} height={band.height} aria-hidden="true">
+          <path d={band.path} />
+        </svg>
+      )}
       {/* Row-major with every cell placed explicitly. A real grid row per weekday
        * is what gives each cell a `row` owner in the accessibility tree, and
        * positional focus needs a position to move from. The wrapper draws no box
