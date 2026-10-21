@@ -58,6 +58,7 @@ export declare const css: {
     readonly calendar: "dlu-calendar";
     readonly calendarCaption: "dlu-calendarCaption";
     readonly calendarHeading: "dlu-calendarHeading";
+    readonly calendarRange: "dlu-calendarRange";
     readonly calendarMeasure: "dlu-calendarMeasure";
     readonly calendarScroll: "dlu-calendarScroll";
     readonly calendarTitle: "dlu-calendarTitle";
@@ -170,6 +171,10 @@ export declare const css: {
     readonly projectToggleHint: "dlu-projectToggleHint";
     readonly sessionInTable: "dlu-sessionInTable";
     readonly range: "dlu-range";
+    readonly rangeBlock: "dlu-rangeBlock";
+    readonly rangeCustom: "dlu-rangeCustom";
+    readonly rangeDash: "dlu-rangeDash";
+    readonly rangeField: "dlu-rangeField";
     readonly ranges: "dlu-ranges";
     readonly rank: "dlu-rank";
     readonly rankBar: "dlu-rankBar";

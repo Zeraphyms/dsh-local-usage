@@ -48,7 +48,7 @@ import { Tile } from './Tile.tsx'
 import { PricingPage } from './PricingPage.tsx'
 import { StatsTables } from './StatsTables.tsx'
 import { WaveChart } from './WaveChart.tsx'
-import { dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
+import { dayKey, dayTime, heatmapWindow, weekdayKey } from './heatmap-grid.ts'
 import { tokensOf } from './tokens.ts'
 import { figureRoom, formatCost, formatDay, formatInteger, formatPercent, formatTokens } from './format.ts'
 import type { UsageInsightsLocaleKey } from './locales.ts'
@@ -73,7 +73,39 @@ const RANGES: readonly { readonly id: string; readonly key: UsageInsightsLocaleK
   { id: 'month', key: 'rangeMonth' },
   { id: 'quarter', key: 'rangeQuarter' },
   { id: 'year', key: 'rangeYear' },
+  { id: 'custom', key: 'rangeCustom' },
 ]
+
+/** A hand-picked range, as the two day keys the date fields hold. */
+interface CustomRange {
+  readonly from: string
+  readonly to: string
+}
+
+/** Clamp a day key into an inclusive window, so a typed date cannot leave it. */
+function clampDay(day: string, from: string, to: string): string {
+  return day < from ? from : day > to ? to : day
+}
+
+/**
+ * The bucket the wave reads a range at.
+ *
+ * A single day is the one window its hour slices describe; wider ranges fall back
+ * to a point per day, then per week, then per month — the same ladder the preset
+ * ranges use, chosen by length for one the reader picked by hand.
+ * @param rangeId - the selected range.
+ * @param from - first instant of the range.
+ * @param to - last instant of the range.
+ * @returns the id the wave buckets by.
+ */
+function waveRangeOf(rangeId: string, from: number, to: number): string {
+  if (rangeId !== 'custom') return rangeId
+  const days = Math.round((to - from + 1) / MS_PER_DAY)
+  if (days <= 1) return 'day'
+  if (days <= 45) return 'month'
+  if (days <= 120) return 'quarter'
+  return 'year'
+}
 
 /** Registration-side face the panel reads its data through. */
 export interface UsagePanelInjected {
@@ -179,14 +211,22 @@ function startOfYear(time: number): number {
 }
 
 /**
- * Inclusive bounds of one selected range, all ending with today.
+ * Inclusive bounds of one selected range, all ending with today except a range
+ * the reader picked by hand.
  * @param id - range id.
  * @param now - the instant the panel treats as today.
+ * @param custom - the hand-picked range, when one is selected.
  * @returns the range's `[from, to]` in Unix epoch milliseconds.
  */
-function rangeBounds(id: string, now: number): readonly [number, number] {
+function rangeBounds(id: string, now: number, custom?: CustomRange): readonly [number, number] {
   const today = startOfDay(now)
   const end = today + MS_PER_DAY - 1
+  if (id === 'custom') {
+    const from = custom === undefined ? today : dayTime(custom.from)
+    const to = custom === undefined ? today : dayTime(custom.to)
+    if (from !== undefined && to !== undefined && to >= from) return [from, to + MS_PER_DAY - 1]
+    return [today, end]
+  }
   if (id === 'day') return [today, end]
   if (id === 'week') return [today - 6 * MS_PER_DAY, end]
   if (id === 'month') return [startOfMonth(now), end]
@@ -297,6 +337,9 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // "what has this session cost me", and the range selector is one click away
   // from every wider window.
   const [rangeId, setRangeId] = useState('day')
+  // The hand-picked range: kept while another range is selected, so the custom
+  // chip comes back to the dates the reader last set rather than to nothing.
+  const [customRange, setCustomRange] = useState<CustomRange | undefined>(undefined)
   const [request, setRequest] = useState(0)
   // Two reads, two states. The calendar's window is the expensive one — the first
   // request after a Host restart is what reads every log — and a range change
@@ -305,14 +348,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // The range's figures, which outlive the fold that replaces them: see
   // `summary-state.ts` for why the strip is never unmounted to show a wait.
   const [summaryState, setSummaryState] = useState<SummaryState>({ status: 'idle' })
-  // What the figure may draw. Only a report folded for the range on the selector:
-  // during a switch the previous range's series was being re-bucketed under the
-  // new range's rule — a single day's rows read as a year of months, one bucket
-  // labelled `10月` — which is a chart belonging to neither range, and the thing
-  // that made a switch look like it loaded something else first.
-  const waveSettled = summaryState.status === 'ready' && summaryState.rangeId === rangeId
-  // Held long enough to be a state rather than a flash.
-  const waveLoading = useMinimumDwell(!waveSettled, 460)
   // Retrying the range must not read the year again, so it has its own counter.
   const [summaryRequest, setSummaryRequest] = useState(0)
   // The day page: which day is open, that day's own fold, and a retry counter.
@@ -347,8 +382,52 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   // The calendar's window: 52 columns ending with this week. It opens on a
   // Sunday, so dropping columns under pressure never splits a week.
   const [gridFrom, gridTo] = useMemo(() => heatmapWindow(now, WINDOW_WEEKS), [now])
-  const [rangeFrom, rangeTo] = useMemo(() => rangeBounds(rangeId, now), [rangeId, now])
+  const [rangeFrom, rangeTo] = useMemo(
+    () => rangeBounds(rangeId, now, customRange),
+    [rangeId, now, customRange],
+  )
   const rangeIsWindow = rangeFrom === gridFrom && rangeTo === gridTo
+  // The range's identity for everything that outlives a fold: two hand-picked
+  // ranges share the id `custom`, and a strip that kept the previous dates' figures
+  // under the new dates' label would be naming the wrong window.
+  const rangeKey = `${rangeId}:${String(rangeFrom)}:${String(rangeTo)}`
+  const waveRange = waveRangeOf(rangeId, rangeFrom, rangeTo)
+  const rangeCaption = rangeId === 'custom'
+    ? t('rangeCustom')
+    : t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')
+  const windowFromDay = dayKey(gridFrom)
+  const windowToDay = dayKey(gridTo)
+
+  // What the figure may draw. Only a report folded for the range on the selector:
+  // during a switch the previous range's series was being re-bucketed under the
+  // new range's rule — a single day's rows read as a year of months, one bucket
+  // labelled `10月` — which is a chart belonging to neither range, and the thing
+  // that made a switch look like it loaded something else first.
+  const waveSettled = summaryState.status === 'ready' && summaryState.rangeId === rangeKey
+  // Held long enough to be a state rather than a flash.
+  const waveLoading = useMinimumDwell(!waveSettled, 460)
+
+  /** Move the date fields of the custom range, clamped to the calendar's window. */
+  function setCustomDay(which: 'from' | 'to', value: string): void {
+    // A cleared date field emits an empty string; keep the date it had rather
+    // than fall to a range with no start.
+    if (value === '') return
+    const day = clampDay(value, windowFromDay, windowToDay)
+    setCustomRange(current => {
+      if (current === undefined) return { from: day, to: day }
+      return which === 'from'
+        ? { from: day, to: day > current.to ? day : current.to }
+        : { from: day < current.from ? day : current.from, to: day }
+    })
+  }
+
+  /** Select one range, seeding a hand-picked range from the one in effect. */
+  function selectRange(id: string): void {
+    if (id === 'custom' && customRange === undefined) {
+      setCustomRange({ from: dayKey(rangeFrom), to: dayKey(rangeTo) })
+    }
+    setRangeId(id)
+  }
 
   // The calendar's window. This is the request that reads the logs, so it is the
   // only one that follows the window and the refresh counter — not the range.
@@ -383,7 +462,7 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     if (gridState.status === 'idle' || gridState.status === 'loading') return
     // A range that is the whole window needs no second read: it is already here.
     if (rangeIsWindow && gridState.status === 'ready') {
-      setSummaryState(summarySettled(gridState.report, rangeId))
+      setSummaryState(summarySettled(gridState.report, rangeKey))
       return
     }
     let current = true
@@ -395,11 +474,11 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
     // front page ignores it, and the fold it costs is a re-price of samples
     // already in hand.
     void report({ from: rangeFrom, to: rangeTo, compare: true }).then(
-      value => { if (current) setSummaryState(summarySettled(value, rangeId)) },
+      value => { if (current) setSummaryState(summarySettled(value, rangeKey)) },
       () => { if (current) setSummaryState(summaryFailed()) },
     )
     return () => { current = false; clearTimeout(slow) }
-  }, [active, report, rangeFrom, rangeTo, rangeIsWindow, summaryRequest, pricingRevision, gridState, rangeId])
+  }, [active, report, rangeFrom, rangeTo, rangeIsWindow, summaryRequest, pricingRevision, gridState, rangeKey])
 
   // The day page's own fold. Cheap by construction: the samples behind it are
   // already in the Host's memory, so narrowing the window to one day re-prices
@@ -531,18 +610,47 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                 <p className={css.subtitle}>{t('subtitle')}</p>
               </div>
               <div className={css.controls}>
-                <div className={css.ranges} role="group" aria-label={t('rangeLabel')}>
-                  {RANGES.map(candidate => (
-                    <button
-                      key={candidate.id}
-                      type="button"
-                      className={css.range}
-                      aria-pressed={candidate.id === rangeId}
-                      onClick={() => { setRangeId(candidate.id) }}
-                    >
-                      {t(candidate.key)}
-                    </button>
-                  ))}
+                <div className={css.rangeBlock}>
+                  <div className={css.ranges} role="group" aria-label={t('rangeLabel')}>
+                    {RANGES.map(candidate => (
+                      <button
+                        key={candidate.id}
+                        type="button"
+                        className={css.range}
+                        aria-pressed={candidate.id === rangeId}
+                        onClick={() => { selectRange(candidate.id) }}
+                      >
+                        {t(candidate.key)}
+                      </button>
+                    ))}
+                  </div>
+                  {rangeId === 'custom' && customRange !== undefined
+                    ? (
+                      <div className={css.rangeCustom}>
+                        <label className={css.rangeField}>
+                          <span>{t('rangeFrom')}</span>
+                          <input
+                            type="date"
+                            value={customRange.from}
+                            min={windowFromDay}
+                            max={windowToDay}
+                            onChange={event => { setCustomDay('from', event.target.value) }}
+                          />
+                        </label>
+                        <span className={css.rangeDash} aria-hidden="true">–</span>
+                        <label className={css.rangeField}>
+                          <span>{t('rangeTo')}</span>
+                          <input
+                            type="date"
+                            value={customRange.to}
+                            min={windowFromDay}
+                            max={windowToDay}
+                            onChange={event => { setCustomDay('to', event.target.value) }}
+                          />
+                        </label>
+                      </div>
+                    )
+                    : null}
                 </div>
                 <div className={css.tools}>
                   {/* Prices are a page, not a hover panel: eight fields per model
@@ -583,8 +691,8 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     * lines where the chart goes and then a finished chart appeared
                     * out of nothing. */}
                   <WaveChart
-                    input={{ days: [], slices: [], range: rangeId }}
-                    caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
+                    input={{ days: [], slices: [], range: waveRange }}
+                    caption={rangeCaption}
                     loading
                     empty={false}
                     locale={activeLocale}
@@ -635,6 +743,8 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                 <CalendarHeatmap
                   from={gridFrom}
                   to={gridTo}
+                  rangeFrom={rangeFrom}
+                  rangeTo={rangeTo}
                   days={gridDays}
                   totalCost={gridState.report.totals.cost}
                   peak={peak}
@@ -654,9 +764,9 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                   input={{
                     days: waveSettled ? summaryState.report.days : [],
                     slices: waveSettled ? summaryState.report.slices : [],
-                    range: rangeId,
+                    range: waveRange,
                   }}
-                  caption={t(RANGES.find(candidate => candidate.id === rangeId)?.key ?? 'rangeMonth')}
+                  caption={rangeCaption}
                   loading={waveLoading}
                   empty={waveSettled && summaryState.report.totals.calls === 0}
                   locale={activeLocale}

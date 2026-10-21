@@ -50,6 +50,12 @@ function panelProps(): UsagePanelProps {
 describe('the panel before its report arrives', () => {
   const markup = renderToStaticMarkup(createElement(UsagePanel, panelProps()))
 
+  it('offers a hand-picked range beside the preset ranges', () => {
+    // The custom chip is the way into the two date fields; without it the header
+    // is a fixed set of windows and nothing can be asked outside them.
+    expect(markup).toContain('rangeCustom')
+  })
+
   it('keeps the way into the prices, inert rather than absent', () => {
     // Prices live on a page now, reached by this control. It waits for the year's
     // report in place: a control that removes itself for the length of a read is

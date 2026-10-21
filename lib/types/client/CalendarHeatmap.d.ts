@@ -30,6 +30,10 @@ export interface CalendarHeatmapProps {
     readonly from: number;
     /** Last rendered day inclusive, normally today. */
     readonly to: number;
+    /** First instant of the selected range, for the band the figures describe. */
+    readonly rangeFrom: number;
+    /** Last instant of the selected range. */
+    readonly rangeTo: number;
     /** Day rows in the window, ascending; days with no usage are simply absent. */
     readonly days: readonly UsageDayRow[];
     /** Cost over the whole window. */
@@ -60,4 +64,4 @@ export interface CalendarHeatmapProps {
  * @param props - the window, its day rows, the selected range, formatters, and copy.
  * @returns the calendar figure.
  */
-export declare function CalendarHeatmap({ from, to, days, totalCost, peak, t, formatCost, formatInteger, formatDay, onSelectDay, focusDayOnMount, }: CalendarHeatmapProps): ReactNode;
+export declare function CalendarHeatmap({ from, to, rangeFrom, rangeTo, days, totalCost, peak, t, formatCost, formatInteger, formatDay, onSelectDay, focusDayOnMount, }: CalendarHeatmapProps): ReactNode;

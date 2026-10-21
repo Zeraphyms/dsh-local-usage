@@ -21,6 +21,9 @@ export declare const zh: {
     rangeMonth: string;
     rangeQuarter: string;
     rangeYear: string;
+    rangeCustom: string;
+    rangeFrom: string;
+    rangeTo: string;
     refresh: string;
     loading: string;
     loadingListing: string;
@@ -62,6 +65,8 @@ export declare const zh: {
     statsMore: string;
     calendarHint: string;
     calendarWindow: string;
+    calendarRangeSelected: string;
+    calendarRangeSelectedDay: string;
     legendLess: string;
     legendMore: string;
     peakDay: string;
@@ -221,6 +226,9 @@ export declare const en: {
     rangeMonth: string;
     rangeQuarter: string;
     rangeYear: string;
+    rangeCustom: string;
+    rangeFrom: string;
+    rangeTo: string;
     refresh: string;
     loading: string;
     loadingListing: string;
@@ -262,6 +270,8 @@ export declare const en: {
     statsMore: string;
     calendarHint: string;
     calendarWindow: string;
+    calendarRangeSelected: string;
+    calendarRangeSelectedDay: string;
     legendLess: string;
     legendMore: string;
     peakDay: string;

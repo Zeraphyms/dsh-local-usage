@@ -61,6 +61,7 @@ export const css = {
   calendar: 'dlu-calendar',
   calendarCaption: 'dlu-calendarCaption',
   calendarHeading: 'dlu-calendarHeading',
+  calendarRange: 'dlu-calendarRange',
   calendarMeasure: 'dlu-calendarMeasure',
   calendarScroll: 'dlu-calendarScroll',
   calendarTitle: 'dlu-calendarTitle',
@@ -174,6 +175,10 @@ export const css = {
   projectToggleHint: 'dlu-projectToggleHint',
   sessionInTable: 'dlu-sessionInTable',
   range: 'dlu-range',
+  rangeBlock: 'dlu-rangeBlock',
+  rangeCustom: 'dlu-rangeCustom',
+  rangeDash: 'dlu-rangeDash',
+  rangeField: 'dlu-rangeField',
   ranges: 'dlu-ranges',
   // The project ranking below the calendar.
   rank: 'dlu-rank',

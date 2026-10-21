@@ -93,11 +93,54 @@ export const styles = String.raw`
   align-items: center;
 }
 
+/* The chips, and the two date fields a hand-picked range opens beneath them. */
+.dlu-rangeBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-inline-size: 0;
+}
+
 .dlu-ranges {
   display: inline-flex;
+  align-self: flex-start;
   overflow: hidden;
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 9px;
+}
+
+.dlu-rangeCustom {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dlu-rangeField {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.dlu-rangeField input {
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+}
+
+.dlu-rangeField input:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 1px;
+}
+
+.dlu-rangeDash {
+  color: var(--dsw-alias-label-caption);
 }
 
 .dlu-range {
@@ -1302,6 +1345,20 @@ export const styles = String.raw`
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* The range the figures were folded over, stated on the picture of the year: a
+ * pill rather than another grey label, because it is the one line in this
+ * caption that changes when the reader clicks. */
+.dlu-calendarRange {
+  align-self: center;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-link);
+  white-space: nowrap;
+  border: 0.5px solid color-mix(in oklab, var(--dsw-alias-link) 35%, transparent);
+  border-radius: 999px;
+}
+
 .dlu-calendarTotal {
   font-size: 14px;
   font-weight: 600;
@@ -1354,6 +1411,19 @@ export const styles = String.raw`
 
 .dlu-cells {
   display: grid;
+}
+
+/* The selected range: days outside it recede, so the band the figures were
+ * folded over can be read off the year at a glance. */
+.dlu-cells[data-range='true'] .dlu-cell {
+  transition: opacity 140ms ease-out;
+}
+
+/* Inside it, a ring on each day: the year keeps its shading — the calendar is
+ * still read for its shape — and the band the figures were folded over is drawn
+ * on top of it rather than by fading the rest away. */
+.dlu-cells[data-range='true'] .dlu-cell[data-in-range='true'] {
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-link);
 }
 
 /* The row wrappers exist for the accessibility tree and for explicit cell

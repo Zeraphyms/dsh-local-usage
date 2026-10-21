@@ -70,6 +70,10 @@ export interface CalendarHeatmapProps {
   readonly from: number
   /** Last rendered day inclusive, normally today. */
   readonly to: number
+  /** First instant of the selected range, for the band the figures describe. */
+  readonly rangeFrom: number
+  /** Last instant of the selected range. */
+  readonly rangeTo: number
   /** Day rows in the window, ascending; days with no usage are simply absent. */
   readonly days: readonly UsageDayRow[]
   /** Cost over the whole window. */
@@ -122,6 +126,10 @@ interface ShadeLevels {
 interface CalendarCellsProps {
   /** Visible columns, oldest first; `null` is a position past today. */
   readonly grid: readonly (readonly (HeatCell | null)[])[]
+  /** First day of the selected range, or undefined when it covers the window. */
+  readonly rangeStart: string | undefined
+  /** Last day of the selected range, or undefined when it covers the window. */
+  readonly rangeEnd: string | undefined
   /** Cell edge in pixels. */
   readonly cellSize: number
   /** Shading thresholds. */
@@ -155,7 +163,7 @@ interface CalendarCellsProps {
  * across the grid would rebuild all 364 labels to move that one box.
  */
 const CalendarCells = memo(function CalendarCells({
-  grid, cellSize, levels, focusDay, t,
+  grid, cellSize, levels, focusDay, t, rangeStart, rangeEnd,
   formatCost, formatInteger, formatDay, cellsRef,
   onSelectDay, onEnter, onLeave, onFocusCell, onKey,
 }: CalendarCellsProps): ReactNode {
@@ -165,6 +173,7 @@ const CalendarCells = memo(function CalendarCells({
       className={css.cells}
       role="grid"
       aria-label={t('calendar')}
+      data-range={rangeStart === undefined ? undefined : 'true'}
       style={{
         // Spans the whole track list: a grid item placed in the single label
         // column would overflow its own track list to the right.
@@ -205,6 +214,9 @@ const CalendarCells = memo(function CalendarCells({
                 className={css.cell}
                 data-level={level}
                 data-day={cell.day}
+                data-in-range={rangeStart === undefined || rangeEnd === undefined
+                  ? undefined
+                  : cell.day >= rangeStart && cell.day <= rangeEnd ? 'true' : 'false'}
                 role="gridcell"
                 aria-label={label}
                 tabIndex={cell.day === focusDay ? 0 : -1}
@@ -234,7 +246,7 @@ const CalendarCells = memo(function CalendarCells({
  * @returns the calendar figure.
  */
 export function CalendarHeatmap({
-  from, to, days, totalCost, peak, t,
+  from, to, rangeFrom, rangeTo, days, totalCost, peak, t,
   formatCost, formatInteger, formatDay, onSelectDay, focusDayOnMount,
 }: CalendarHeatmapProps): ReactNode {
   const [hover, setHover] = useState<Hover | undefined>(undefined)
@@ -242,6 +254,11 @@ export function CalendarHeatmap({
   const first = midnight(from)
   const last = midnight(to)
   const totalColumns = heatmapColumns(first, last)
+  // The band the figures were folded over. A range that spans the whole window
+  // marks nothing: every day is in it, and dimming none of them is the statement.
+  const rangeStart = dayKey(rangeFrom)
+  const rangeEnd = dayKey(rangeTo)
+  const narrowed = rangeStart > dayKey(from) || rangeEnd < dayKey(to)
 
   const byDay = useMemo(() => new Map(days.map(row => [row.day, row])), [days])
   const grid = useMemo(() => {
@@ -376,6 +393,15 @@ export function CalendarHeatmap({
         <div className={css.calendarHeading}>
           <span className={css.calendarTitle}>{t('calendar')}</span>
           <span className={css.calendarYear}>{t('calendarWindow')}</span>
+          {narrowed
+            ? (
+              <span className={css.calendarRange}>
+                {rangeStart === rangeEnd
+                  ? t('calendarRangeSelectedDay', { day: formatDay(rangeStart) })
+                  : t('calendarRangeSelected', { from: formatDay(rangeStart), to: formatDay(rangeEnd) })}
+              </span>
+            )
+            : null}
         </div>
         <span className={css.calendarTotal}>{formatCost(totalCost)}</span>
       </figcaption>
@@ -407,6 +433,8 @@ export function CalendarHeatmap({
               cellSize={cellSize}
               levels={levels}
               focusDay={focusDay}
+              rangeStart={narrowed ? rangeStart : undefined}
+              rangeEnd={narrowed ? rangeEnd : undefined}
               t={t}
               formatCost={formatCost}
               formatInteger={formatInteger}
