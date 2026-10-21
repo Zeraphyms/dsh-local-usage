@@ -274,10 +274,12 @@ There is deliberately **no `prepare` script**. `lib/` is committed, and a build 
 
 ### Dev Note
 
+Module boundaries, the read/pricing/timezone contracts and the artifact build are documented in [docs/architecture.md](docs/architecture.md).
+
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-The Host half and the browser half each merge the Cordis `Context` under the same keys with different services, so **one TypeScript program cannot see both**; the harness splits its own typecheck for the same reason. `tsconfig.host.json` and `tsconfig.client.json` are the two programs used by `typecheck` and by editors, and `tsconfig.host.build.json` / `tsconfig.client.build.json` are their narrow descendants that emit declarations to `lib/types` — the layout `package.json`'s `exports` points at, and the layout the harness uses for its own client packages (`rootDir: src`, `outDir: lib/types`). Each half globs its own files (`src/*.ts` and `tests/*.host.spec.ts` against `src/client/**/*` and `tests/*.client.spec.ts`) rather than listing them: a hand-kept list is how a new module ends up shipping unchecked, which is what the split exists to prevent.
+The Host half and the browser half each merge the Cordis `Context` under the same keys with different services, so **one TypeScript program cannot see both**; the harness splits its own typecheck for the same reason. `tsconfig.host.json` and `tsconfig.client.json` are the two programs used by `typecheck` and by editors, and `tsconfig.host.build.json` / `tsconfig.client.build.json` are their narrow descendants that emit declarations to `lib/types` — the layout `package.json`'s `exports` points at, and the layout the harness uses for its own client packages (`rootDir: src`, `outDir: lib/types`). Each half globs its own files (`src/*.ts`, `src/host/**/*.ts` and `tests/*.host.spec.ts` against `src/client/**/*` and `tests/*.client.spec.ts`) rather than listing them: a hand-kept list is how a new module ends up shipping unchecked, which is what the split exists to prevent.
 
 Two consequences follow:
 

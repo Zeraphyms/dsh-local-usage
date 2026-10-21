@@ -272,10 +272,12 @@ pnpm run link:host -- --src /path/to/deepseek-harness
 
 ### 开发者备注
 
+模块边界、读取/计价/时区契约与产物构建见 [docs/architecture.md](docs/architecture.md)。
+
 <details>
 <summary>面向维护者的工作上下文 —— 点击展开</summary>
 
-Host 半边与浏览器半边都会在相同的 key 上合并 Cordis `Context`，但服务不同，因此**同一个 TypeScript 程序无法同时看到两者**；Harness 自身也是出于同样的原因拆分类型检查。`tsconfig.host.json` 与 `tsconfig.client.json` 是 `typecheck` 与编辑器所用的两个程序，而 `tsconfig.host.build.json` / `tsconfig.client.build.json` 是它们收窄后的子集，用于把声明产出到 `lib/types` —— 这正是 `package.json` 的 `exports` 所指向的布局，也是 Harness 自身客户端包的布局（`rootDir: src`，`outDir: lib/types`）。两半各自用自己的 glob 收拢文件（`src/*.ts` 与 `tests/*.host.spec.ts`，对应 `src/client/**/*` 与 `tests/*.client.spec.ts`）而不是逐个列出：手工维护的清单正是一个新模块最终「附带发布却从未被检查」的方式，而拆分本来就是为了防止这件事。
+Host 半边与浏览器半边都会在相同的 key 上合并 Cordis `Context`，但服务不同，因此**同一个 TypeScript 程序无法同时看到两者**；Harness 自身也是出于同样的原因拆分类型检查。`tsconfig.host.json` 与 `tsconfig.client.json` 是 `typecheck` 与编辑器所用的两个程序，而 `tsconfig.host.build.json` / `tsconfig.client.build.json` 是它们收窄后的子集，用于把声明产出到 `lib/types` —— 这正是 `package.json` 的 `exports` 所指向的布局，也是 Harness 自身客户端包的布局（`rootDir: src`，`outDir: lib/types`）。两半各自用自己的 glob 收拢文件（`src/*.ts`、`src/host/**/*.ts` 与 `tests/*.host.spec.ts`，对应 `src/client/**/*` 与 `tests/*.client.spec.ts`）而不是逐个列出：手工维护的清单正是一个新模块最终「附带发布却从未被检查」的方式，而拆分本来就是为了防止这件事。
 
 由此有两点需要注意：
 
