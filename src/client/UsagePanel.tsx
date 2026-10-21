@@ -637,7 +637,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                             onChange={event => { setCustomDay('from', event.target.value) }}
                           />
                         </label>
-                        <span className={css.rangeDash} aria-hidden="true">–</span>
                         <label className={css.rangeField}>
                           <span>{t('rangeTo')}</span>
                           <input

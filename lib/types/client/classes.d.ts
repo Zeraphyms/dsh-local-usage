@@ -173,7 +173,6 @@ export declare const css: {
     readonly range: "dlu-range";
     readonly rangeBlock: "dlu-rangeBlock";
     readonly rangeCustom: "dlu-rangeCustom";
-    readonly rangeDash: "dlu-rangeDash";
     readonly rangeField: "dlu-rangeField";
     readonly ranges: "dlu-ranges";
     readonly rank: "dlu-rank";

@@ -111,10 +111,13 @@ export const styles = String.raw`
   border-radius: 9px;
 }
 
+/* The two ends of the range, one under each end of the chip row: the editor
+ * spans the chips' width, so the block keeps one rectangular silhouette. */
 .dlu-rangeCustom {
   display: flex;
-  gap: 6px;
+  gap: 12px;
   align-items: center;
+  justify-content: space-between;
   font-size: 11.5px;
   color: var(--dsw-alias-label-tertiary);
 }
@@ -126,6 +129,9 @@ export const styles = String.raw`
 }
 
 .dlu-rangeField input {
+  /* A fixed measure: the native field's default width differs between browsers,
+   * and two of them at their own sizes made the row as wide as the chips. */
+  inline-size: 124px;
   padding: 3px 6px;
   font: inherit;
   font-size: 11.5px;
@@ -141,9 +147,6 @@ export const styles = String.raw`
   outline-offset: 1px;
 }
 
-.dlu-rangeDash {
-  color: var(--dsw-alias-label-caption);
-}
 
 .dlu-range {
   padding: 6px 13px;

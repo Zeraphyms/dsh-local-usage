@@ -177,7 +177,6 @@ export const css = {
   range: 'dlu-range',
   rangeBlock: 'dlu-rangeBlock',
   rangeCustom: 'dlu-rangeCustom',
-  rangeDash: 'dlu-rangeDash',
   rangeField: 'dlu-rangeField',
   ranges: 'dlu-ranges',
   // The project ranking below the calendar.
