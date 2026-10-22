@@ -22,7 +22,6 @@ export declare const css: {
     readonly callColCost: "dlu-callColCost";
     readonly callColModel: "dlu-callColModel";
     readonly callColNumber: "dlu-callColNumber";
-    readonly callColProject: "dlu-callColProject";
     readonly callColSession: "dlu-callColSession";
     readonly callColTime: "dlu-callColTime";
     readonly callColTiming: "dlu-callColTiming";
@@ -36,16 +35,14 @@ export declare const css: {
     readonly callPagerControls: "dlu-callPagerControls";
     readonly callPagerNote: "dlu-callPagerNote";
     readonly callPagerPage: "dlu-callPagerPage";
-    readonly callProjectCell: "dlu-callProjectCell";
-    readonly callProjectName: "dlu-callProjectName";
     readonly callRange: "dlu-callRange";
     readonly callRangeGroup: "dlu-callRangeGroup";
     readonly callScopeNote: "dlu-callScopeNote";
     readonly callSearchField: "dlu-callSearchField";
     readonly callSummary: "dlu-callSummary";
     readonly callSessionCell: "dlu-callSessionCell";
-    readonly callSessionId: "dlu-callSessionId";
     readonly callSessionName: "dlu-callSessionName";
+    readonly callSubjectMeta: "dlu-callSubjectMeta";
     readonly callSkeletonRow: "dlu-callSkeletonRow";
     readonly callTable: "dlu-callTable";
     readonly callTableWrap: "dlu-callTableWrap";

@@ -162,7 +162,7 @@ export const details = String.raw`/* ── The range's detail view ────
 
 .dlu-callTable {
   inline-size: 100%;
-  min-inline-size: 1080px;
+  min-inline-size: 1000px;
   font-size: 11.5px;
   table-layout: fixed;
   border-collapse: collapse;
@@ -175,15 +175,11 @@ export const details = String.raw`/* ── The range's detail view ────
 }
 
 .dlu-callColSession {
-  inline-size: 150px;
-}
-
-.dlu-callColProject {
-  inline-size: 100px;
+  inline-size: 230px;
 }
 
 .dlu-callColModel {
-  inline-size: 140px;
+  inline-size: 120px;
 }
 
 .dlu-callColNumber {
@@ -243,7 +239,7 @@ export const details = String.raw`/* ── The range's detail view ────
 }
 
 .dlu-callSessionCell {
-  max-inline-size: 180px;
+  max-inline-size: 250px;
   padding-inline-end: 12px;
   font-weight: 500;
   text-align: left;
@@ -258,24 +254,13 @@ export const details = String.raw`/* ── The range's detail view ────
   text-overflow: ellipsis;
 }
 
-.dlu-callSessionId {
+.dlu-callSubjectMeta {
   display: block;
   margin-top: 1px;
   overflow: hidden;
   font-size: 10px;
   font-weight: 400;
   color: var(--dsw-alias-label-caption);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.dlu-callProjectCell {
-  max-inline-size: 120px;
-}
-
-.dlu-callProjectName {
-  display: block;
-  overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -288,7 +273,7 @@ export const details = String.raw`/* ── The range's detail view ────
   display: block;
   overflow: hidden;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--dsw-alias-label-primary);
   white-space: nowrap;
   text-overflow: ellipsis;

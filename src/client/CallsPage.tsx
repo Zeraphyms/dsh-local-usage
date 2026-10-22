@@ -497,7 +497,6 @@ export function CallsPage({
               <colgroup>
                 <col className={css.callColTime} />
                 <col className={css.callColSession} />
-                <col className={css.callColProject} />
                 <col className={css.callColModel} />
                 <col className={css.callColNumber} />
                 <col className={css.callColNumber} />
@@ -519,7 +518,6 @@ export function CallsPage({
                     {t('callsColumnTime')}
                   </th>
                   <th scope="col">{t('callsColumnSession')}</th>
-                  <th scope="col">{t('callsColumnProject')}</th>
                   <th scope="col">{t('callsColumnModel')}</th>
                   <th scope="col" className={css.numeric}>{t('inputTokens')}</th>
                   <th scope="col" className={css.numeric}>{t('cacheRead')}</th>
@@ -618,13 +616,20 @@ function CallRowView({
         <span className={css.callSessionName} title={row.title ?? row.sessionId}>
           {row.title ?? t('sessionUntitled')}
         </span>
-        <code className={css.callSessionId}>#{shortSessionId(row.sessionId)}</code>
-      </th>
-      <td className={css.callProjectCell} title={row.cwd}>
-        <span className={css.callProjectName}>
+        <span
+          className={css.callSubjectMeta}
+          title={`${row.cwd ?? t('projectUnknown')} · ${row.sessionId}${row.turn === undefined || row.step === undefined ? '' : ` · ${t('callsTurnStep', { turn: formatInteger(row.turn), step: formatInteger(row.step) })}`}`}
+        >
           {row.cwd === undefined ? t('projectUnknown') : projectName(row.cwd) ?? row.cwd}
+          {' · #'}{shortSessionId(row.sessionId)}
+          {row.turn === undefined || row.step === undefined
+            ? ''
+            : ` · ${t('callsTurnStep', {
+              turn: formatInteger(row.turn),
+              step: formatInteger(row.step),
+            })}`}
         </span>
-      </td>
+      </th>
       <td
         className={css.callModelCell}
         title={row.priced ? row.route : `${row.route} · ${t('pricingSourceFallback')}`}
@@ -686,7 +691,6 @@ function CallSkeleton(): ReactNode {
         <colgroup>
           <col className={css.callColTime} />
           <col className={css.callColSession} />
-          <col className={css.callColProject} />
           <col className={css.callColModel} />
           <col className={css.callColNumber} />
           <col className={css.callColNumber} />
@@ -702,7 +706,7 @@ function CallSkeleton(): ReactNode {
         <tbody>
           {Array.from({ length: 8 }, (_, row) => (
             <tr key={row} className={css.callSkeletonRow}>
-              {Array.from({ length: 14 }, (_, column) => (
+              {Array.from({ length: 13 }, (_, column) => (
                 <td key={column}><span className={css.skelLine} /></td>
               ))}
             </tr>
