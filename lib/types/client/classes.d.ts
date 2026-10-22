@@ -40,7 +40,6 @@ export declare const css: {
     readonly callProjectName: "dlu-callProjectName";
     readonly callRange: "dlu-callRange";
     readonly callRangeGroup: "dlu-callRangeGroup";
-    readonly callProvider: "dlu-callProvider";
     readonly callScopeNote: "dlu-callScopeNote";
     readonly callSearchField: "dlu-callSearchField";
     readonly callSummary: "dlu-callSummary";

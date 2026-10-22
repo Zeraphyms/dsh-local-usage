@@ -112,7 +112,6 @@ export declare const zh: {
     callsColumnDuration: string;
     callsColumnTps: string;
     callsColumnHitRate: string;
-    callsTurnStep: string;
     callsExact: string;
     callsEmpty: string;
     callsLoading: string;
@@ -368,7 +367,6 @@ export declare const en: {
     callsColumnDuration: string;
     callsColumnTps: string;
     callsColumnHitRate: string;
-    callsTurnStep: string;
     callsExact: string;
     callsEmpty: string;
     callsLoading: string;

@@ -618,26 +618,18 @@ function CallRowView({
         <span className={css.callSessionName} title={row.title ?? row.sessionId}>
           {row.title ?? t('sessionUntitled')}
         </span>
-        <code className={css.callSessionId}>
-          #{shortSessionId(row.sessionId)}
-          {row.turn === undefined || row.step === undefined
-            ? ''
-            : ` · ${t('callsTurnStep', {
-              turn: formatInteger(row.turn),
-              step: formatInteger(row.step),
-            })}`}
-        </code>
+        <code className={css.callSessionId}>#{shortSessionId(row.sessionId)}</code>
       </th>
       <td className={css.callProjectCell} title={row.cwd}>
         <span className={css.callProjectName}>
           {row.cwd === undefined ? t('projectUnknown') : projectName(row.cwd) ?? row.cwd}
         </span>
       </td>
-      <td className={css.callModelCell} title={row.route}>
+      <td
+        className={css.callModelCell}
+        title={row.priced ? row.route : `${row.route} · ${t('pricingSourceFallback')}`}
+      >
         <span className={css.callModelName}>{row.model}</span>
-        <span className={css.callProvider}>
-          {row.priced ? row.provider : `${row.provider} · ${t('pricingSourceFallback')}`}
-        </span>
       </td>
       <td className={css.numeric} title={exact(row.tokens.uncachedInputTokens)}>
         {formatTokens(row.tokens.uncachedInputTokens)}

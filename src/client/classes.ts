@@ -44,7 +44,6 @@ export const css = {
   callProjectName: 'dlu-callProjectName',
   callRange: 'dlu-callRange',
   callRangeGroup: 'dlu-callRangeGroup',
-  callProvider: 'dlu-callProvider',
   callScopeNote: 'dlu-callScopeNote',
   callSearchField: 'dlu-callSearchField',
   callSummary: 'dlu-callSummary',

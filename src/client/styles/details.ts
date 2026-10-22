@@ -162,7 +162,7 @@ export const details = String.raw`/* ── The range's detail view ────
 
 .dlu-callTable {
   inline-size: 100%;
-  min-inline-size: 1160px;
+  min-inline-size: 1080px;
   font-size: 11.5px;
   table-layout: fixed;
   border-collapse: collapse;
@@ -171,31 +171,31 @@ export const details = String.raw`/* ── The range's detail view ────
 /* Fixed column measures: a session title is truncated to its cell, and the
  * numeric columns stay the same width whether a call cost 0.0001 or 12.30. */
 .dlu-callColTime {
-  inline-size: 100px;
+  inline-size: 92px;
 }
 
 .dlu-callColSession {
-  inline-size: 200px;
+  inline-size: 150px;
 }
 
 .dlu-callColProject {
-  inline-size: 120px;
+  inline-size: 100px;
 }
 
 .dlu-callColModel {
-  inline-size: 170px;
+  inline-size: 140px;
 }
 
 .dlu-callColNumber {
-  inline-size: 54px;
+  inline-size: 60px;
 }
 
 .dlu-callColTiming {
-  inline-size: 58px;
+  inline-size: 56px;
 }
 
 .dlu-callColCost {
-  inline-size: 62px;
+  inline-size: 60px;
 }
 
 .dlu-callTable th {
@@ -243,8 +243,8 @@ export const details = String.raw`/* ── The range's detail view ────
 }
 
 .dlu-callSessionCell {
-  max-inline-size: 220px;
-  padding-inline-end: 18px;
+  max-inline-size: 180px;
+  padding-inline-end: 12px;
   font-weight: 500;
   text-align: left;
   color: var(--dsw-alias-label-primary);
@@ -270,7 +270,7 @@ export const details = String.raw`/* ── The range's detail view ────
 }
 
 .dlu-callProjectCell {
-  max-inline-size: 160px;
+  max-inline-size: 120px;
 }
 
 .dlu-callProjectName {
@@ -281,7 +281,7 @@ export const details = String.raw`/* ── The range's detail view ────
 }
 
 .dlu-callModelCell {
-  max-inline-size: 220px;
+  max-inline-size: 160px;
 }
 
 .dlu-callModelName {
@@ -290,15 +290,6 @@ export const details = String.raw`/* ── The range's detail view ────
   font-size: 12px;
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.dlu-callProvider {
-  display: block;
-  overflow: hidden;
-  font-size: 10px;
-  color: var(--dsw-alias-label-caption);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
