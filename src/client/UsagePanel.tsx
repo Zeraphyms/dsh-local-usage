@@ -4,8 +4,8 @@
  * This is a global panel rather than a settings page: the calendar needs the
  * main column's width to show a whole year without scrolling, and what the
  * profile has spent is not a preference. It spans the current year and fills in
- * as the year passes; the range selector narrows the figures and rings the days
- * it covers, so the frame stays put while the reading changes.
+ * as the year passes; the range selector narrows the figures and marks the days
+ * it covers on the calendar, so the frame stays put while the reading changes.
  *
  * Everything is fetched per session fold the Host already cached, so switching
  * ranges re-prices instead of re-reading logs — and so does opening a day, which
@@ -259,7 +259,6 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   const waveSettled = summaryState.status === 'ready' && summaryState.rangeId === rangeKey
   // Held long enough to be a state rather than a flash.
   const waveLoading = useMinimumDwell(!waveSettled, 460)
-
 
   /** Move the date fields of the custom range, clamped to the calendar's window. */
   function setCustomDay(which: 'from' | 'to', value: string): void {

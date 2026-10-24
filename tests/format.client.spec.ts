@@ -70,6 +70,10 @@ describe('formatRate', () => {
     expect(tiny).toBe('0.0000002')
   })
 
+  it('states a value that is not a number as a dash', () => {
+    expect(formatRate(Number.NaN, 'en')).toBe('—')
+  })
+
   it('keeps the shipped cards readable, and the cheap buckets unrounded', () => {
     expect(formatRate(4.5, 'en')).toBe('4.5')
     expect(formatRate(13.5, 'en')).toBe('13.5')

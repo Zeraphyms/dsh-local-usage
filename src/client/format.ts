@@ -187,6 +187,7 @@ export function formatPercent(value: number, locale: string): string {
  * @returns the rate as written in the active locale.
  */
 export function formatRate(value: number, locale: string): string {
+  if (!Number.isFinite(value)) return '—'
   if (value === 0) return '0'
   const formatter = resolve(
     rateFormatters,
@@ -194,6 +195,24 @@ export function formatRate(value: number, locale: string): string {
     () => new Intl.NumberFormat(locale, { maximumSignificantDigits: 4 }),
   )
   return formatter === undefined ? String(value) : formatter.format(value)
+}
+
+/**
+ * A token count at the scale the price sheet states volume: thousands, millions,
+ * billions.
+ *
+ * Deliberately not localized: the sheet's volume column is read beside rates
+ * quoted per million tokens, and a reader comparing a card with a provider's
+ * rate card checks it in those units. Every other surface uses `formatTokens`,
+ * which follows the reader's language.
+ * @param value - token count.
+ * @returns the count as `1.2K`, `3.4M`, `5.6B`, or the plain number below 1,000.
+ */
+export function formatCompact(value: number): string {
+  if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`
+  if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`
+  if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`
+  return String(value)
 }
 
 /** Local midnight of one `YYYY-MM-DD` day key, or `undefined` when malformed. */

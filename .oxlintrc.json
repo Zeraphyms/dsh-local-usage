@@ -1,0 +1,14 @@
+{
+  "plugins": ["react"],
+  "rules": {
+    "react/purity": "off",
+    "react/set-state-in-effect": "off",
+    "react-hooks/exhaustive-deps": "error",
+    "react/button-has-type": "error",
+    "react/jsx-key": "error",
+    "react/jsx-no-duplicate-props": "error",
+    "react/jsx-no-target-blank": "error",
+    "react/no-children-prop": "error",
+    "react/void-dom-elements-no-children": "error"
+  }
+}

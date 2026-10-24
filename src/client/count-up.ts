@@ -81,9 +81,11 @@ export function useEntrance(animate: boolean, onDone?: () => void): number {
   const [share, setShare] = useState(animate ? 0 : 1)
   const settled = useRef(!animate)
   // Held by reference so an inline callback does not restart the entrance on
-  // every render, which is what a dependency on it would do.
+  // every render, which is what a dependency on it would do. Written from an
+  // effect rather than during render: a render must not mutate a ref, and this
+  // one is declared before the entrance so the first frame already sees it.
   const done = useRef(onDone)
-  done.current = onDone
+  useEffect(() => { done.current = onDone }, [onDone])
 
   useEffect(() => {
     if (!animate || settled.current || prefersReducedMotion()) {

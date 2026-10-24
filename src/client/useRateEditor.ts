@@ -15,12 +15,12 @@ import type { UsageModelPrice, UsagePricingUpdate } from '../types.ts'
 import {
   draftsFrom,
   pendingUpdate,
+  rateSignature,
   type ModelDrafts,
   type PriceSet,
   type RateDraftResult,
   type RateField,
 } from './rate-draft.ts'
-import { rateSignature } from './RateGroup.tsx'
 
 /** How long the saved confirmation stays up. */
 const CONFIRMATION_MS = 2200
@@ -66,6 +66,9 @@ export function useRateEditor({ models, onSave, table }: UseRateEditorOptions): 
   const signature = models
     .map(card => `${card.match}\u0000${String(card.peakEnabled)}\u0000${rateSignature(card.offPeak)}\u0000${rateSignature(card.peak)}`)
     .join('\u0001')
+  // `signature` is the identity of `models`: the array is rebuilt on every
+  // render of the page, so depending on it would reset the drafts mid-keystroke.
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setDrafts(draftsFrom(models)) }, [signature])
 
   useEffect(() => {

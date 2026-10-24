@@ -8,7 +8,6 @@
  */
 import type { ReactNode } from 'react';
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
-import type { UsageRate } from '../types.ts';
 import { type ModelDraft, type PriceSet, type RateField } from './rate-draft.ts';
 import type { RateRow } from './rate-row.ts';
 /** Props for one model's block of rows. */
@@ -23,6 +22,8 @@ interface RateGroupProps {
         readonly field: RateField;
     } | undefined;
     readonly busy: boolean;
+    /** Active locale id, for the rates as written. */
+    readonly locale: string;
     readonly t: PropsLocale<'usage'>['t'];
     readonly formatCost: (value: number) => string;
     readonly onEdit: () => void;
@@ -42,7 +43,5 @@ interface RateGroupProps {
  * @param props - one row's card, its draft, and the editor's handlers.
  * @returns a table body, one group per model.
  */
-export declare function RateGroup({ row, draft, open, invalid, busy, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, }: RateGroupProps): ReactNode;
-/** A price set reduced to what tells two configurations apart. */
-export declare function rateSignature(rate: UsageRate): string;
+export declare function RateGroup({ row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, }: RateGroupProps): ReactNode;
 export {};

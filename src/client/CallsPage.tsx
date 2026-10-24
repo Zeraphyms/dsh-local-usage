@@ -21,10 +21,12 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageCallRow, UsageCallsReport, UsageCallSort, UsageTokens } from '../types.ts'
 import { cacheHitRate } from './cache-rate.ts'
-import { addDays, dayKey, dayTime, midnight, nextDayStart } from './heatmap-grid.ts'
+import { dayKey } from './heatmap-grid.ts'
 import { displayModel, modelKey } from '../model-name.ts'
 import { projectName } from './paths.ts'
 import { CALLS_PATH } from './routes.ts'
+import { rangeBounds } from './range.ts'
+import type { CustomRange } from './range.ts'
 import { formatMoment, formatSeconds, formatThroughput } from './format.ts'
 import { normalizeCallsReport } from './wire-calls.ts'
 import type { UsageInsightsLocaleKey } from './locales.ts'
@@ -70,38 +72,25 @@ const DEFAULT_SORT: SortChoice = SORTS[0] ?? {
 /** Page sizes offered, in the order a reader is likely to want them. */
 const PAGE_SIZES: readonly number[] = [50, 100, 200]
 
-/** A hand-picked range, as the two day keys the date fields hold. */
-interface CustomRange {
-  readonly from: string
-  readonly to: string
-}
-
 /** One query fetch's state; `data` survives a later page so the table never blinks. */
 interface CallsState {
   readonly status: 'loading' | 'ready' | 'error'
   readonly data?: UsageCallsReport
 }
 
-/** Inclusive bounds of one selected range, in Unix epoch milliseconds. */
+/**
+ * Inclusive bounds of one selected range, in Unix epoch milliseconds.
+ *
+ * The presets are the panel's own (see `range.ts`); only `all` is the log's, an
+ * unbounded query the calendar has no equivalent for.
+ */
 function boundsOf(id: RangeId, now: number, custom: CustomRange | undefined): {
   readonly from?: number
   readonly to?: number
 } {
-  const today = midnight(now)
-  const end = nextDayStart(today) - 1
   if (id === 'all') return {}
-  if (id === 'today') return { from: today, to: end }
-  if (id === 'week') return { from: addDays(today, -6), to: end }
-  if (id === 'month') {
-    const date = new Date(now)
-    return { from: new Date(date.getFullYear(), date.getMonth(), 1).getTime(), to: end }
-  }
-  if (id === 'custom' && custom !== undefined) {
-    const from = dayTime(custom.from)
-    const to = dayTime(custom.to)
-    if (from !== undefined && to !== undefined && to >= from) return { from, to: nextDayStart(to) - 1 }
-  }
-  return { from: today, to: end }
+  const [from, to] = rangeBounds(id === 'today' ? 'day' : id, now, custom)
+  return { from, to }
 }
 
 /** The first eight characters of a session's own id, without the shared prefix. */
@@ -221,6 +210,7 @@ export function CallsPage({
     return () => { live = false; controller.abort() }
     // `queryKey` carries every filter; `offset` and `reload` are the page and the
     // retry, and changing either is a new request over the same filters.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [queryKey, offset, reload])
 
   /** Move one end of the hand-picked range, keeping the other end on its side. */

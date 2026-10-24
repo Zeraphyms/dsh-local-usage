@@ -41,6 +41,19 @@ export type ModelDrafts = Record<string, ModelDraft>
 /** The four buckets, in the order the editor writes them. */
 export const RATE_FIELDS = ['input', 'cacheRead', 'cacheWrite', 'output'] as const
 
+/**
+ * A price set reduced to what tells two configurations apart.
+ *
+ * The editor re-seeds its drafts when the cards in effect change, and the cards
+ * are rebuilt on every render of the page; this is the string it compares, so a
+ * render that changed nothing does not overwrite what is being typed.
+ * @param rate - one set of four prices.
+ * @returns the four prices as a stable signature.
+ */
+export function rateSignature(rate: UsageRate): string {
+  return RATE_FIELDS.map(field => String(rate[field])).join(',')
+}
+
 /** One bucket of one card. */
 export type RateField = typeof RATE_FIELDS[number]
 

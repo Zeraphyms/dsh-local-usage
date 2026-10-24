@@ -37,6 +37,7 @@ describe('RateEditor interaction', () => {
     const { container } = render(createElement(RateEditor, {
       rows: [row('a'), row('b')],
       currency: 'CNY',
+      locale: 'zh',
       formatCost: (value: number) => `¥${value.toFixed(2)}`,
       t,
       onSave,

@@ -78,6 +78,18 @@ export declare function formatPercent(value: number, locale: string): string;
  */
 export declare function formatRate(value: number, locale: string): string;
 /**
+ * A token count at the scale the price sheet states volume: thousands, millions,
+ * billions.
+ *
+ * Deliberately not localized: the sheet's volume column is read beside rates
+ * quoted per million tokens, and a reader comparing a card with a provider's
+ * rate card checks it in those units. Every other surface uses `formatTokens`,
+ * which follows the reader's language.
+ * @param value - token count.
+ * @returns the count as `1.2K`, `3.4M`, `5.6B`, or the plain number below 1,000.
+ */
+export declare function formatCompact(value: number): string;
+/**
  * How much room one rendered figure needs, as a bucket rather than a width.
  *
  * The strip's layout is not allowed to depend on the data — a bigger total must

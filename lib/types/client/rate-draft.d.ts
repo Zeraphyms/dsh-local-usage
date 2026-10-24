@@ -14,7 +14,7 @@
  *
  * @module dsh-local-usage/client/rate-draft
  */
-import type { UsageModelPrice, UsagePricingUpdate } from '../types.ts';
+import type { UsageModelPrice, UsagePricingUpdate, UsageRate } from '../types.ts';
 /** One set of four price fields, as typed. */
 export interface PriceFields {
     input: string;
@@ -35,6 +35,16 @@ export interface ModelDraft {
 export type ModelDrafts = Record<string, ModelDraft>;
 /** The four buckets, in the order the editor writes them. */
 export declare const RATE_FIELDS: readonly ["input", "cacheRead", "cacheWrite", "output"];
+/**
+ * A price set reduced to what tells two configurations apart.
+ *
+ * The editor re-seeds its drafts when the cards in effect change, and the cards
+ * are rebuilt on every render of the page; this is the string it compares, so a
+ * render that changed nothing does not overwrite what is being typed.
+ * @param rate - one set of four prices.
+ * @returns the four prices as a stable signature.
+ */
+export declare function rateSignature(rate: UsageRate): string;
 /** One bucket of one card. */
 export type RateField = typeof RATE_FIELDS[number];
 /** Which of a card's two sets of prices a field belongs to. */

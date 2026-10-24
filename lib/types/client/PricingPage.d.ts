@@ -7,9 +7,9 @@
  * slip away from being dismissed. A page keeps its state, takes the width the
  * eight field columns need, and matches the day view this panel already has.
  *
- * Three sections, in the order a reader needs them: what the figure means, the
- * cards they can correct, and the routes those cards price — normalized by model,
- * because that is the unit pricing is stated in.
+ * Two blocks, in the order a reader needs them: the sheet itself, one row per
+ * model (the unit a price is stated in), and — folded away beneath it — where the
+ * figures come from and what they leave out.
  *
  * @module dsh-local-usage/client/PricingPage
  */

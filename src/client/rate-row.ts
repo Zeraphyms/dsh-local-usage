@@ -32,7 +32,6 @@ export interface RateRow {
   readonly inherited: boolean
 }
 
-
 /** The dictionary key of each bucket's column label. */
 export const FIELD_KEYS: Record<RateField, 'pricingColumnInput' | 'pricingColumnCacheRead' | 'pricingColumnCacheWrite' | 'pricingColumnOutput'> = {
   input: 'pricingColumnInput',

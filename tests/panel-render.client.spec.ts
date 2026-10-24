@@ -160,6 +160,7 @@ describe('the stylesheet keeps the layout a function of the panel, not of the da
 describe('the price sheet', () => {
   const base = {
     currency: 'CNY',
+    locale: 'en',
     t,
     formatCost: (value: number) => `CNY ${value.toFixed(2)}`,
     onSave: () => Promise.resolve(),

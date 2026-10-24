@@ -17,6 +17,7 @@ import {
   type RateField,
 } from './rate-draft.ts'
 import { FIELD_KEYS } from './rate-row.ts'
+import { formatCompact, formatRate } from './format.ts'
 import type { RateRow } from './rate-row.ts'
 import { css } from './classes.ts'
 
@@ -36,6 +37,8 @@ interface RateGroupProps {
   /** The field that holds something which is not a price, when it is here. */
   readonly invalid: { readonly set: PriceSet; readonly field: RateField } | undefined
   readonly busy: boolean
+  /** Active locale id, for the rates as written. */
+  readonly locale: string
   readonly t: PropsLocale<'usage'>['t']
   readonly formatCost: (value: number) => string
   readonly onEdit: () => void
@@ -57,7 +60,7 @@ interface RateGroupProps {
  * @returns a table body, one group per model.
  */
 export function RateGroup({
-  row, draft, open, invalid, busy, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite,
+  row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite,
 }: RateGroupProps): ReactNode {
   const card = row.card
   const editing = open && draft !== undefined
@@ -109,7 +112,7 @@ export function RateGroup({
                     onChange={event => { onWrite(entry.set, field, event.target.value) }}
                   />
                 )
-                : formatPrice(entry.rate[field])}
+                : formatRate(entry.rate[field], locale)}
             </td>
           ))}
           {index === 0
@@ -208,22 +211,4 @@ function priceSets(
   return peakEnabled
     ? [{ set: 'peak', label: t('rateSetPeak'), rate: card.peak }, offPeak]
     : [offPeak]
-}
-
-/** A price set reduced to what tells two configurations apart. */
-export function rateSignature(rate: UsageRate): string {
-  return RATE_FIELDS.map(field => String(rate[field])).join(',')
-}
-
-/** A token count as the row's volume: thousands, millions, billions. */
-function formatCompact(value: number): string {
-  if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`
-  if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`
-  if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`
-  return String(value)
-}
-
-/** A price as it reads in the table: the number as typed, without grouping. */
-function formatPrice(value: number): string {
-  return Number.isFinite(value) ? String(value) : '—'
 }
