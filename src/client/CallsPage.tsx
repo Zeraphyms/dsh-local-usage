@@ -16,82 +16,20 @@
  * @module dsh-local-usage/client/CallsPage
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { UsageCallRow, UsageCallsReport, UsageCallSort, UsageTokens } from '../types.ts'
+import type { UsageCallRow, UsageTokens } from '../types.ts'
 import { cacheHitRate } from './cache-rate.ts'
-import { dayKey } from './heatmap-grid.ts'
-import { displayModel, modelKey } from '../model-name.ts'
 import { projectName } from './paths.ts'
-import { CALLS_PATH } from './routes.ts'
-import { rangeBounds } from './range.ts'
-import type { CustomRange } from './range.ts'
+import {
+  CALLS_PAGE_SIZES,
+  CALLS_RANGES,
+  CALLS_SORTS,
+  useCallsQuery,
+} from './useCallsQuery.ts'
 import { formatMoment, formatSeconds, formatThroughput } from './format.ts'
-import { normalizeCallsReport } from './wire-calls.ts'
-import type { UsageInsightsLocaleKey } from './locales.ts'
 import { css } from './classes.ts'
-
-/** Ranges the page offers, in selection order. */
-type RangeId = 'today' | 'week' | 'month' | 'all' | 'custom'
-
-const RANGES: readonly { readonly id: RangeId; readonly key: UsageInsightsLocaleKey }[] = [
-  { id: 'today', key: 'rangeDay' },
-  { id: 'week', key: 'range7' },
-  { id: 'month', key: 'rangeMonth' },
-  { id: 'all', key: 'callsRangeAll' },
-  { id: 'custom', key: 'rangeCustom' },
-]
-
-/** Ordering choices, the id carrying both the column and its direction. */
-type SortId = 'time-desc' | 'time-asc' | 'cost-desc' | 'tokens-desc' | 'output-desc'
-
-interface SortChoice {
-  readonly id: SortId
-  readonly key: UsageInsightsLocaleKey
-  readonly sort: UsageCallSort
-  readonly dir: 'asc' | 'desc'
-}
-
-const SORTS: readonly SortChoice[] = [
-  { id: 'time-desc', key: 'callsSortTimeDesc', sort: 'time', dir: 'desc' },
-  { id: 'time-asc', key: 'callsSortTimeAsc', sort: 'time', dir: 'asc' },
-  { id: 'cost-desc', key: 'callsSortCostDesc', sort: 'cost', dir: 'desc' },
-  { id: 'tokens-desc', key: 'callsSortTokensDesc', sort: 'tokens', dir: 'desc' },
-  { id: 'output-desc', key: 'callsSortOutputDesc', sort: 'output', dir: 'desc' },
-]
-
-/** The ordering used until the reader says otherwise. */
-const DEFAULT_SORT: SortChoice = SORTS[0] ?? {
-  id: 'time-desc',
-  key: 'callsSortTimeDesc',
-  sort: 'time',
-  dir: 'desc',
-}
-
-/** Page sizes offered, in the order a reader is likely to want them. */
-const PAGE_SIZES: readonly number[] = [50, 100, 200]
-
-/** One query fetch's state; `data` survives a later page so the table never blinks. */
-interface CallsState {
-  readonly status: 'loading' | 'ready' | 'error'
-  readonly data?: UsageCallsReport
-}
-
-/**
- * Inclusive bounds of one selected range, in Unix epoch milliseconds.
- *
- * The presets are the panel's own (see `range.ts`); only `all` is the log's, an
- * unbounded query the calendar has no equivalent for.
- */
-function boundsOf(id: RangeId, now: number, custom: CustomRange | undefined): {
-  readonly from?: number
-  readonly to?: number
-} {
-  if (id === 'all') return {}
-  const [from, to] = rangeBounds(id === 'today' ? 'day' : id, now, custom)
-  return { from, to }
-}
 
 /** The first eight characters of a session's own id, without the shared prefix. */
 function shortSessionId(id: string): string {
@@ -134,156 +72,25 @@ export function CallsPage({
   formatCost, formatTokens, formatInteger, formatPercent,
   initialFrom, initialTo, backLabel, onBack,
 }: CallsPageProps): ReactNode {
-  // The panel fixes its frame at mount; the call log does the same, so a page
-  // left open across midnight keeps answering the window it was opened on.
-  const now = useMemo(() => Date.now(), [])
   const frame = useRef<HTMLElement>(null)
   // Replacing the panel's contents drops focus to the document body; a page
   // that opens should start at its own top, keyboard included.
   useEffect(() => { frame.current?.focus() }, [])
-  const [rangeId, setRangeId] = useState<RangeId>(initialFrom === undefined ? 'week' : 'custom')
-  const [custom, setCustom] = useState<CustomRange | undefined>(
-    initialFrom === undefined
-      ? undefined
-      : { from: dayKey(initialFrom), to: dayKey(initialTo ?? initialFrom) },
-  )
-  const [model, setModel] = useState('')
-  const [search, setSearch] = useState('')
-  const [appliedSearch, setAppliedSearch] = useState('')
-  const [sortId, setSortId] = useState<SortId>(DEFAULT_SORT.id)
-  const [limit, setLimit] = useState(50)
-  const [offset, setOffset] = useState(0)
-  const [reload, setReload] = useState(0)
-  const [state, setState] = useState<CallsState>({ status: 'loading' })
-
-  // Typing is a query on every keystroke only if the reader asked for one; a
-  // short settle keeps a title being spelled from firing a request per letter.
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setAppliedSearch(search.trim())
-      setOffset(0)
-    }, 220)
-    return () => { window.clearTimeout(timer) }
-  }, [search])
-
-  const bounds = boundsOf(rangeId, now, custom)
-  const sort = SORTS.find(candidate => candidate.id === sortId) ?? DEFAULT_SORT
-  const queryKey = [
-    String(bounds.from ?? ''),
-    String(bounds.to ?? ''),
-    model,
-    appliedSearch,
-    sort.sort,
-    sort.dir,
-    String(limit),
-  ].join('|')
-
-  useEffect(() => {
-    const controller = new AbortController()
-    let live = true
-    setState(previous => previous.data === undefined
-      ? { status: 'loading' }
-      : { status: 'loading', data: previous.data })
-    const url = new URL(CALLS_PATH, window.location.origin)
-    if (bounds.from !== undefined) url.searchParams.set('from', String(bounds.from))
-    if (bounds.to !== undefined) url.searchParams.set('to', String(bounds.to))
-    if (model.length > 0) url.searchParams.set('model', model)
-    if (appliedSearch.length > 0) url.searchParams.set('q', appliedSearch)
-    url.searchParams.set('sort', sort.sort)
-    url.searchParams.set('dir', sort.dir)
-    url.searchParams.set('offset', String(offset))
-    url.searchParams.set('limit', String(limit))
-    void fetch(url, { credentials: 'include', signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`call log answered ${String(response.status)}`)
-        return await response.json() as Partial<UsageCallsReport>
-      })
-      .then((value) => {
-        if (live) setState({ status: 'ready', data: normalizeCallsReport(value) })
-      })
-      .catch(() => {
-        if (!live) return
-        setState(previous => previous.data === undefined
-          ? { status: 'error' }
-          : { status: 'error', data: previous.data })
-      })
-    return () => { live = false; controller.abort() }
-    // `queryKey` carries every filter; `offset` and `reload` are the page and the
-    // retry, and changing either is a new request over the same filters.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey, offset, reload])
-
-  /** Move one end of the hand-picked range, keeping the other end on its side. */
-  function moveCustom(which: 'from' | 'to', value: string): void {
-    // A cleared date field emits an empty string; keep the date it had rather
-    // than fall to a range with no start.
-    if (value === '') return
-    setCustom(current => {
-      const base = current ?? { from: dayKey(now), to: dayKey(now) }
-      return which === 'from'
-        ? { from: value, to: value > base.to ? value : base.to }
-        : { from: value < base.from ? value : base.from, to: value }
-    })
-    setOffset(0)
-  }
-
-  /** Select one range, seeding a hand-picked range from the one in effect. */
-  function chooseRange(id: RangeId): void {
-    if (id === 'custom' && custom === undefined) {
-      const current = boundsOf(rangeId, now, undefined)
-      setCustom({
-        from: dayKey(current.from ?? now),
-        to: dayKey(current.to ?? now),
-      })
-    }
-    setRangeId(id)
-    setOffset(0)
-  }
-
-  /** Replace the whole query with one model, or with every model. */
-  function chooseModel(value: string): void {
-    setModel(value)
-    setOffset(0)
-  }
-
-  const data = state.data
+  // Filters, the page and the request they imply live in the query's own hook;
+  // this component decides only how each of its states is drawn.
+  const {
+    rangeId, custom, model, search, sort, limit, offset, state, data, models,
+    total, pageSize, page, pages, shownFrom, shownTo,
+    chooseRange, moveCustom, chooseModel, writeSearch, chooseSort, chooseLimit, goToOffset, retry,
+  } = useCallsQuery({
+    ...initialFrom === undefined ? {} : { initialFrom },
+    ...initialTo === undefined ? {} : { initialTo },
+  })
   // A provider that never reports cache writes makes a column of zeroes read as
   // a bug in this panel. When the whole match reports none, the column is
   // dropped and the summary says writes went unreported instead.
   const showCacheWrite = data !== undefined && data.totals.cacheWriteTokens > 0
-  const pageSize = data !== undefined && data.limit > 0 ? data.limit : limit
-  const total = data?.total ?? 0
-  const totals = data?.totals
-  const hitRate = totals === undefined ? undefined : cacheHitRate(totals)
-  const pages = Math.max(1, Math.ceil(total / pageSize))
-  const page = Math.floor(offset / pageSize) + 1
-  const shownFrom = total === 0 ? 0 : offset + 1
-  const shownTo = Math.min(offset + (data?.rows.length ?? 0), total)
-
-  // The filter lists models, not routes: one model is sold through several
-  // vendor routes, and a reader choosing "deepseek-v4-flash" means all of them.
-  const models = useMemo(() => {
-    const groups = new Map<string, {
-      readonly key: string
-      readonly names: string[]
-      calls: number
-      routes: number
-    }>()
-    for (const facet of state.data?.routes ?? []) {
-      const key = modelKey(facet.model)
-      const current = groups.get(key)
-      if (current === undefined) {
-        groups.set(key, { key, names: [facet.model], calls: facet.calls, routes: 1 })
-      } else {
-        current.names.push(facet.model)
-        current.calls += facet.calls
-        current.routes += 1
-      }
-    }
-    return [...groups.values()]
-      .map(group => ({ key: group.key, model: displayModel(group.names), calls: group.calls, routes: group.routes }))
-      .sort((left, right) => right.calls - left.calls || left.model.localeCompare(right.model))
-  }, [state.data])
+  const hitRate = data === undefined ? undefined : cacheHitRate(data.totals)
 
   return (
     <section ref={frame} className={css.breakdown} tabIndex={-1} aria-label={t('callsTitle')}>
@@ -301,7 +108,7 @@ export function CallsPage({
         <div className={css.callField}>
           <span>{t('callsFilterRange')}</span>
           <div className={`${css.ranges} ${css.callRangeGroup}`} role="group" aria-label={t('callsFilterRange')}>
-            {RANGES.map(candidate => (
+            {CALLS_RANGES.map(candidate => (
               <button
                 key={candidate.id}
                 type="button"
@@ -361,7 +168,7 @@ export function CallsPage({
             type="search"
             value={search}
             placeholder={t('callsSearchPlaceholder')}
-            onChange={event => { setSearch(event.target.value) }}
+            onChange={event => { writeSearch(event.target.value) }}
           />
         </label>
 
@@ -370,14 +177,11 @@ export function CallsPage({
           <select
             value={sort.id}
             onChange={(event) => {
-              const next = SORTS.find(candidate => candidate.id === event.target.value)
-              if (next !== undefined) {
-                setSortId(next.id)
-                setOffset(0)
-              }
+              const next = CALLS_SORTS.find(candidate => candidate.id === event.target.value)
+              if (next !== undefined) chooseSort(next.id)
             }}
           >
-            {SORTS.map(candidate => (
+            {CALLS_SORTS.map(candidate => (
               <option key={candidate.id} value={candidate.id}>{t(candidate.key)}</option>
             ))}
           </select>
@@ -388,11 +192,10 @@ export function CallsPage({
           <select
             value={String(limit)}
             onChange={(event) => {
-              setLimit(Number(event.target.value))
-              setOffset(0)
+              chooseLimit(Number(event.target.value))
             }}
           >
-            {PAGE_SIZES.map(size => <option key={size} value={String(size)}>{String(size)}</option>)}
+            {CALLS_PAGE_SIZES.map(size => <option key={size} value={String(size)}>{String(size)}</option>)}
           </select>
         </label>
       </div>
@@ -465,7 +268,7 @@ export function CallsPage({
         ? (
           <div className={css.failure}>
             <p role="alert">{t('callsError')}</p>
-            <Button variant="outline" size="sm" onClick={() => { setReload(value => value + 1) }}>
+            <Button variant="outline" size="sm" onClick={retry}>
               {t('retry')}
             </Button>
           </div>
@@ -557,7 +360,7 @@ export function CallsPage({
               variant="outline"
               size="sm"
               disabled={offset === 0 || state.status === 'loading'}
-              onClick={() => { setOffset(Math.max(0, offset - pageSize)) }}
+              onClick={() => { goToOffset(Math.max(0, offset - pageSize)) }}
             >
               {t('callsPrev')}
             </Button>
@@ -571,7 +374,7 @@ export function CallsPage({
               variant="outline"
               size="sm"
               disabled={offset + pageSize >= total || state.status === 'loading'}
-              onClick={() => { setOffset(offset + pageSize) }}
+              onClick={() => { goToOffset(offset + pageSize) }}
             >
               {t('callsNext')}
             </Button>

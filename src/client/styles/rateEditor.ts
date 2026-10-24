@@ -9,12 +9,6 @@
 
 export const rateEditor = String.raw`/* ── Rate editor ──────────────────────────────────────────────────────── */
 
-.dlu-editor {
-  padding-top: 12px;
-  margin-top: 14px;
-  border-top: 0.5px dashed var(--dsw-alias-border-l2);
-}
-
 .dlu-editorTitle {
   margin: 0 0 4px;
   font-size: 12.5px;
@@ -27,46 +21,6 @@ export const rateEditor = String.raw`/* ── Rate editor ───────
   font-size: 11px;
   line-height: 1.5;
   color: var(--dsw-alias-label-tertiary);
-}
-
-.dlu-editorTable {
-  inline-size: 100%;
-  font-size: 11.5px;
-  border-collapse: collapse;
-}
-
-.dlu-editorTable th {
-  padding: 0 0 6px;
-  font-weight: 400;
-  color: var(--dsw-alias-label-caption);
-  text-align: left;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
-}
-
-.dlu-editorTable .dlu-numeric {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.dlu-editorTable td {
-  padding: 5px 0;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
-}
-
-.dlu-editorTable th[scope='row'] {
-  max-inline-size: 168px;
-  padding-right: 8px;
-}
-
-.dlu-editorSource {
-  display: block;
-  margin-top: 2px;
-  font-size: 10px;
-  color: var(--dsw-alias-label-caption);
-}
-
-.dlu-editorSource[data-source='override'] {
-  color: var(--dsw-alias-link);
 }
 
 .dlu-editorField {
@@ -88,14 +42,6 @@ export const rateEditor = String.raw`/* ── Rate editor ───────
 
 .dlu-editorField[aria-invalid='true'] {
   border-color: var(--dsw-alias-state-error-primary);
-}
-
-.dlu-editorActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  margin-top: 10px;
 }
 
 .dlu-editorStatus {
@@ -138,16 +84,8 @@ export const rateEditor = String.raw`/* ── Rate editor ───────
     display: none;
   }
 
-  /* A narrow viewport has no room for a 640px panel anchored to a trigger, so
-   * the panel becomes a sheet under the header instead of overflowing it. */
-  .dlu-popoverPanel {
-    position: fixed;
-    inset-inline: 16px;
-    inset-block-start: 88px;
-    inline-size: auto;
-    max-inline-size: none;
-    max-block-size: calc(100vh - 150px);
-  }
+  
+
 }
 
 @media (max-width: 560px) {
@@ -214,8 +152,7 @@ export const rateEditor = String.raw`/* ── Rate editor ───────
   .dlu-summary .dlu-hero,
   .dlu-summary .dlu-tiles,
   .dlu-rank .dlu-rankList,
-  .dlu-rank .dlu-rankRowHead,
-  .dlu-rank .dlu-rankMore {
+  .dlu-rank .dlu-rankRowHead {
     transition: none;
   }
 

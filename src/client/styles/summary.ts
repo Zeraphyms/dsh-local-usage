@@ -83,8 +83,7 @@ export const summary = String.raw`/* ── Summary: one hero figure, then suppo
 .dlu-summary .dlu-hero,
 .dlu-summary .dlu-tiles,
 .dlu-rank .dlu-rankList,
-.dlu-rank .dlu-rankRowHead,
-.dlu-rank .dlu-rankMore {
+.dlu-rank .dlu-rankRowHead {
   transition: opacity 140ms ease-out;
 }
 

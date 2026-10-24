@@ -330,28 +330,6 @@ export const details = String.raw`/* ── The range's detail view ────
   }
 }
 
-.dlu-block {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 16px;
-  border-top: 0.5px solid var(--dsw-alias-border-l2);
-}
-
-.dlu-blockTitle {
-  margin: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-}
-
-.dlu-blockHint {
-  margin: 0;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--dsw-alias-label-tertiary);
-}
-
 /* Readings wrap rather than count: unlike the front page's strip, whose height
  * a figure must not be able to change, this grid has room to reflow and a
  * reading that needs two lines may have them. */
@@ -395,88 +373,6 @@ export const details = String.raw`/* ── The range's detail view ────
   overflow-wrap: anywhere;
 }
 
-/* Bars: the label and the value are fixed so the track is the only thing whose
- * length carries meaning, and a long label cannot shorten the chart. */
-.dlu-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.dlu-barRow {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 84px;
-  gap: 10px;
-  align-items: center;
-  font-size: 11.5px;
-}
-
-.dlu-barLabel {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.dlu-barTrack {
-  block-size: 8px;
-  overflow: hidden;
-  background: color-mix(in oklab, var(--dsw-alias-label-primary) 8%, transparent);
-  border-radius: 999px;
-}
-
-.dlu-barFill {
-  display: block;
-  block-size: 100%;
-  background: var(--dsw-alias-link);
-  border-radius: inherit;
-}
-
-.dlu-barValue {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  text-align: right;
-  color: var(--dsw-alias-label-secondary);
-}
-
-/* The detail view's tables: the day page's table, named for this page so a
- * change to one does not silently restyle the other. */
-.dlu-table {
-  inline-size: 100%;
-  font-size: 12px;
-  border-collapse: collapse;
-}
-
-.dlu-table th {
-  padding: 0 0 6px;
-  font-weight: 400;
-  color: var(--dsw-alias-label-caption);
-  text-align: left;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
-}
-
-.dlu-table td {
-  padding: 7px 0;
-  color: var(--dsw-alias-label-secondary);
-  font-variant-numeric: tabular-nums;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
-}
-
-.dlu-table th.dlu-cellName {
-  padding-right: 20px;
-  font-weight: 500;
-  vertical-align: top;
-  color: var(--dsw-alias-label-primary);
-}
-
-.dlu-table .dlu-numeric {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  text-align: right;
-}
-
 /* A route no configured card claimed: it is priced at the fallback rate, and
  * the badge is what stops that figure reading as a matched price. */
 .dlu-unpricedBadge {
@@ -490,23 +386,6 @@ export const details = String.raw`/* ── The range's detail view ────
   border-radius: 999px;
 }
 
-.dlu-sessionList {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.dlu-sessionRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px;
-  gap: 2px 12px;
-  align-items: baseline;
-  padding: 7px 0;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
-}
-
 .dlu-sessionName {
   overflow: hidden;
   font-size: 12.5px;
@@ -514,16 +393,6 @@ export const details = String.raw`/* ── The range's detail view ────
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--dsw-alias-label-primary);
-}
-
-.dlu-sessionFigures {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--dsw-alias-label-secondary);
 }
 
 `

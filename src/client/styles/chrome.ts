@@ -7,7 +7,7 @@
  * @module dsh-local-usage/client/styles/chrome
  */
 
-export const chrome = String.raw`/* ── Status and notes ─────────────────────────────────────────────────── */
+export const chrome = String.raw`/* ── Status ───────────────────────────────────────────────────────────── */
 
 .dlu-status {
   margin: 0;
@@ -185,53 +185,8 @@ export const chrome = String.raw`/* ── Status and notes ──────�
   color: var(--dsw-alias-state-error-primary);
 }
 
-.dlu-notes {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.dlu-notes p {
-  margin: 0;
-}
-
-.dlu-notesHeading {
-  margin: 0 0 2px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--dsw-alias-label-secondary);
-}
-
-/* The figure carries the finding, the note beside it says what it was measured
-   against; tertiary text at the same size would leave the two indistinguishable. */
-.dlu-noteValue {
-  margin-right: 6px;
-  font-variant-numeric: tabular-nums;
-  color: var(--dsw-alias-label-secondary);
-}
-
 .dlu-warning {
   color: var(--dsw-alias-state-warn-primary);
-}
-
-.dlu-scan {
-  font-variant-numeric: tabular-nums;
-}
-
-.dlu-disclosure {
-  padding-top: 12px;
-  margin-top: 4px;
-  border-top: 0.5px solid var(--dsw-alias-border-l1);
-}
-
-.dlu-disclosureSummary {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--dsw-alias-label-secondary);
-  cursor: pointer;
 }
 
 .dlu-disclosureBody {
@@ -248,39 +203,8 @@ export const chrome = String.raw`/* ── Status and notes ──────�
   margin: 0;
 }
 
-.dlu-pricingCaveat {
-  color: var(--dsw-alias-state-warn-primary);
-}
-
-.dlu-pricingRatesLabel {
-  margin-top: 3px;
-  color: var(--dsw-alias-label-secondary);
-}
-
 .dlu-pricingHint {
   color: var(--dsw-alias-label-caption);
-}
-
-.dlu-priceTable {
-  inline-size: 100%;
-  max-inline-size: 620px;
-  font-size: 11px;
-  border-collapse: collapse;
-}
-
-.dlu-priceTable th {
-  padding: 0 0 5px;
-  font-weight: 400;
-  color: var(--dsw-alias-label-caption);
-  text-align: left;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
-}
-
-.dlu-priceTable td {
-  padding: 5px 0;
-  color: var(--dsw-alias-label-secondary);
-  font-variant-numeric: tabular-nums;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 
 /* Every right-aligned figure in a table: one line, so a large amount widens its
@@ -333,8 +257,7 @@ export const chrome = String.raw`/* ── Status and notes ──────�
   color: var(--dsw-alias-label-secondary);
 }
 
-
-/* ── Header tools: the rate table and the provenance block ────────────── */
+/* ── Header tools: the pages and the recount ──────────────────────────── */
 
 .dlu-tools {
   display: flex;
@@ -342,93 +265,7 @@ export const chrome = String.raw`/* ── Status and notes ──────�
   gap: 8px;
 }
 
-.dlu-popoverHost {
-  position: relative;
-  display: inline-flex;
-}
-
-.dlu-iconButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 28px;
-  block-size: 28px;
-  padding: 0;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.dlu-iconButton:hover {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.dlu-iconButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-link);
-  outline-offset: 1px;
-}
-
-.dlu-iconButton[aria-expanded='true'] {
-  color: var(--dsw-alias-link);
-  border-color: var(--dsw-alias-link);
-}
-
-/* Waiting on the report behind it: still a control, visibly not yet a live one.
- * It keeps its box, so the header does not reflow when the read lands. */
-.dlu-iconButton[data-disabled='true'] {
-  color: var(--dsw-alias-label-caption);
-  cursor: default;
-  opacity: 0.5;
-}
-
-.dlu-iconButton[data-disabled='true']:hover {
-  color: var(--dsw-alias-label-caption);
-  background: transparent;
-}
-
-/* Anchored to the trigger and scrollable: the rate panel carries a table and an
- * editor, and neither is allowed to push the panel off the bottom of the frame. */
-.dlu-popoverPanel {
-  position: absolute;
-  z-index: 30;
-  inset-block-start: calc(100% + 8px);
-  inset-inline-end: 0;
-  inline-size: var(--dlu-popover-inline, 560px);
-  max-block-size: min(70vh, 640px);
-  max-inline-size: calc(100vw - 32px);
-  overflow: auto;
-  padding: 14px 16px 16px;
-  text-align: start;
-  background: var(--dsw-alias-bg-overlay);
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
-  box-shadow: 0 18px 44px rgb(0 0 0 / 0.18);
-}
-
-/* The eight pixels between the trigger and the panel are the panel's, not a
- * gap. Without this the pointer leaves the host while crossing them, the panel
- * closes under the hand travelling towards it, and the reference material is
- * unreachable by hover — which is the whole gesture. A transparent strip above
- * the panel makes the crossing one continuous hit area. */
-.dlu-popoverPanel::before {
-  content: '';
-  position: absolute;
-  inset-block-start: -8px;
-  inset-inline: 0;
-  block-size: 8px;
-}
-
-.dlu-popoverTitle {
-  margin: 0 0 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-}
-
-/* ── Project ranking ──────────────────────────────────────────────────── */
+/* ── Project ranking: the loading frame keeps the list's shape ────────── */
 
 .dlu-rank {
   display: flex;
@@ -445,19 +282,6 @@ export const chrome = String.raw`/* ── Status and notes ──────�
   gap: 4px 12px;
   align-items: baseline;
   justify-content: space-between;
-}
-
-.dlu-rankTitle {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-}
-
-.dlu-rankScope {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--dsw-alias-label-tertiary);
 }
 
 .dlu-rankList {
@@ -501,21 +325,6 @@ export const chrome = String.raw`/* ── Status and notes ──────�
   min-width: 0;
 }
 
-.dlu-rankNameText {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--dsw-alias-label-primary);
-}
-
-.dlu-rankPath {
-  display: block;
-  margin-top: 1px;
-  font-size: 10.5px;
-  color: var(--dsw-alias-label-caption);
-  overflow-wrap: anywhere;
-}
-
 /* The bar is the share of the leader, so the ranking stays readable when one
  * project dominates: scaled to the total, every other row would be a sliver. */
 .dlu-rankBar {
@@ -523,13 +332,6 @@ export const chrome = String.raw`/* ── Status and notes ──────�
   overflow: hidden;
   background: color-mix(in oklab, var(--dsw-alias-label-primary) 9%, transparent);
   border-radius: 999px;
-}
-
-.dlu-rankBarFill {
-  display: block;
-  block-size: 100%;
-  background: var(--dsw-alias-link);
-  border-radius: inherit;
 }
 
 .dlu-rankTokens,
@@ -545,32 +347,6 @@ export const chrome = String.raw`/* ── Status and notes ──────�
 .dlu-rankCost {
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
-}
-
-.dlu-rankMore {
-  align-self: flex-start;
-  padding: 5px 10px;
-  font-size: 11.5px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  cursor: pointer;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-}
-
-.dlu-rankMore:hover:not(:disabled) {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.dlu-rankMore:focus-visible {
-  outline: 2px solid var(--dsw-alias-link);
-  outline-offset: 1px;
-}
-
-.dlu-rankMore:disabled {
-  cursor: default;
-  opacity: 0.5;
 }
 
 `
