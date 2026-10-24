@@ -634,7 +634,12 @@ function CallRowView({
         className={css.callModelCell}
         title={row.priced ? row.route : `${row.route} · ${t('pricingSourceFallback')}`}
       >
-        <span className={css.callModelName}>{row.model}</span>
+        <span
+          className={css.callModelName}
+          title={`${row.model}\n${row.route}${row.priced ? '' : ` · ${t('pricingSourceFallback')}`}`}
+        >
+          {row.model}
+        </span>
       </td>
       <td className={css.numeric} title={exact(row.tokens.uncachedInputTokens)}>
         {formatTokens(row.tokens.uncachedInputTokens)}

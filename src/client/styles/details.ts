@@ -162,7 +162,7 @@ export const details = String.raw`/* ── The range's detail view ────
 
 .dlu-callTable {
   inline-size: 100%;
-  min-inline-size: 1000px;
+  min-inline-size: 1040px;
   font-size: 11.5px;
   table-layout: fixed;
   border-collapse: collapse;
@@ -175,11 +175,11 @@ export const details = String.raw`/* ── The range's detail view ────
 }
 
 .dlu-callColSession {
-  inline-size: 230px;
+  inline-size: 200px;
 }
 
 .dlu-callColModel {
-  inline-size: 120px;
+  inline-size: 150px;
 }
 
 .dlu-callColNumber {
@@ -266,7 +266,7 @@ export const details = String.raw`/* ── The range's detail view ────
 }
 
 .dlu-callModelCell {
-  max-inline-size: 160px;
+  max-inline-size: 170px;
 }
 
 .dlu-callModelName {
