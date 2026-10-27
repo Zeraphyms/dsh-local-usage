@@ -20,6 +20,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageCallRow, UsageTokens } from '../types.ts'
+import { UNKNOWN_PROJECT } from '../types.ts'
 import { cacheHitRate } from './cache-rate.ts'
 import { projectName } from './paths.ts'
 import {
@@ -56,6 +57,10 @@ export interface CallsPageProps {
   readonly initialFrom?: number
   /** Last instant of that window. */
   readonly initialTo?: number
+  /** Session id the opener narrowed to, when a stats table or day page did. */
+  readonly initialSession?: string
+  /** Working directory the opener narrowed to, when one did. */
+  readonly initialProject?: string
   /** Label for the way back, which differs between the calendar and a day page. */
   readonly backLabel?: string
   /** Leave the call log. */
@@ -70,7 +75,7 @@ export interface CallsPageProps {
 export function CallsPage({
   locale, t,
   formatCost, formatTokens, formatInteger, formatPercent,
-  initialFrom, initialTo, backLabel, onBack,
+  initialFrom, initialTo, initialSession, initialProject, backLabel, onBack,
 }: CallsPageProps): ReactNode {
   const frame = useRef<HTMLElement>(null)
   // Replacing the panel's contents drops focus to the document body; a page
@@ -79,12 +84,15 @@ export function CallsPage({
   // Filters, the page and the request they imply live in the query's own hook;
   // this component decides only how each of its states is drawn.
   const {
-    rangeId, custom, model, search, sort, limit, offset, state, data, models,
+    rangeId, custom, model, session, project, sort, limit, offset, state, data, models,
+    sessionOptions, projectOptions,
     total, pageSize, page, pages, shownFrom, shownTo,
-    chooseRange, moveCustom, chooseModel, writeSearch, chooseSort, chooseLimit, goToOffset, retry,
+    chooseRange, moveCustom, chooseModel, chooseSession, chooseProject, chooseSort, chooseLimit, goToOffset, retry,
   } = useCallsQuery({
     ...initialFrom === undefined ? {} : { initialFrom },
     ...initialTo === undefined ? {} : { initialTo },
+    ...initialSession === undefined ? {} : { initialSession },
+    ...initialProject === undefined ? {} : { initialProject },
   })
   // A provider that never reports cache writes makes a column of zeroes read as
   // a bug in this panel. When the whole match reports none, the column is
@@ -162,14 +170,36 @@ export function CallsPage({
           </select>
         </label>
 
-        <label className={`${css.callField} ${css.callSearchField}`}>
-          <span>{t('callsSearch')}</span>
-          <input
-            type="search"
-            value={search}
-            placeholder={t('callsSearchPlaceholder')}
-            onChange={event => { writeSearch(event.target.value) }}
-          />
+        <label className={css.callField}>
+          <span>{t('callsFilterSession')}</span>
+          <select value={session} onChange={event => { chooseSession(event.target.value) }}>
+            <option value="">{t('callsFilterAllSessions')}</option>
+            {session !== '' && !sessionOptions.some(option => option.sessionId === session)
+              ? <option value={session}>{session}</option>
+              : null}
+            {sessionOptions.map(option => (
+              <option key={option.sessionId} value={option.sessionId}>
+                {option.title ?? t('sessionUntitled')} · {formatInteger(option.calls)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className={css.callField}>
+          <span>{t('callsFilterProject')}</span>
+          <select value={project} onChange={event => { chooseProject(event.target.value) }}>
+            <option value="">{t('callsFilterAllProjects')}</option>
+            {project !== '' && !projectOptions.some(option => option.path === project)
+              ? <option value={project}>{projectName(project) ?? project}</option>
+              : null}
+            {projectOptions.map(option => (
+              <option key={option.path} value={option.path}>
+                {option.path === UNKNOWN_PROJECT
+                  ? t('projectUnknown')
+                  : projectName(option.path) ?? option.path} · {formatInteger(option.calls)}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className={css.callField}>

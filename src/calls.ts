@@ -25,6 +25,8 @@ import type {
   UsageCallsQuery,
   UsageCallsReport,
   UsageCosted,
+  UsageProjectFacet,
+  UsageSessionFacet,
   UsageTokens,
 } from './types.ts'
 
@@ -145,6 +147,8 @@ export function queryCalls(
   const rows: UsageCallRow[] = []
   const totals = emptyBucket()
   const facets = new Map<string, FacetBucket>()
+  const sessionFacets = new Map<string, { sessionId: string; title?: string; calls: number; cost: number }>()
+  const projectFacets = new Map<string, { path: string; calls: number; cost: number }>()
   const sessions = new Set<string>()
   const projects = new Set<string>()
   const modelNeedle = query.model === undefined || query.model.length === 0
@@ -156,6 +160,9 @@ export function queryCalls(
   const sessionNeedle = query.session === undefined || query.session.length === 0
     ? undefined
     : query.session
+  const projectNeedle = query.project === undefined || query.project.length === 0
+    ? undefined
+    : query.project
   const textNeedle = query.q === undefined ? '' : query.q.trim().toLowerCase()
 
   for (const input of inputs) {
@@ -198,9 +205,32 @@ export function queryCalls(
       }
       addTo(facet, sample.tokens, cost)
 
+      // The session and project facets see the window, not the filters — same
+      // rule as the route facets above, so no picker narrows its own choices.
+      let sessionFacet = sessionFacets.get(input.sessionId)
+      if (sessionFacet === undefined) {
+        sessionFacet = {
+          sessionId: input.sessionId,
+          ...input.title === undefined ? {} : { title: input.title },
+          calls: 0,
+          cost: 0,
+        }
+        sessionFacets.set(input.sessionId, sessionFacet)
+      }
+      sessionFacet.calls += 1
+      sessionFacet.cost += cost
+      let projectFacet = projectFacets.get(project)
+      if (projectFacet === undefined) {
+        projectFacet = { path: project, calls: 0, cost: 0 }
+        projectFacets.set(project, projectFacet)
+      }
+      projectFacet.calls += 1
+      projectFacet.cost += cost
+
       if (routeNeedle !== undefined && sample.route !== routeNeedle) continue
       if (modelNeedle !== undefined && modelKey(model) !== modelNeedle) continue
       if (sessionNeedle !== undefined && input.sessionId !== sessionNeedle) continue
+      if (projectNeedle !== undefined && project !== projectNeedle) continue
       if (textNeedle.length > 0
         && !sessionText.includes(textNeedle)
         && !sample.route.toLowerCase().includes(textNeedle)) continue
@@ -265,6 +295,22 @@ export function queryCalls(
     .sort((left, right) => right.calls - left.calls || right.cost - left.cost
       || left.route.localeCompare(right.route))
 
+  // Dearest first, then by title so the picker's order is stable across pages.
+  const sessionFacetRows: UsageSessionFacet[] = [...sessionFacets.values()]
+    .map(facet => ({
+      sessionId: facet.sessionId,
+      ...facet.title === undefined ? {} : { title: facet.title },
+      calls: facet.calls,
+      cost: facet.cost,
+    }))
+    .sort((left, right) => right.cost - left.cost
+      || (left.title ?? '').localeCompare(right.title ?? '')
+      || left.sessionId.localeCompare(right.sessionId))
+
+  const projectFacetRows: UsageProjectFacet[] = [...projectFacets.values()]
+    .map(facet => ({ ...facet }))
+    .sort((left, right) => right.cost - left.cost || left.path.localeCompare(right.path))
+
   return {
     generatedAt: meta.generatedAt,
     currency: options.currency,
@@ -274,6 +320,8 @@ export function queryCalls(
     limit,
     totals: costedOf(totals),
     routes,
+    sessionFacets: sessionFacetRows,
+    projectFacets: projectFacetRows,
     sessions: sessions.size,
     projects: projects.size,
     scannedSessions: meta.scannedSessions,

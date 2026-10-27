@@ -154,7 +154,42 @@ export interface UsageCallFacet {
 /** Which column a call-log query orders by. */
 export type UsageCallSort = 'time' | 'cost' | 'tokens' | 'output'
 
+/**
+ * One session the time window recorded, before the session/text filters.
+ *
+ * The call log's session picker reads this: the option's label is the title,
+ * its value the id, and the counts say how much choosing it would show. Like
+ * the route facets, these describe the window rather than the current query,
+ * so a filter never narrows the choices it offers.
+ */
+export interface UsageSessionFacet {
+  /** The durable session id, exactly as the log names it. */
+  readonly sessionId: string
+  /** Folded session title, absent when the log named none. */
+  readonly title?: string
+  /** Calls this session billed in the window. */
+  readonly calls: number
+  /** Money this session cost in the window. */
+  readonly cost: number
+}
+
+/**
+ * One working directory the window recorded, before the project/text filters.
+ *
+ * The value is the absolute path — what the `project` query parameter matches —
+ * and the label is the caller's business (the client shortens it for display).
+ */
+export interface UsageProjectFacet {
+  /** Absolute working directory, or the no-directory bucket's sentinel. */
+  readonly path: string
+  /** Calls billed from this directory in the window. */
+  readonly calls: number
+  /** Money this directory cost in the window. */
+  readonly cost: number
+}
+
 /** One call-log query. Every field is optional; the defaults are the newest page. */
+/** One call-log query. Every field is optional except ordering and paging. */
 export interface UsageCallsQuery {
   /** Inclusive lower bound on a call's settlement time, in Unix epoch milliseconds. */
   readonly from?: number
@@ -166,6 +201,8 @@ export interface UsageCallsQuery {
   readonly model?: string
   /** Exact durable session id. */
   readonly session?: string
+  /** Exact working directory: every session opened in it, plus the no-directory bucket. */
+  readonly project?: string
   /** Case-insensitive substring over session title, directory, id and route. */
   readonly q?: string
   readonly sort?: UsageCallSort
@@ -197,6 +234,10 @@ export interface UsageCallsReport {
   readonly totals: UsageCosted
   /** Routes in the time window, before the route/model filter, so the filter does not narrow itself. */
   readonly routes: readonly UsageCallFacet[]
+  /** Sessions in the time window, before the session/text filter, for the session picker. */
+  readonly sessionFacets: readonly UsageSessionFacet[]
+  /** Working directories in the time window, before the project/text filter, for the project picker. */
+  readonly projectFacets: readonly UsageProjectFacet[]
   /** Distinct sessions among the matching calls. */
   readonly sessions: number
   /** Distinct working directories among the matching calls. */

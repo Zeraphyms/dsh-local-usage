@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import type { UsageCallSort, UsageCallsReport } from '../types.ts'
+import type { UsageCallSort, UsageCallsReport, UsageProjectFacet, UsageSessionFacet } from '../types.ts'
 import { dayKey } from './heatmap-grid.ts'
 import { displayModel, modelKey } from '../model-name.ts'
 import { CALLS_PATH } from './routes.ts'
@@ -73,6 +73,16 @@ export interface CallsModelOption {
   readonly calls: number
 }
 
+/** Where the page starts, when a calendar, day page or stats table sent the reader here. */
+export interface CallsQueryOptions {
+  readonly initialFrom?: number
+  readonly initialTo?: number
+  /** Session id the opener narrowed to, when it did. */
+  readonly initialSession?: string
+  /** Working directory the opener narrowed to, when it did. */
+  readonly initialProject?: string
+}
+
 /**
  * Inclusive bounds of one selected range, in Unix epoch milliseconds.
  *
@@ -88,17 +98,13 @@ function boundsOf(id: CallsRangeId, now: number, custom: CustomRange | undefined
   return { from, to }
 }
 
-/** Where the page starts, when a calendar or day page sent the reader here. */
-export interface CallsQueryOptions {
-  readonly initialFrom?: number
-  readonly initialTo?: number
-}
-
 /** The query's state, its request's answer, and the controls that change it. */
 export interface CallsQuery {
   readonly rangeId: CallsRangeId
   readonly custom: CustomRange | undefined
   readonly model: string
+  readonly session: string
+  readonly project: string
   readonly search: string
   readonly sort: CallsSortChoice
   readonly limit: number
@@ -107,6 +113,10 @@ export interface CallsQuery {
   readonly data: UsageCallsReport | undefined
   /** Models the filter can choose, most called first. */
   readonly models: readonly CallsModelOption[]
+  /** Sessions the picker can choose, dearest first. */
+  readonly sessionOptions: readonly UsageSessionFacet[]
+  /** Directories the picker can choose, dearest first. */
+  readonly projectOptions: readonly UsageProjectFacet[]
   /** Rows of the current page, and where they sit in the whole match. */
   readonly total: number
   readonly pageSize: number
@@ -117,6 +127,8 @@ export interface CallsQuery {
   chooseRange: (id: CallsRangeId) => void
   moveCustom: (which: 'from' | 'to', value: string) => void
   chooseModel: (value: string) => void
+  chooseSession: (value: string) => void
+  chooseProject: (value: string) => void
   writeSearch: (value: string) => void
   chooseSort: (id: CallsSortId) => void
   chooseLimit: (size: number) => void
@@ -129,7 +141,7 @@ export interface CallsQuery {
  * @param options - the window a calendar or day page opened on, when it did.
  * @returns the query state, its answer, and the controls.
  */
-export function useCallsQuery({ initialFrom, initialTo }: CallsQueryOptions): CallsQuery {
+export function useCallsQuery({ initialFrom, initialTo, initialSession, initialProject }: CallsQueryOptions): CallsQuery {
   // The page fixes its frame at mount; a log left open across midnight keeps
   // answering the window it was opened on.
   const now = useMemo(() => Date.now(), [])
@@ -140,6 +152,8 @@ export function useCallsQuery({ initialFrom, initialTo }: CallsQueryOptions): Ca
       : { from: dayKey(initialFrom), to: dayKey(initialTo ?? initialFrom) },
   )
   const [model, setModel] = useState('')
+  const [session, setSession] = useState(initialSession ?? '')
+  const [project, setProject] = useState(initialProject ?? '')
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [sortId, setSortId] = useState<CallsSortId>(CALLS_DEFAULT_SORT.id)
@@ -164,6 +178,8 @@ export function useCallsQuery({ initialFrom, initialTo }: CallsQueryOptions): Ca
     String(bounds.from ?? ''),
     String(bounds.to ?? ''),
     model,
+    session,
+    project,
     appliedSearch,
     sort.sort,
     sort.dir,
@@ -180,6 +196,8 @@ export function useCallsQuery({ initialFrom, initialTo }: CallsQueryOptions): Ca
     if (bounds.from !== undefined) url.searchParams.set('from', String(bounds.from))
     if (bounds.to !== undefined) url.searchParams.set('to', String(bounds.to))
     if (model.length > 0) url.searchParams.set('model', model)
+    if (session.length > 0) url.searchParams.set('session', session)
+    if (project.length > 0) url.searchParams.set('project', project)
     if (appliedSearch.length > 0) url.searchParams.set('q', appliedSearch)
     url.searchParams.set('sort', sort.sort)
     url.searchParams.set('dir', sort.dir)
@@ -263,6 +281,8 @@ export function useCallsQuery({ initialFrom, initialTo }: CallsQueryOptions): Ca
     rangeId,
     custom,
     model,
+    session,
+    project,
     search,
     sort,
     limit,
@@ -270,6 +290,8 @@ export function useCallsQuery({ initialFrom, initialTo }: CallsQueryOptions): Ca
     state,
     data,
     models,
+    sessionOptions: state.data?.sessionFacets ?? [],
+    projectOptions: state.data?.projectFacets ?? [],
     total,
     pageSize,
     page,
@@ -279,6 +301,8 @@ export function useCallsQuery({ initialFrom, initialTo }: CallsQueryOptions): Ca
     chooseRange,
     moveCustom,
     chooseModel: (value) => { setModel(value); setOffset(0) },
+    chooseSession: (value) => { setSession(value); setOffset(0) },
+    chooseProject: (value) => { setProject(value); setOffset(0) },
     writeSearch: (value) => { setSearch(value) },
     chooseSort: (id) => { setSortId(id); setOffset(0) },
     chooseLimit: (size) => { setLimit(size); setOffset(0) },

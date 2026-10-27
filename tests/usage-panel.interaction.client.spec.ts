@@ -94,7 +94,8 @@ describe('UsagePanel interaction', () => {
     const callsPage: UsageCallsReport = {
       generatedAt: 1, currency: 'CNY', rows: [], total: 0, offset: 0, limit: 50,
       totals: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0, calls: 0 },
-      routes: [], sessions: 0, projects: 0, scannedSessions: 0, unreadableSessions: 0, cached: true,
+      routes: [], sessionFacets: [], projectFacets: [],
+      sessions: 0, projects: 0, scannedSessions: 0, unreadableSessions: 0, cached: true,
     }
     const fetchMock = vi.fn(async () => new Response(JSON.stringify(callsPage), {
       status: 200, headers: { 'content-type': 'application/json' },

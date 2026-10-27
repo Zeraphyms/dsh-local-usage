@@ -37,6 +37,12 @@ function page(): UsageCallsReport {
       route: 'p/m', model: 'm', provider: 'p', calls: 1,
       tokens: 6, cost: 0.01,
     }],
+    sessionFacets: [{
+      sessionId: 'session-12345678', title: 'Alpha task', calls: 1, cost: 0.01,
+    }],
+    projectFacets: [{
+      path: '/work/alpha', calls: 1, cost: 0.01,
+    }],
     sessions: 1, projects: 1, scannedSessions: 1, unreadableSessions: 0, cached: true,
   }
 }

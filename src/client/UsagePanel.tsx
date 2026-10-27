@@ -107,7 +107,15 @@ type PanelPage =
   | { readonly kind: 'calendar' }
   | { readonly kind: 'day'; readonly day: string }
   | { readonly kind: 'pricing' }
-  | { readonly kind: 'calls'; readonly range?: { readonly from: number; readonly to: number }; readonly returnDay?: string }
+  | {
+    readonly kind: 'calls'
+    readonly range?: { readonly from: number; readonly to: number }
+    readonly returnDay?: string
+    /** Session id the opener narrowed to, when a stats table row sent the reader here. */
+    readonly session?: string
+    /** Working directory the opener narrowed to, when one did. */
+    readonly project?: string
+  }
 
 /** Full component props assembled by the main slot renderer. */
 export type UsagePanelProps =
@@ -200,6 +208,8 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
   const showPricing = page.kind === 'pricing'
   const showCalls = page.kind === 'calls'
   const callsRange = page.kind === 'calls' ? page.range : undefined
+  const callsSession = page.kind === 'calls' ? page.session : undefined
+  const callsProject = page.kind === 'calls' ? page.project : undefined
   // Bumped after a rate write: every view re-prices without discarding folds.
   const [pricingRevision, setPricingRevision] = useState(0)
   // Whether the summary strip still owes the reader its entrance. Cleared when
@@ -356,6 +366,8 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
             formatInteger={integer}
             formatPercent={percent}
             {...callsRange === undefined ? {} : { initialFrom: callsRange.from, initialTo: callsRange.to }}
+            {...callsSession === undefined ? {} : { initialSession: callsSession }}
+            {...callsProject === undefined ? {} : { initialProject: callsProject }}
             {...callsRange === undefined ? {} : { backLabel: t('backToDay') }}
             onBack={() => {
               setPage(page.kind === 'calls' && page.returnDay !== undefined
@@ -569,6 +581,12 @@ export function UsagePanel({ panelId, locale, report, saveRates, t, usePanelInfo
                     t={t}
                     formatCost={money}
                     formatInteger={integer}
+                    onOpenCalls={(sessionId) => {
+                      // The call log was opened from the front page, not from a
+                      // day, so the way back goes to the calendar.
+                      setReturnDay(undefined)
+                      setPage({ kind: 'calls', session: sessionId })
+                    }}
                   />
                 ) : null}
 

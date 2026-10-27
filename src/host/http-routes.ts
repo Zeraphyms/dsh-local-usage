@@ -56,6 +56,7 @@ function callsQueryOf(params: URLSearchParams): UsageCallsQuery {
   const route = textParam(params, 'route', 200)
   const model = textParam(params, 'model', 120)
   const session = textParam(params, 'session', 200)
+  const project = textParam(params, 'project', 400)
   const q = textParam(params, 'q', 200)
   const offset = numberParam(params, 'offset')
   const limit = numberParam(params, 'limit')
@@ -65,6 +66,7 @@ function callsQueryOf(params: URLSearchParams): UsageCallsQuery {
     ...route === undefined ? {} : { route },
     ...model === undefined ? {} : { model },
     ...session === undefined ? {} : { session },
+    ...project === undefined ? {} : { project },
     ...q === undefined ? {} : { q },
     sort,
     dir: params.get('dir') === 'asc' ? 'asc' : 'desc',

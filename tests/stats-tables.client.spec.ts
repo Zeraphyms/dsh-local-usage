@@ -22,7 +22,7 @@ function t(key: string, params?: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => params[name] ?? match)
 }
 
-/** A report carrying one route and one directory. */
+/** A report carrying one route, one directory, and one session. */
 function reportOf(models: number, projects: number): UsageInsightsReport {
   return {
     currency: 'CNY',
@@ -46,6 +46,19 @@ function reportOf(models: number, projects: number): UsageInsightsReport {
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
     })),
+    sessions: Array.from({ length: projects }, (_, index) => ({
+      sessionId: `session-demo-${String(index)}`,
+      title: `Demo session ${String(index)}`,
+      cwd: `/Users/demo/work/project-${String(index)}`,
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_100_000,
+      cost: 8 - index,
+      calls: 2,
+      uncachedInputTokens: 500,
+      outputTokens: 50,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })),
   } as unknown as UsageInsightsReport
 }
 
@@ -58,7 +71,7 @@ const base = {
 }
 
 describe('StatsTables', () => {
-  it('lists the routes and the directories the report carried', () => {
+  it('lists the routes, the directories and the sessions the report carried', () => {
     const markup = renderToStaticMarkup(createElement(StatsTables, {
       ...base,
       report: reportOf(2, 1),
@@ -66,8 +79,10 @@ describe('StatsTables', () => {
 
     expect(markup).toContain(t('statsByModel'))
     expect(markup).toContain(t('statsByProject'))
+    expect(markup).toContain(t('statsBySession'))
     expect(markup).toContain('demo/route-0')
     expect(markup).toContain('project-0')
+    expect(markup).toContain('Demo session 0')
     // The shortened name is the cell; the full path is beside it.
     expect(markup).toContain('/Users/demo/work/project-0')
     expect(markup).toContain('CNY 10.00')

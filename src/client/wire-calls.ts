@@ -51,6 +51,8 @@ export function normalizeCallsReport(value: Partial<UsageCallsReport>): UsageCal
       calls: totals?.calls ?? 0,
     },
     routes: value.routes ?? [],
+    sessionFacets: value.sessionFacets ?? [],
+    projectFacets: value.projectFacets ?? [],
     sessions: value.sessions ?? 0,
     projects: value.projects ?? 0,
     scannedSessions: value.scannedSessions ?? 0,

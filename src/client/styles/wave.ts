@@ -1,4 +1,4 @@
-/**
+﻿/**
  * The range wave and its axis.
  *
  * A fragment of the one sheet the panel injects; order is preserved by
@@ -7,14 +7,14 @@
  * @module dsh-local-usage/client/styles/wave
  */
 
-export const wave = String.raw`/* ── The range's wave ─────────────────────────────────────────────────── */
+export const wave = String.raw`/* 鈹€鈹€ The range's wave 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 
 /* The range's own shape, under the calendar: the calendar answers a year, this
  * answers the window the reader selected. */
 .dlu-wave {
   /* Border-box, like the rest of the app: with the default content-box the wave
    * and the calendar came out 42px wider than the panel's content box once their
-   * own padding and border were added, and the panel — which scrolls — answered
+   * own padding and border were added, and the panel 鈥?which scrolls 鈥?answered
    * with a 21px horizontal scrollbar for a figure that fits. */
   box-sizing: border-box;
   display: flex;
@@ -139,7 +139,7 @@ export const wave = String.raw`/* ── The range's wave ───────�
   animation-delay: -1.7s;
 }
 
-/* Anchored at the foot of the column — the whale's head — so the water climbs. */
+/* Anchored at the foot of the column 鈥?the whale's head 鈥?so the water climbs. */
 .dlu-waveSpoutJet {
   fill: var(--dsw-alias-link);
   transform-origin: 50% 100%;
@@ -295,13 +295,22 @@ export const wave = String.raw`/* ── The range's wave ───────�
 }
 
 /* The route or directory column of these tables has more to say than the day
- * page's does — a fallback-rate badge rides beside the name — so it keeps the
+ * page's does 鈥?a fallback-rate badge rides beside the name 鈥?so it keeps the
  * row's line box from growing by seating the badge on the baseline. */
 .dlu-tableBlock .dlu-unpricedBadge {
   margin-left: 8px;
   vertical-align: baseline;
 }
 
+/* The session table's rows open the call log: the affordance is the cursor and
+ * a hover shade, because the table stays a table rather than growing buttons. */
+.dlu-statsRowLink {
+  cursor: pointer;
+}
+
+.dlu-statsRowLink:hover .dlu-projectName {
+  text-decoration: underline;
+}
 /* The axis names several points, not just the ends. Each label is placed on the
  * share of the width its point sits at, and the two ends are pulled inward so a
  * label under the first or last bucket stays inside the figure. */
