@@ -16,10 +16,11 @@ import type { UsageInsightsLocaleKey } from './locales.ts'
 /** Ranges offered, in selection order. */
 export const RANGES: readonly { readonly id: string; readonly key: UsageInsightsLocaleKey }[] = [
   { id: 'day', key: 'rangeDay' },
+  { id: 'h24', key: 'range24h' },
   { id: 'week', key: 'range7' },
   { id: 'month', key: 'rangeMonth' },
-  { id: 'quarter', key: 'rangeQuarter' },
   { id: 'year', key: 'rangeYear' },
+  { id: 'all', key: 'rangeAll' },
   { id: 'custom', key: 'rangeCustom' },
 ]
 
@@ -95,9 +96,13 @@ export function rangeBounds(id: string, now: number, custom?: CustomRange): read
     return [today, end]
   }
   if (id === 'day') return [today, end]
+  if (id === 'h24') return [now - 24 * 60 * 60 * 1000 + 1, end]
   if (id === 'week') return [addDays(today, -6), end]
   if (id === 'month') return [startOfMonth(now), end]
   if (id === 'quarter') return [startOfQuarter(now), end]
+  // Everything the corpus holds: an unbounded window, answered by the Host from
+  // whatever days its logs carry.
+  if (id === 'all') return [0, Number.MAX_SAFE_INTEGER]
   return [startOfYear(now), end]
 }
 

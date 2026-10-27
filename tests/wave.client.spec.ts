@@ -46,6 +46,32 @@ describe('waveSeries', () => {
     expect(waveSeries({ days, slices: [], range: 'month' }, false)).toHaveLength(2)
   })
 
+  it('reads twenty-four hours in clock points, thinned to the hour marks', () => {
+    // The window spans two calendar days, so the report's slices fold both days'
+    // samples by Beijing clock time; the same buckets serve, thinned.
+    const points = waveSeries({ days: [], slices: SLICES, range: 'h24' }, false)
+
+    // Every sixth slice kept, plus the final one.
+    expect(points.length).toBeLessThanOrEqual(25)
+    expect(points[0]?.label).toBe('00:00')
+    expect(points[1]?.label).toBe('01:00')
+    // The tenth hour of the day is its sixtieth slice, kept (60 % 6 === 0).
+    expect(points.find(p => p.label === '10:00')).toEqual({ label: '10:00', cost: 5 })
+  })
+
+  it('reads all time in month buckets drawn only where days exist', () => {
+    const days = [day('2025-10-05', 2), day('2026-01-05', 1), day('2026-10-05', 3)]
+    const points = waveSeries({ days, slices: [], range: 'all' }, true)
+
+    // No from/to is passed: the span is open-ended, so only recorded months draw.
+    // The span crosses years, so every label carries its own.
+    expect(points).toEqual([
+      { label: '2025-10', cost: 2 },
+      { label: '2026-01', cost: 1 },
+      { label: '2026-10', cost: 3 },
+    ])
+  })
+
   it('folds a quarter into the weeks its days belong to', () => {
     // 2026-09-21 is a Monday, so the 21st to the 27th is one working week and the
     // 28th opens the next.

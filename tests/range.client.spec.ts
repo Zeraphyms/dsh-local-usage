@@ -28,6 +28,22 @@ describe('rangeBounds', () => {
     expect(to).toBe(nextDayStart(from) - 1)
   })
 
+  it('bounds twenty-four hours by the clock, ending with today', () => {
+    const now = noon(2026, 3, 8)
+    const [from, to] = rangeBounds('h24', now)
+
+    expect(from).toBe(now - 24 * 60 * 60 * 1000 + 1)
+    expect(to).toBe(nextDayStart(now) - 1)
+  })
+
+  it('answers an unbounded window for all time', () => {
+    const now = noon(2026, 3, 8)
+    const [from, to] = rangeBounds('all', now)
+
+    expect(from).toBe(0)
+    expect(to).toBe(Number.MAX_SAFE_INTEGER)
+  })
+
   it('keeps a week seven calendar days long', () => {
     const now = noon(2026, 3, 12)
     const [from, to] = rangeBounds('week', now)

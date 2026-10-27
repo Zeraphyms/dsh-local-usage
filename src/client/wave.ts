@@ -142,6 +142,33 @@ export function waveSeries(input: WaveInput, zh: boolean): WavePoint[] {
     // carries no slices; the day view then has no profile rather than a crash.
     return (input.slices ?? []).map(row => ({ label: clockLabel(row.minutes), cost: row.cost }))
   }
+  // Twenty-four hours is the other window the day rows cannot describe: it ends
+  // mid-day, so its two calendar days are each partial. The report's hour slices
+  // fold every sample the window carried by Beijing clock time — the two days'
+  // shared hours sum together, which is the truth about when in the day the
+  // spend happened — so the same 144 buckets serve, relabelled every sixth point.
+  if (input.range === 'h24') {
+    const all = (input.slices ?? []).map(row => ({ label: clockLabel(row.minutes), cost: row.cost }))
+    // 144 points is too dense for 24 hours of context; keep every sixth hour.
+    return all.filter((_, index) => index % 6 === 0 || index === all.length - 1)
+  }
+  // Everything the corpus holds: the span is open-ended, so no calendar ladder
+  // fits — month buckets, drawn only for the months the day rows name.
+  if (input.range === 'all') {
+    const byMonth = new Map<string, number>()
+    for (const day of input.days) {
+      const key = monthKeyOf(day.day)
+      if (key === undefined) continue
+      byMonth.set(key, (byMonth.get(key) ?? 0) + day.cost)
+    }
+    const keys = [...byMonth.keys()].sort()
+    const crossYear = keys.length > 0
+      && keys[0]?.slice(0, 4) !== keys[keys.length - 1]?.slice(0, 4)
+    return keys.map(key => ({
+      label: monthKeyLabel(key, crossYear, zh),
+      cost: byMonth.get(key) ?? 0,
+    }))
+  }
   if (input.range === 'year') {
     const byMonth = new Map<string, number>()
     for (const day of input.days) {

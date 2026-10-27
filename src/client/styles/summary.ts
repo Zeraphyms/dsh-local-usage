@@ -1,4 +1,4 @@
-/**
+﻿/**
  * The range summary, its supporting rows and the table block.
  *
  * A fragment of the one sheet the panel injects; order is preserved by
@@ -7,7 +7,7 @@
  * @module dsh-local-usage/client/styles/summary
  */
 
-export const summary = String.raw`/* ── Summary: one hero figure, then supporting tiles ───────────────────── */
+export const summary = String.raw`/* 鈹€鈹€ Summary: one hero figure, then supporting tiles 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 
 /* The figures are the header of the page, not the page: the hero and its tiles
  * share one row so the calendar below them starts high on the screen. */
@@ -35,7 +35,7 @@ export const summary = String.raw`/* ── Summary: one hero figure, then suppo
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* The headline figure: exact to the last digit, and never broken across lines —
+/* The headline figure: exact to the last digit, and never broken across lines 鈥?
  * a money amount split over two lines is unreadable, and it changes the height
  * of the block the whole page hangs off.
  *
@@ -99,7 +99,7 @@ export const summary = String.raw`/* ── Summary: one hero figure, then suppo
  *
  * This is the rule that keeps a big figure from moving the page. The hero's
  * track is sized by its own content, so a seven-figure total beside these tiles
- * leaves them less room — and with an auto-fitting grid that narrower room is
+ * leaves them less room 鈥?and with an auto-fitting grid that narrower room is
  * what decides how many rows they take, which is a change in the strip's height
  * caused by the data. Pinning the count to the container makes the row count a
  * property of the panel, and the figures inside a tile adapt instead.
@@ -222,7 +222,7 @@ export const summary = String.raw`/* ── Summary: one hero figure, then suppo
   font-weight: 400;
 }
 
-/* The pricing page: the day view's frame, because it is the same kind of thing —
+/* The pricing page: the day view's frame, because it is the same kind of thing 鈥?
  * a page the panel replaces itself with, not a panel floating over the figures. */
 .dlu-pricingPage {
   display: flex;
@@ -497,6 +497,40 @@ export const summary = String.raw`/* ── Summary: one hero figure, then suppo
   justify-content: space-between;
 }
 
+/* The add-card form: one row of labelled fields, wider than the sheet's edit
+ * fields because a match rule is a sentence rather than a number. */
+.dlu-rateAddRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0 0;
+  margin-top: 4px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.dlu-rateAddForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: end;
+}
+
+.dlu-rateAddField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.dlu-rateAddField .dlu-editorField {
+  inline-size: 88px;
+  text-align: left;
+}
+
+.dlu-rateAddField:has(> .dlu-editorField[aria-invalid='true']) > span {
+  color: var(--dsw-alias-state-error-primary);
+}
 .dlu-rateEditorActions {
   display: flex;
   gap: 16px;

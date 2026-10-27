@@ -26,6 +26,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsagePricingUpdate } from '../types.ts'
 import { RATE_FIELDS } from './rate-draft.ts'
 import { css } from './classes.ts'
+import { AddRateCard } from './AddRateCard.tsx'
 import { RateGroup } from './RateGroup.tsx'
 import { useRateEditor } from './useRateEditor.ts'
 import { FIELD_KEYS } from './rate-row.ts'
@@ -67,6 +68,12 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: Ra
       <section className={css.pricingSection}>
         <h4 className={css.editorTitle}>{t('pricingModelsTitle')}</h4>
         <p className={css.editorHint}>{t('pricingEditorEmpty')}</p>
+        <AddRateCard
+          existing={[]}
+          currency={currency}
+          t={t}
+          onSave={onSave}
+        />
       </section>
     )
   }
@@ -139,6 +146,15 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: Ra
           <p className={css.editorError} role="alert">{t('pricingSaveFailed', { message: failure })}</p>
         )}
         {saved ? <p className={css.editorStatus} role="status">{t('pricingSaved')}</p> : null}
+
+        {/* A card for a model the window has not billed yet: the sheet edits what
+          * exists, and this adds what is coming. */}
+        <AddRateCard
+          existing={models.map(card => card.match)}
+          currency={currency}
+          t={t}
+          onSave={onSave}
+        />
       </div>
     </section>
   )
