@@ -46,6 +46,10 @@ interface RateGroupProps {
   readonly onSave: () => void
   readonly onPeak: (enabled: boolean) => void
   readonly onWrite: (set: PriceSet, field: RateField, value: string) => void
+  /** Delete this card edit, shown only while the group is open. */
+  readonly onDelete?: () => void
+  /** Label for the delete action: remove for a user-added card, reset for a built-in. */
+  readonly deleteLabel?: string
 }
 
 /**
@@ -60,7 +64,7 @@ interface RateGroupProps {
  * @returns a table body, one group per model.
  */
 export function RateGroup({
-  row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite,
+  row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel,
 }: RateGroupProps): ReactNode {
   const card = row.card
   const editing = open && draft !== undefined
@@ -162,7 +166,17 @@ export function RateGroup({
                   <span>{t('pricingPeakEnabled')}</span>
                 </label>
                 <span className={css.rateEditorActions}>
-                  <button type="button" className={css.rateAction} disabled={busy} onClick={onCancel}>
+                                    {onDelete === undefined || deleteLabel === undefined ? null : (
+                    <button
+                      type="button"
+                      className={css.rateAction}
+                      disabled={busy}
+                      onClick={() => { onDelete() }}
+                    >
+                      {deleteLabel}
+                    </button>
+                  )}
+<button type="button" className={css.rateAction} disabled={busy} onClick={onCancel}>
                     {t('pricingCancel')}
                   </button>
                   <button

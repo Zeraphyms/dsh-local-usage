@@ -25,6 +25,24 @@ import {
 /** How long the saved confirmation stays up. */
 const CONFIRMATION_MS = 2200
 
+
+/** Matches the plugin ships with, mirrored from the host's DEFAULT_CONFIG
+ * (src/host/config.ts). A card outside this list is the reader's own addition:
+ * deleting it removes the card outright. A card inside it is a priced built-in:
+ * "deleting" its edit only clears the override, and the card returns at its
+ * configured prices ? which is why the button is named differently there. */
+export const BUILT_IN_MATCHES = new Set([
+  "deepseek-v4.1-flash",
+  "deepseek-v4-pro",
+  "deepseek-flash",
+  "deepseek-v4-flash",
+  "glm-5.3-flash",
+  "gpt-5.6-sol",
+  "grok-4.6",
+  "kimi-k3-1",
+  "kimi-k2.8-preview",
+]);
+
 export interface UseRateEditorOptions {
   readonly models: readonly UsageModelPrice[]
   readonly onSave: (update: UsagePricingUpdate) => Promise<void>
@@ -43,6 +61,8 @@ export interface RateEditorState {
   readonly openEditor: (model: string) => void
   readonly discard: () => void
   readonly commit: () => Promise<void>
+  /** Delete one card's edit: removes a user-added card, or clears a built-in's override. */
+  readonly removeCard: (match: string) => Promise<void>
 }
 
 /**
@@ -157,5 +177,25 @@ export function useRateEditor({ models, onSave, table }: UseRateEditorOptions): 
     }
   }
 
-  return { drafts, editing, busy, saved, failure, pending, write, switchPeak, openEditor, discard, commit }
+  /**
+   * Remove one card's edit by writing a null delete: a user-added card leaves
+   * the sheet outright, while a built-in's override is cleared and the card
+   * returns at its configured prices on the next report.
+   */
+  async function removeCard(match: string): Promise<void> {
+    if (match.length === 0) return;
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await onSave({ models: { [match]: null } });
+      setSaved(true);
+      setEditing(undefined);
+    } catch (error: unknown) {
+      setFailure(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { drafts, editing, busy, saved, failure, pending, write, switchPeak, openEditor, discard, commit, removeCard }
 }

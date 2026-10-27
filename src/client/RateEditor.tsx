@@ -24,6 +24,7 @@
 import { useRef, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsagePricingUpdate } from '../types.ts'
+import { BUILT_IN_MATCHES } from './useRateEditor.ts'
 import { RATE_FIELDS } from './rate-draft.ts'
 import { css } from './classes.ts'
 import { AddRateCard } from './AddRateCard.tsx'
@@ -58,7 +59,7 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: Ra
   const table = useRef<HTMLTableElement>(null)
   const {
     drafts, editing, busy, saved, failure, pending,
-    write, switchPeak, openEditor, discard, commit,
+    write, switchPeak, openEditor, discard, commit, removeCard,
   } = useRateEditor({ models, onSave, table })
 
   // Stated rather than omitted: an empty table reads as an editor that was
@@ -136,6 +137,15 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: Ra
                   onSave={() => { void commit() }}
                   onPeak={enabled => { switchPeak(card.match, enabled) }}
                   onWrite={(set, field, value) => { write(card.match, set, field, value) }}
+                  onDelete={async () => {
+                    // Removing the sheet's card needs the reader's go-ahead:
+                    // a user-added card leaves outright, a built-in resets,
+                    // and neither action is reversible by undo.
+                    if (card.match === '') return
+                    if (!window.confirm(BUILT_IN_MATCHES.has(card.match) ? t('pricingResetConfirm', { match: card.match }) : t('pricingRemoveConfirm', { match: card.match }))) return
+                    await removeCard(card.match)
+                  }}
+                  deleteLabel={card.match === '' ? undefined : BUILT_IN_MATCHES.has(card.match) ? t('pricingReset') : t('pricingRemove')}
                 />
               )
             })}
