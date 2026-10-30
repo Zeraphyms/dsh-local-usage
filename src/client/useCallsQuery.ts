@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import type { UsageCallSort, UsageCallsReport, UsageProjectFacet, UsageSessionFacet } from '../types.ts'
+import type { UsageCallSort, UsageCallsReport, UsageProjectFacet } from '../types.ts'
 import { dayKey } from './heatmap-grid.ts'
 import { displayModel, modelKey } from '../model-name.ts'
 import { CALLS_PATH } from './routes.ts'
@@ -113,8 +113,14 @@ export interface CallsQuery {
   readonly data: UsageCallsReport | undefined
   /** Models the filter can choose, most called first. */
   readonly models: readonly CallsModelOption[]
-  /** Sessions the picker can choose, dearest first. */
-  readonly sessionOptions: readonly UsageSessionFacet[]
+  /** Session picker options: same-title fork chains grouped, dearest first. The value is the chain's comma-separated id set. */
+  readonly sessionChainOptions: readonly {
+    readonly value: string
+    readonly label: string
+    readonly calls: number
+    /** Member session ids, for the hover title. */
+    readonly title: string
+  }[]
   /** Directories the picker can choose, dearest first. */
   readonly projectOptions: readonly UsageProjectFacet[]
   /** Rows of the current page, and where they sit in the whole match. */
@@ -277,6 +283,29 @@ export function useCallsQuery({ initialFrom, initialTo, initialSession, initialP
       .sort((left, right) => right.calls - left.calls || left.model.localeCompare(right.model))
   }, [state.data])
 
+  // The session picker groups same-title sessions (a fork chain from the
+  // harness's edit-resend/retry) into one option whose value is the chain's
+  // comma-separated id set — the exact spelling the Host's session filter
+  // accepts. Untitled or unique sessions stay one-option-one-id.
+  const sessionChainOptions = useMemo(() => {
+    const facets = state.data?.sessionFacets ?? []
+    const groups = new Map<string, { value: string; label: string; calls: number; title: string }>()
+    for (const facet of facets) {
+      const label = facet.title ?? ''
+      const current = groups.get(label)
+      if (current === undefined) {
+        groups.set(label, { value: facet.sessionId, label, calls: facet.calls, title: facet.sessionId })
+      } else {
+        current.value = `${current.value},${facet.sessionId}`
+        current.calls += facet.calls
+        current.title = `${current.title}\n${facet.sessionId}`
+      }
+    }
+    return [...groups.values()]
+      .map(group => ({ value: group.value, label: group.label, calls: group.calls, title: group.title }))
+      .sort((left, right) => right.calls - left.calls || left.label.localeCompare(right.label))
+  }, [state.data])
+
   return {
     rangeId,
     custom,
@@ -290,7 +319,7 @@ export function useCallsQuery({ initialFrom, initialTo, initialSession, initialP
     state,
     data,
     models,
-    sessionOptions: state.data?.sessionFacets ?? [],
+    sessionChainOptions,
     projectOptions: state.data?.projectFacets ?? [],
     total,
     pageSize,

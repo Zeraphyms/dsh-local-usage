@@ -627,6 +627,44 @@ export function buildReport(
     }
   }
 
+  // Same-title fork chains fold into one row. The harness's edit-resend and
+  // retry create a fork — a new session that copies the parent's event stream
+  // and shares its title — so one conversation reads as several rows keyed by
+  // their own session ids. The title + cwd pair is the chain's signature: each
+  // fork inherits both, and two conversations in different directories that
+  // happen to share a title stay apart. Each fork is billed only for the events
+  // it added (its fold starts after the inherited prefix), so the chain's spend
+  // is the sum of its members, not a double count. A member with no samples in
+  // the window contributes nothing and is dropped by the window itself.
+  const chains = new Map<string, UsageSessionRow[]>()
+  for (const row of sessionRows) {
+    const key = `${row.title ?? ''}\u0000${row.cwd ?? ''}`
+    const chain = chains.get(key)
+    if (chain === undefined) chains.set(key, [row])
+    else chain.push(row)
+  }
+  const mergedSessionRows: UsageSessionRow[] = [...chains.values()].map(members => {
+    if (members.length === 1) return members[0]
+    const ordered = [...members].sort((left, right) => left.createdAt - right.createdAt)
+    const head = ordered[0]
+    const sum = (pick: (row: UsageSessionRow) => number): number =>
+      members.reduce((total, row) => total + pick(row), 0)
+    return {
+      sessionId: head.sessionId,
+      ...head.title === undefined ? {} : { title: head.title },
+      ...head.cwd === undefined ? {} : { cwd: head.cwd },
+      createdAt: head.createdAt,
+      updatedAt: ordered.reduce((latest, row) => Math.max(latest, row.updatedAt), head.createdAt),
+      uncachedInputTokens: sum(row => row.uncachedInputTokens),
+      outputTokens: sum(row => row.outputTokens),
+      cacheReadTokens: sum(row => row.cacheReadTokens),
+      cacheWriteTokens: sum(row => row.cacheWriteTokens),
+      cost: sum(row => row.cost),
+      calls: sum(row => row.calls),
+      chainSessionIds: ordered.map(row => row.sessionId),
+    }
+  })
+
   const days: UsageDayRow[] = [...byDay.entries()]
     .map(([day, bucket]) => ({
       day,
@@ -671,7 +709,8 @@ export function buildReport(
     }))
     .sort((left, right) => right.cost - left.cost || right.outputTokens - left.outputTokens)
 
-  sessionRows.sort((left, right) => right.cost - left.cost || right.updatedAt - left.updatedAt)
+  sessionRows.length = 0
+  sessionRows.push(...mergedSessionRows.sort((left, right) => right.cost - left.cost || right.updatedAt - left.updatedAt))
 
   return {
     generatedAt: meta.generatedAt,

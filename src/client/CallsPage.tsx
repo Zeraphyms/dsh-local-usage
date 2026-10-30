@@ -2,8 +2,8 @@
  * The call log: one row per billed model call, queried and paged by the Host.
  *
  * This is the surface the folds cannot provide. A calendar answers when, a
- * project table answers where, and a model table answers which — but “why did
- * this figure move” is only ever answered by the settlement itself: its instant,
+ * project table answers where, and a model table answers which —but —渨hy did
+ * this figure move—is only ever answered by the settlement itself: its instant,
  * its route, its four token buckets and the money its own buckets cost. So the
  * page is a table first and a chart never, and every control above it narrows
  * the same query rather than drawing a second, derived figure.
@@ -85,7 +85,7 @@ export function CallsPage({
   // this component decides only how each of its states is drawn.
   const {
     rangeId, custom, model, session, project, sort, limit, offset, state, data, models,
-    sessionOptions, projectOptions,
+    sessionChainOptions, projectOptions,
     total, pageSize, page, pages, shownFrom, shownTo,
     chooseRange, moveCustom, chooseModel, chooseSession, chooseProject, chooseSort, chooseLimit, goToOffset, retry,
   } = useCallsQuery({
@@ -164,7 +164,7 @@ export function CallsPage({
               : null}
             {models.map(option => (
               <option key={option.key} value={option.model}>
-                {option.model} · {formatInteger(option.calls)}
+                {option.model} 路 {formatInteger(option.calls)}
               </option>
             ))}
           </select>
@@ -174,12 +174,12 @@ export function CallsPage({
           <span>{t('callsFilterSession')}</span>
           <select value={session} onChange={event => { chooseSession(event.target.value) }}>
             <option value="">{t('callsFilterAllSessions')}</option>
-            {session !== '' && !sessionOptions.some(option => option.sessionId === session)
+            {session !== '' && !sessionChainOptions.some(option => option.value === session)
               ? <option value={session}>{session}</option>
               : null}
-            {sessionOptions.map(option => (
-              <option key={option.sessionId} value={option.sessionId}>
-                {option.title ?? t('sessionUntitled')} · {formatInteger(option.calls)}
+            {sessionChainOptions.map(option => (
+              <option key={option.value} value={option.value} title={option.title}>
+                {option.label === '' ? t('sessionUntitled') : option.label} 路 {formatInteger(option.calls)}
               </option>
             ))}
           </select>
@@ -196,7 +196,7 @@ export function CallsPage({
               <option key={option.path} value={option.path}>
                 {option.path === UNKNOWN_PROJECT
                   ? t('projectUnknown')
-                  : projectName(option.path) ?? option.path} · {formatInteger(option.calls)}
+                  : projectName(option.path) ?? option.path} 路 {formatInteger(option.calls)}
               </option>
             ))}
           </select>
@@ -383,7 +383,7 @@ export function CallsPage({
                 to: formatInteger(shownTo),
                 total: formatInteger(total),
               })}
-            {state.status === 'loading' ? ` · ${t('callsQuerying')}` : null}
+            {state.status === 'loading' ? ` 路 ${t('callsQuerying')}` : null}
           </span>
           <div className={css.callPagerControls}>
             <Button
@@ -441,13 +441,13 @@ function CallRowView({
         </span>
         <span
           className={css.callSubjectMeta}
-          title={`${row.cwd ?? t('projectUnknown')} · ${row.sessionId}${row.turn === undefined || row.step === undefined ? '' : ` · ${t('callsTurnStep', { turn: formatInteger(row.turn), step: formatInteger(row.step) })}`}`}
+          title={`${row.cwd ?? t('projectUnknown')} 路 ${row.sessionId}${row.turn === undefined || row.step === undefined ? '' : ` 路 ${t('callsTurnStep', { turn: formatInteger(row.turn), step: formatInteger(row.step) })}`}`}
         >
           {row.cwd === undefined ? t('projectUnknown') : projectName(row.cwd) ?? row.cwd}
-          {' · #'}{shortSessionId(row.sessionId)}
+          {' 路 #'}{shortSessionId(row.sessionId)}
           {row.turn === undefined || row.step === undefined
             ? ''
-            : ` · ${t('callsTurnStep', {
+            : ` 路 ${t('callsTurnStep', {
               turn: formatInteger(row.turn),
               step: formatInteger(row.step),
             })}`}
@@ -455,11 +455,11 @@ function CallRowView({
       </th>
       <td
         className={css.callModelCell}
-        title={row.priced ? row.route : `${row.route} · ${t('pricingSourceFallback')}`}
+        title={row.priced ? row.route : `${row.route} 路 ${t('pricingSourceFallback')}`}
       >
         <span
           className={css.callModelName}
-          title={`${row.model}\n${row.route}${row.priced ? '' : ` · ${t('pricingSourceFallback')}`}`}
+          title={`${row.model}\n${row.route}${row.priced ? '' : ` 路 ${t('pricingSourceFallback')}`}`}
         >
           {row.model}
         </span>
@@ -501,7 +501,7 @@ function CallRowView({
       >
         {row.outputTps === undefined ? '—' : formatThroughput(row.outputTps, locale)}
       </td>
-      <td className={css.numeric} title={hit === undefined ? undefined : formatPercent(hit)}>
+      <td className={css.numeric} title={hit === undefined ? '—' : formatPercent(hit)}>
         {hit === undefined ? '—' : formatPercent(hit)}
       </td>
       <td className={css.callCost} title={t('callsExact', { value: formatCost(row.cost) })}>

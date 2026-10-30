@@ -78,9 +78,16 @@ export interface UsageProjectRow extends UsageCosted {
   readonly sessions: number
 }
 
-/** Usage attributed to one session. */
+/**
+ * Usage attributed to one session, or to one same-title fork chain of sessions.
+ *
+ * The harness's edit-resend and retry create a fork: a new session that copies
+ * the parent's whole event stream as an inherited prefix and shares its title.
+ * The chain is one conversation to a reader, so the report folds it into one
+ * row; each fork is still billed only for the events it added.
+ */
 export interface UsageSessionRow extends UsageCosted {
-  /** Durable session id. */
+  /** Durable session id. For a merged fork chain, the earliest-created member's id. */
   readonly sessionId: string
   /** Folded session title when one is known. */
   readonly title?: string
@@ -90,6 +97,13 @@ export interface UsageSessionRow extends UsageCosted {
   readonly createdAt: number
   /** Latest usage sample time in Unix epoch milliseconds, or `createdAt` when the session recorded none. */
   readonly updatedAt: number
+  /**
+   * Every member session id of this row, when the row merges a same-title fork
+   * chain. Absent for a single-session row. The calls page's session filter
+   * accepts the whole set, so selecting the chain shows every segment of the
+   * conversation rather than only the newest fork.
+   */
+  readonly chainSessionIds?: readonly string[]
 }
 
 /**

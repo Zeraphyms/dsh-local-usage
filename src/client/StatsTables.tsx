@@ -119,12 +119,17 @@ export function StatsTables({ report, t, formatCost, formatInteger, onOpenCalls 
   )
 }
 
-/** One session table row: named by its title, identified by its id and directory. */
+/** One session table row: named by its title, identified by its id and directory.
+ *  A merged fork chain names the conversation once and filters by every member id. */
 function sessionRowOf(row: UsageSessionRow, t: PropsLocale<'usage'>['t']): StatsRow {
+  const chainIds = row.chainSessionIds ?? []
+  const merged = chainIds.length > 1
   return {
-    key: row.sessionId,
+    key: merged ? chainIds.join(',') : row.sessionId,
     name: row.title ?? t('sessionUntitled'),
-    detail: row.cwd === undefined ? row.sessionId : `${row.cwd} · ${row.sessionId}`,
+    detail: merged
+      ? `${row.cwd ?? ''} · ${t('chainParts', { count: chainIds.length })}`
+      : row.cwd === undefined ? row.sessionId : `${row.cwd} · ${row.sessionId}`,
     figures: row,
     count: row.calls,
   }

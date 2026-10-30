@@ -202,4 +202,24 @@ describe('queryCalls', () => {
     expect(past.rows).toHaveLength(0)
     expect(past.total).toBe(5)
   })
+
+  it('accepts a comma-separated session set for merged fork chains', () => {
+    const input = (id, text) => ({
+      sessionId: id,
+      title: text,
+      cwd: 'D:/artra',
+      createdAt: OFF_PEAK,
+      samples: [
+        { time: OFF_PEAK, route: 'p/m', tokens: { uncachedInputTokens: 10, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0 } },
+      ],
+    });
+    const report = queryCalls(
+      [input('session-aaa', 'A'), input('session-bbb', 'A'), input('session-ccc', 'B')],
+      OPTIONS,
+      { session: 'session-aaa,session-bbb' },
+      { generatedAt: OFF_PEAK, scannedSessions: 3, unreadableSessions: 0, cached: false },
+    );
+    expect(report.total).toBe(2);
+    expect(report.rows.every((row) => row.sessionId !== 'session-ccc')).toBe(true);
+  });
 })

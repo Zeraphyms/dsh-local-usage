@@ -157,6 +157,7 @@ export function queryCalls(
   const routeNeedle = query.route === undefined || query.route.length === 0
     ? undefined
     : query.route
+  // A merged fork chain arrives as one comma-separated id set; a bare id is a set of one.
   const sessionNeedle = query.session === undefined || query.session.length === 0
     ? undefined
     : query.session
@@ -227,9 +228,13 @@ export function queryCalls(
       projectFacet.calls += 1
       projectFacet.cost += cost
 
+      // The merged-chain session picker sends one chain as a comma set; a bare
+      // id from an older caller still matches as a one-element set.
+      const sessionSet = sessionNeedle !== undefined ? new Set(sessionNeedle.split(',')) : undefined
+
       if (routeNeedle !== undefined && sample.route !== routeNeedle) continue
       if (modelNeedle !== undefined && modelKey(model) !== modelNeedle) continue
-      if (sessionNeedle !== undefined && input.sessionId !== sessionNeedle) continue
+      if (sessionSet !== undefined && !sessionSet.has(input.sessionId)) continue
       if (projectNeedle !== undefined && project !== projectNeedle) continue
       if (textNeedle.length > 0
         && !sessionText.includes(textNeedle)
