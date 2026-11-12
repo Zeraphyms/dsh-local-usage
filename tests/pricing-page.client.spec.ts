@@ -54,6 +54,33 @@ const report = {
 } as unknown as UsageInsightsReport
 
 describe('the pricing page and the effective card', () => {
+  const renderPricing = (value: UsageInsightsReport): string => renderToStaticMarkup(createElement(PricingPage, {
+    report: value, weeks: 52, locale: 'en', t, formatCost: String,
+    onSaveRates: () => Promise.resolve(), onBack: () => {},
+  }))
+
+  it('hides unused built-in and custom cards while retaining models with usage and zero cost', () => {
+    const value = {
+      ...report,
+      prices: [...report.prices,
+        { ...report.prices[0]!, match: 'unused-built-in' },
+        { ...report.prices[0]!, match: 'unused-custom' }],
+      models: report.models.map(row => ({ ...row, cost: 0 })),
+    }
+    const markup = renderPricing(value)
+    expect(markup).toContain('deepseek-v4.1-flash')
+    expect(markup).not.toContain('unused-built-in')
+    expect(markup).not.toContain('unused-custom')
+    expect(markup).toContain('pricingAdd')
+  })
+
+  it('keeps the price table empty when the window has no usage', () => {
+    const markup = renderPricing({ ...report, models: [], routeRates: [] })
+    expect(markup).toContain('pricingEditorEmpty')
+    expect(markup).toContain('pricingAdd')
+    expect(markup).not.toContain('data-rate-edit=')
+  })
+
   it('shows the matched card rather than the fallback', () => {
     const markup = renderToStaticMarkup(createElement(PricingPage, {
       report,

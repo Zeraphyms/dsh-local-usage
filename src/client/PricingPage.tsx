@@ -91,9 +91,6 @@ export function PricingPage({
       group.routes += 1
     }
   }
-  for (const card of report.prices) {
-    if (!groups.has(card.match)) groups.set(card.match, { card, names: new Set([card.match]), tokens: 0, cost: 0, routes: 0 })
-  }
   const rows: RateRow[] = [...groups.values()]
     .map(group => {
       const names = [...group.names]
