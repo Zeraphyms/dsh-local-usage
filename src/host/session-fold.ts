@@ -13,6 +13,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { foldSessionTitle } from '@deepseek-ai/dsh-session-title'
 import { reliabilityOf, reliabilityWithin, samplesOf } from '../aggregate.ts'
 import type { ReliabilityDay, SessionUsageInput, UsageSample } from '../aggregate.ts'
+import { sessionChainId } from './session-chain.ts'
 
 /** One cached session fold: the samples, the reliability counters, and the identity facts. */
 export interface CachedSession {
@@ -28,6 +29,7 @@ export interface CachedSession {
   readonly title?: string
   readonly cwd?: string
   readonly createdAt: number
+  readonly chainId?: string
 }
 
 /** Everything one session's fold reads out of its log. */
@@ -47,6 +49,8 @@ interface SessionFoldSource {
    * of, which is what the harness's own projection does.
    */
   readonly skipBefore: number
+  readonly seeded?: boolean
+  readonly subagent?: boolean
 }
 
 /**
@@ -63,7 +67,9 @@ export function foldSession(source: SessionFoldSource): CachedSession {
   const samples = samplesOf(own)
   const reliability = reliabilityOf(own)
   const title = foldSessionTitle(source.events)?.title
+  const chainId = sessionChainId(source.events, source.skipBefore, source.seeded ?? source.skipBefore > 0, source.subagent === true)
   return {
+    ...chainId === undefined ? {} : { chainId },
     samples,
     reliability,
     createdAt: source.createdAt,
@@ -80,6 +86,7 @@ export function sessionInputOf(
 ): SessionUsageInput {
   return {
     sessionId,
+    ...entry.chainId === undefined ? {} : { chainId: entry.chainId },
     createdAt: entry.createdAt,
     samples: withinRange(entry.samples, request.from, request.to),
     reliability: reliabilityWithin(entry.reliability, request.from, request.to),

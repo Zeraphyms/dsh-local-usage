@@ -37,10 +37,11 @@ function props(overrides: Partial<CallsPageProps> = {}): CallsPageProps {
 describe('the call log before its first page', () => {
   const markup = renderToStaticMarkup(createElement(CallsPage, props()))
 
-  it('offers every filter the query accepts', () => {
+  it('offers time, model, session, project, ordering and page-size controls', () => {
     expect(markup).toContain('callsFilterRange')
     expect(markup).toContain('callsFilterModel')
-    expect(markup).toContain('callsSearch')
+    expect(markup).toContain('callsFilterSession')
+    expect(markup).toContain('callsFilterProject')
     expect(markup).toContain('callsSort')
     expect(markup).toContain('callsPageSize')
     expect(markup).toContain('rangeCustom')

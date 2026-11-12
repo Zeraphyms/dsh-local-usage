@@ -145,7 +145,7 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: Ra
                     if (!window.confirm(BUILT_IN_MATCHES.has(card.match) ? t('pricingResetConfirm', { match: card.match }) : t('pricingRemoveConfirm', { match: card.match }))) return
                     await removeCard(card.match)
                   }}
-                  deleteLabel={card.match === '' ? undefined : BUILT_IN_MATCHES.has(card.match) ? t('pricingReset') : t('pricingRemove')}
+                  {...card.match === '' ? {} : { deleteLabel: BUILT_IN_MATCHES.has(card.match) ? t('pricingReset') : t('pricingRemove') }}
                 />
               )
             })}

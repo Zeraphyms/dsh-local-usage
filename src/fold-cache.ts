@@ -36,12 +36,14 @@ import type { ReliabilityDay, UsageSample } from './aggregate.ts'
  * changes: an entry is only reused when the code that wrote it folded the same
  * way this build does.
  *
+ * 3 adds shared-history conversation ids; version 2 folds must be read again
+ * rather than reused without the identity needed for fork grouping.
  * 2 adds per-settlement turn, step and timing to the samples. An entry written
  * by version 1 has the right tokens but no latency, and a call log that silently
  * stated no latency for every old session would be a different answer from the
  * one this build gives — so the old document is dropped and the logs read again.
  */
-const DOCUMENT_VERSION = 2
+const DOCUMENT_VERSION = 3
 
 const MS_PER_DAY = 86_400_000
 
@@ -75,6 +77,7 @@ export interface CachedFold {
   readonly title?: string
   readonly cwd?: string
   readonly createdAt: number
+  readonly chainId?: string
 }
 
 /** One stored session: its fold plus the log revision it was folded from. */
@@ -224,7 +227,10 @@ function readStored(value: unknown): StoredFold | undefined {
   }
   const title = source.title
   const cwd = source.cwd
+  const chainId = source.chainId
+  if (chainId !== undefined && (typeof chainId !== 'string' || !/^chain:[a-f0-9]{64}$/.test(chainId))) return undefined
   return {
+    ...chainId === undefined ? {} : { chainId },
     revision,
     createdAt,
     samples,
@@ -296,6 +302,7 @@ export function createFoldCache(path: string): FoldCache {
     for (const [sessionId, entry] of entries) {
       sessions[sessionId] = {
         revision: entry.revision,
+        ...entry.chainId === undefined ? {} : { chainId: entry.chainId },
         createdAt: entry.createdAt,
         ...entry.title === undefined ? {} : { title: entry.title },
         ...entry.cwd === undefined ? {} : { cwd: entry.cwd },
@@ -349,6 +356,7 @@ export function createFoldCache(path: string): FoldCache {
     write: (sessionId, revision, fold) => {
       entries.set(sessionId, {
         revision,
+        ...fold.chainId === undefined ? {} : { chainId: fold.chainId },
         createdAt: fold.createdAt,
         samples: fold.samples,
         reliability: fold.reliability,

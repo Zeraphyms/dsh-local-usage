@@ -9,7 +9,7 @@
  *
  * @module dsh-local-usage/client/useCallsQuery
  */
-import type { UsageCallSort, UsageCallsReport } from '../types.ts';
+import type { UsageCallSort, UsageCallsReport, UsageProjectFacet } from '../types.ts';
 import type { CustomRange } from './range.ts';
 import type { UsageInsightsLocaleKey } from './locales.ts';
 /** Ranges the page offers, in selection order. */
@@ -42,16 +42,22 @@ export interface CallsModelOption {
     readonly model: string;
     readonly calls: number;
 }
-/** Where the page starts, when a calendar or day page sent the reader here. */
+/** Where the page starts, when a calendar, day page or stats table sent the reader here. */
 export interface CallsQueryOptions {
     readonly initialFrom?: number;
     readonly initialTo?: number;
+    /** Session id the opener narrowed to, when it did. */
+    readonly initialSession?: string;
+    /** Working directory the opener narrowed to, when it did. */
+    readonly initialProject?: string;
 }
 /** The query's state, its request's answer, and the controls that change it. */
 export interface CallsQuery {
     readonly rangeId: CallsRangeId;
     readonly custom: CustomRange | undefined;
     readonly model: string;
+    readonly session: string;
+    readonly project: string;
     readonly search: string;
     readonly sort: CallsSortChoice;
     readonly limit: number;
@@ -60,6 +66,16 @@ export interface CallsQuery {
     readonly data: UsageCallsReport | undefined;
     /** Models the filter can choose, most called first. */
     readonly models: readonly CallsModelOption[];
+    /** Conversations grouped by the Host, dearest first; value is an opaque chain or session id. */
+    readonly sessionChainOptions: readonly {
+        readonly value: string;
+        readonly label: string;
+        readonly calls: number;
+        /** Member session ids, for the hover title. */
+        readonly title: string;
+    }[];
+    /** Directories the picker can choose, dearest first. */
+    readonly projectOptions: readonly UsageProjectFacet[];
     /** Rows of the current page, and where they sit in the whole match. */
     readonly total: number;
     readonly pageSize: number;
@@ -70,6 +86,8 @@ export interface CallsQuery {
     chooseRange: (id: CallsRangeId) => void;
     moveCustom: (which: 'from' | 'to', value: string) => void;
     chooseModel: (value: string) => void;
+    chooseSession: (value: string) => void;
+    chooseProject: (value: string) => void;
     writeSearch: (value: string) => void;
     chooseSort: (id: CallsSortId) => void;
     chooseLimit: (size: number) => void;
@@ -81,4 +99,4 @@ export interface CallsQuery {
  * @param options - the window a calendar or day page opened on, when it did.
  * @returns the query state, its answer, and the controls.
  */
-export declare function useCallsQuery({ initialFrom, initialTo }: CallsQueryOptions): CallsQuery;
+export declare function useCallsQuery({ initialFrom, initialTo, initialSession, initialProject }: CallsQueryOptions): CallsQuery;

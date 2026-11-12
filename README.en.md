@@ -102,6 +102,12 @@ The **call log** behind the header button takes the same fold down to its finest
 
 The ramp's empty step is a visible neutral tile rather than the page background, so a quiet month reads as an empty month instead of as nothing at all. It is a low wash of the text colour mixed into the surface, which is what makes it correct in both themes: no surface token is offset from the page in both, and the one that is (`bg-layer-2`) resolves to the page background itself in the light theme. The first active step stays clearly distinct from it by *hue* — it is blue — which reads at a glance where a lightness step this small would not.
 
+### Conversation chains
+
+The session ranking and call-log picker share one Host rule: ordinary forks belong together only when they inherit the same complete log prefix through the first user message, including event sequence, timestamps and content. Renaming does not change membership. Matching titles, directories or missing titles do not establish a chain, and subagents remain separate. Current Harness ordinary forks omit their source id, so the plugin identifies shared inherited history with an opaque fingerprint. Empty forks and histories without sufficient inherited evidence stay independent.
+
+Opening a chain's call log sends one fixed-length chain id; the Host matches all members without a growing list that can be truncated. The first read after upgrading rebuilds the fold cache. Original logs and pricing stay intact.
+
 ### Language
 
 The panel follows the harness's own language setting; it has no switch of its own. Copy and figures are internationalized separately, because they are two different problems:

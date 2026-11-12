@@ -72,6 +72,32 @@ describe('buildReport', () => {
     expect(report.currency).toBe('CNY')
   })
 
+  it('keeps duplicate titles and untitled independent sessions in separate rows', () => {
+    const inputs = ['a', 'b', 'c', 'd'].map((id, index) => ({
+      ...session(id, [[OFF_PEAK, 'x/flash', tokens(1_000_000)]], index),
+      cwd: '/work/same',
+      ...index < 2 ? { title: 'Same title' } : {},
+    }))
+    expect(buildReport(inputs, OPTIONS, META).sessions).toHaveLength(4)
+  })
+
+  it('merges inherited history even after a fork is renamed, without changing totals', () => {
+    const chainId = 'chain:' + 'a'.repeat(64)
+    const inputs = [
+      { ...session('root', [[OFF_PEAK, 'x/flash', tokens(1_000_000)]], 1), title: 'Original', chainId },
+      { ...session('fork', [[OFF_PEAK, 'x/flash', tokens(2_000_000)]], 2), title: 'Renamed', chainId },
+      { ...session('other', [[OFF_PEAK, 'x/flash', tokens(4_000_000)]], 3), title: 'Original' },
+    ]
+    const report = buildReport(inputs, OPTIONS, META)
+    expect(report.sessions).toHaveLength(2)
+    expect(report.sessions.find(row => row.sessionId === 'root')).toMatchObject({
+      chainId, chainSessionIds: ['root', 'fork'], title: 'Original', calls: 2, cost: 3,
+    })
+    expect(report.totals).toMatchObject({ calls: 3, sessions: 3, cost: 7 })
+    const narrowed = buildReport(inputs.slice(1), OPTIONS, META)
+    expect(narrowed.sessions.find(row => row.sessionId === 'fork')?.chainId).toBe(chainId)
+  })
+
   it('prices a peak sample at the configured multiple', () => {
     const report = buildReport([
       session('a', [[PEAK, 'x/flash', tokens(1_000_000)]]),

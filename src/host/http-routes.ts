@@ -55,7 +55,8 @@ function callsQueryOf(params: URLSearchParams): UsageCallsQuery {
   const to = numberParam(params, 'to')
   const route = textParam(params, 'route', 200)
   const model = textParam(params, 'model', 120)
-  const session = textParam(params, 'session', 200)
+  // Keep legacy id lists intact; new clients use a fixed-length chain id.
+  const session = params.get('session')?.trim() || undefined
   const project = textParam(params, 'project', 400)
   const q = textParam(params, 'q', 200)
   const offset = numberParam(params, 'offset')

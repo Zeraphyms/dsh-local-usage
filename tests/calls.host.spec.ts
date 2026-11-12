@@ -94,6 +94,30 @@ const INPUTS: readonly SessionUsageInput[] = [
 ]
 
 describe('queryCalls', () => {
+  it('groups only shared-history facets and filters all chain members using a compact id', () => {
+    const chainId = 'chain:' + 'b'.repeat(64)
+    const inputs = Array.from({ length: 40 }, (_, index) => ({
+      ...session('session-' + String(index).padStart(36, '0'), [[OFF_PEAK, 'x/flash', tokens(10)]]),
+      chainId, title: index === 0 ? 'Original' : 'Renamed',
+    }))
+    const unrelated = { ...session('unrelated', [[OFF_PEAK, 'x/flash', tokens(50)]]), title: 'Original' }
+    const page = queryCalls([...inputs, unrelated], OPTIONS, { session: chainId, limit: 200 }, META)
+    expect(page.total).toBe(40)
+    expect(page.sessions).toBe(40)
+    expect(page.totals.uncachedInputTokens).toBe(400)
+    expect(page.sessionFacets).toHaveLength(2)
+    expect(page.sessionFacets.find(facet => facet.chainId === chainId)?.chainSessionIds).toHaveLength(40)
+    expect(queryCalls(inputs, OPTIONS, { session: inputs.map(input => input.sessionId).join(',') }, META).total).toBe(40)
+  })
+
+  it('keeps independent duplicate and missing titles separate in the session picker', () => {
+    const inputs = Array.from({ length: 4 }, (_, index) => ({
+      ...session(String(index), [[OFF_PEAK, 'x/flash', tokens(10)]]),
+      ...index < 2 ? { title: 'Duplicate' } : {},
+    }))
+    expect(queryCalls(inputs, OPTIONS, {}, META).sessionFacets).toHaveLength(4)
+  })
+
   it('pages a stable newest-first order and totals every match, not the page', () => {
     const page = queryCalls(INPUTS, OPTIONS, { limit: 2 }, META)
 
@@ -204,7 +228,7 @@ describe('queryCalls', () => {
   })
 
   it('accepts a comma-separated session set for merged fork chains', () => {
-    const input = (id, text) => ({
+    const input = (id: string, text: string) => ({
       sessionId: id,
       title: text,
       cwd: 'D:/artra',

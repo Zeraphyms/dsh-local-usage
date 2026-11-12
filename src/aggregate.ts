@@ -63,6 +63,8 @@ export interface UsageSample {
 /** One session's inputs to a report, plus what the window keeps of it. */
 export interface SessionUsageInput {
   readonly sessionId: string
+  /** Opaque identity established from inherited conversation history. */
+  readonly chainId?: string
   readonly title?: string
   readonly cwd?: string
   readonly createdAt: number
@@ -618,6 +620,7 @@ export function buildReport(
     if (input.samples.length > 0) {
       sessionRows.push({
         sessionId: input.sessionId,
+        ...input.chainId === undefined ? {} : { chainId: input.chainId },
         ...input.title === undefined ? {} : { title: input.title },
         ...input.cwd === undefined ? {} : { cwd: input.cwd },
         createdAt: input.createdAt,
@@ -627,30 +630,24 @@ export function buildReport(
     }
   }
 
-  // Same-title fork chains fold into one row. The harness's edit-resend and
-  // retry create a fork — a new session that copies the parent's event stream
-  // and shares its title — so one conversation reads as several rows keyed by
-  // their own session ids. The title + cwd pair is the chain's signature: each
-  // fork inherits both, and two conversations in different directories that
-  // happen to share a title stay apart. Each fork is billed only for the events
-  // it added (its fold starts after the inherited prefix), so the chain's spend
-  // is the sum of its members, not a double count. A member with no samples in
-  // the window contributes nothing and is dropped by the window itself.
-  const chains = new Map<string, UsageSessionRow[]>()
+  // Only shared inherited history establishes a chain. Titles and directories
+  // are presentation fields and never merge otherwise independent sessions.
+  const chains = new Map<string, [UsageSessionRow, ...UsageSessionRow[]]>()
   for (const row of sessionRows) {
-    const key = `${row.title ?? ''}\u0000${row.cwd ?? ''}`
+    const key = row.chainId ?? row.sessionId
     const chain = chains.get(key)
     if (chain === undefined) chains.set(key, [row])
     else chain.push(row)
   }
   const mergedSessionRows: UsageSessionRow[] = [...chains.values()].map(members => {
     if (members.length === 1) return members[0]
-    const ordered = [...members].sort((left, right) => left.createdAt - right.createdAt)
+    const ordered = members.sort((left, right) => left.createdAt - right.createdAt || left.sessionId.localeCompare(right.sessionId))
     const head = ordered[0]
     const sum = (pick: (row: UsageSessionRow) => number): number =>
       members.reduce((total, row) => total + pick(row), 0)
     return {
       sessionId: head.sessionId,
+      ...head.chainId === undefined ? {} : { chainId: head.chainId },
       ...head.title === undefined ? {} : { title: head.title },
       ...head.cwd === undefined ? {} : { cwd: head.cwd },
       createdAt: head.createdAt,

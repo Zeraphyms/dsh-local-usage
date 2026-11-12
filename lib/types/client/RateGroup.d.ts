@@ -31,6 +31,10 @@ interface RateGroupProps {
     readonly onSave: () => void;
     readonly onPeak: (enabled: boolean) => void;
     readonly onWrite: (set: PriceSet, field: RateField, value: string) => void;
+    /** Delete this card edit, shown only while the group is open. */
+    readonly onDelete?: () => void;
+    /** Label for the delete action: remove for a user-added card, reset for a built-in. */
+    readonly deleteLabel?: string;
 }
 /**
  * Render one model: its rate rows, its volume, and — while it is open — its
@@ -43,5 +47,5 @@ interface RateGroupProps {
  * @param props - one row's card, its draft, and the editor's handlers.
  * @returns a table body, one group per model.
  */
-export declare function RateGroup({ row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, }: RateGroupProps): ReactNode;
+export declare function RateGroup({ row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, }: RateGroupProps): ReactNode;
 export {};

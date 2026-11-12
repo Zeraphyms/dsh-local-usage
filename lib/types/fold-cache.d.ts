@@ -51,6 +51,7 @@ export interface CachedFold {
     readonly title?: string;
     readonly cwd?: string;
     readonly createdAt: number;
+    readonly chainId?: string;
 }
 /** The persisted fold cache, kept in memory and mirrored to disk. */
 export interface FoldCache {

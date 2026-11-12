@@ -132,6 +132,9 @@ export declare const css: {
     readonly pricingSummary: "dlu-pricingSummary";
     readonly rateAction: "dlu-rateAction";
     readonly rateActions: "dlu-rateActions";
+    readonly rateAddRow: "dlu-rateAddRow";
+    readonly rateAddForm: "dlu-rateAddForm";
+    readonly rateAddField: "dlu-rateAddField";
     readonly rateColAction: "dlu-rateColAction";
     readonly rateColSet: "dlu-rateColSet";
     readonly rateColUsage: "dlu-rateColUsage";
@@ -161,6 +164,7 @@ export declare const css: {
     readonly statsColName: "dlu-statsColName";
     readonly statsColTokens: "dlu-statsColTokens";
     readonly statsTable: "dlu-statsTable";
+    readonly statsRowLink: "dlu-statsRowLink";
     readonly tableBlock: "dlu-tableBlock";
     readonly tableHeading: "dlu-tableHeading";
     readonly tableNote: "dlu-tableNote";

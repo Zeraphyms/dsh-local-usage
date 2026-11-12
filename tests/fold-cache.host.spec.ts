@@ -36,6 +36,7 @@ function fold(time: number): CachedFold {
     }],
     title: 'a session',
     cwd: '/tmp/project',
+    chainId: 'chain:' + 'a'.repeat(64),
   }
 }
 
@@ -60,6 +61,7 @@ describe('createFoldCache', () => {
     expect(hit?.samples).toHaveLength(1)
     expect(hit?.title).toBe('a session')
     expect(hit?.cwd).toBe('/tmp/project')
+    expect(hit?.chainId).toBe('chain:' + 'a'.repeat(64))
     // The two count maps survive the round trip as maps, not as plain objects.
     expect(hit?.reliability[0]?.retryCauses.get('RATE_LIMIT')).toBe(1)
     expect(hit?.reliability[0]?.toolErrorCodes.get('FS_STALE_VERSION')).toBe(1)
@@ -161,7 +163,7 @@ describe('createFoldCache', () => {
     const now = Date.now()
     const good = fold(now - MS_PER_DAY)
     await writeFile(path, JSON.stringify({
-      version: 2,
+      version: 3,
       sessions: {
         good: { revision: 'rev-1', createdAt: good.createdAt, samples: good.samples, reliability: [] },
         // A sample whose token buckets are not numbers: this entry is dropped,

@@ -37,6 +37,8 @@ export interface UsageSample {
 /** One session's inputs to a report, plus what the window keeps of it. */
 export interface SessionUsageInput {
     readonly sessionId: string;
+    /** Opaque identity established from inherited conversation history. */
+    readonly chainId?: string;
     readonly title?: string;
     readonly cwd?: string;
     readonly createdAt: number;

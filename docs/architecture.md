@@ -8,7 +8,7 @@
 session logs (durable JSONL)
         │
         ▼
-host/session-fold.ts        foldSession → samples + reliability + title/cwd
+host/session-fold.ts        foldSession → samples + reliability + title/cwd/chainId
         │
         ▼
 host/corpus-reader.ts       batch projection / exact read
@@ -26,7 +26,13 @@ src/index.ts                 activation, caches, read queue, invalidation
 - **Reading is serialized.** `src/index.ts` owns one promise queue (`serialize`); a report, the call log and the warm-up never walk the corpus concurrently. A queued read starts from the folds the previous one filled, and the single progress object therefore describes one read.
 - **Folding is pure.** `foldSession` takes events and returns samples; the same function serves the batch projection and the exact read, so both paths count the same settlements.
 - **Invalidation is generation-checked.** `apply` increments a per-session generation on `session/event`. A fold that was in flight may answer the current request as a snapshot, but it is not written back to the in-memory or durable cache when its generation moved.
-- **The durable cache is optional.** Without `sessionPersistence` there are no revisions; every session takes the exact read and the report is still complete.
+- **The durable cache is optional.** Without `sessionPersistence` there are no revisions; the memory cache and batch/exact read paths still work.
+
+## Conversation grouping
+
+`host/session-chain.ts` hashes the complete event prefix through the first user message, including event sequence and timestamps, with sorted object keys. A seeded session receives that identity only when the entire prefix was inherited. Titles and directories never establish identity. Headers marked as subagents, delegation depth, and inherited subagent descriptors keep delegated histories separate. Empty forks and histories without a first user message stay independent. The digest is an opaque shared-history identity, not a stored parent-session link: current Harness ordinary forks do not retain their source id.
+
+The fold cache stores the digest, never the hashed message text. Version 3 invalidates earlier cached folds so the first read computes the new identity. Both `buildReport` and `queryCalls` group by this identity; the Client uses the Host's facets directly and leaves older Hosts' individual session facets separate. New call-log requests send one fixed-length `chain:` id rather than a growing member list. Exact session ids and legacy comma-separated lists still work without silent truncation; the list is parsed once per query.
 
 ## Pricing
 

@@ -2,8 +2,8 @@
  * The call log: one row per billed model call, queried and paged by the Host.
  *
  * This is the surface the folds cannot provide. A calendar answers when, a
- * project table answers where, and a model table answers which — but “why did
- * this figure move” is only ever answered by the settlement itself: its instant,
+ * project table answers where, and a model table answers which —but —渨hy did
+ * this figure move—is only ever answered by the settlement itself: its instant,
  * its route, its four token buckets and the money its own buckets cost. So the
  * page is a table first and a chart never, and every control above it narrows
  * the same query rather than drawing a second, derived figure.
@@ -30,6 +30,10 @@ export interface CallsPageProps {
     readonly initialFrom?: number;
     /** Last instant of that window. */
     readonly initialTo?: number;
+    /** Session id the opener narrowed to, when a stats table or day page did. */
+    readonly initialSession?: string;
+    /** Working directory the opener narrowed to, when one did. */
+    readonly initialProject?: string;
     /** Label for the way back, which differs between the calendar and a day page. */
     readonly backLabel?: string;
     /** Leave the call log. */
@@ -40,4 +44,4 @@ export interface CallsPageProps {
  * @param props - the formatters, the optional starting window and the way back.
  * @returns the page.
  */
-export declare function CallsPage({ locale, t, formatCost, formatTokens, formatInteger, formatPercent, initialFrom, initialTo, backLabel, onBack, }: CallsPageProps): ReactNode;
+export declare function CallsPage({ locale, t, formatCost, formatTokens, formatInteger, formatPercent, initialFrom, initialTo, initialSession, initialProject, backLabel, onBack, }: CallsPageProps): ReactNode;

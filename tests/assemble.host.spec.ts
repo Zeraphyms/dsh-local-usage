@@ -63,13 +63,14 @@ function log(seqStart: number, time: number, count: number, firstTurn = 1): Sess
 }
 
 /** A `listSessions` record for one session id. */
-function record(id: string, seeded = false, cwd?: string, live = false): unknown {
+function record(id: string, seeded = false, cwd?: string, live = false, subagent = false): unknown {
   return {
     header: {
       version: 3,
       id,
       createdAt: DAY_ONE,
       isSeeded: seeded,
+      ...subagent ? { origin: 'subagent', delegationDepth: 1 } : {},
       ...cwd === undefined ? {} : { cwd },
     },
     live,
@@ -81,6 +82,7 @@ function record(id: string, seeded = false, cwd?: string, live = false): unknown
 interface FakeLog {
   readonly events: readonly SessionEvent[]
   readonly seeded?: boolean
+  readonly subagent?: boolean
   readonly cwd?: string
   readonly inheritedEventCount?: number
   /** When true, both read paths reject for this session. */
@@ -144,6 +146,7 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
         logs.get(id)?.seeded === true,
         logs.get(id)?.cwd,
         live.has(id),
+        logs.get(id)?.subagent === true,
       )))
     },
     readSession: (id: string) => {
@@ -170,7 +173,7 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
           return { sessionId: id, status: 'rejected' as const, reason: new Error('unreadable') }
         }
         const value = project({
-          header: { createdAt: DAY_ONE, ...entry.cwd === undefined ? {} : { cwd: entry.cwd } },
+          header: { id, createdAt: DAY_ONE, ...entry.cwd === undefined ? {} : { cwd: entry.cwd } },
           // The projection receives the log as the reader holds it, which is the
           // whole point of this path: no clone, no replay validation.
           events: entry.events,
@@ -661,6 +664,44 @@ describe('the pricing route', () => {
 })
 
 describe('the call-log route', () => {
+  it('keeps delegated sessions separate on both batch and exact paths', async () => {
+    const prompt = { type: 'user/message', seq: 0, time: DAY_ONE, data: { role: 'user', content: 'task' } } as unknown as SessionEvent
+    const logs = new Map<string, FakeLog>([
+      ['root', { events: [prompt, message(1, DAY_ONE + 1, 1)] }],
+      ['batch-child', { events: [prompt, message(1, DAY_ONE + 2, 1)], subagent: true }],
+      ['fork-child', { events: [prompt, message(1, DAY_TWO, 1)], seeded: true, inheritedEventCount: 1, subagent: true }],
+    ])
+    const value = await report(mount(logs, true))
+    expect(value.sessions).toHaveLength(3)
+  })
+
+  it('keeps long legacy session lists intact through HTTP parsing', async () => {
+    const ids = Array.from({ length: 40 }, (_, index) => 'session-' + String(index).padStart(36, '0'))
+    const logs = new Map(ids.map(id => [id, { events: log(0, DAY_ONE, 1) }]))
+    logs.set('unrelated', { events: log(0, DAY_ONE, 1) })
+    const page = await calls(mount(logs, true), { session: ids.join(','), limit: '200' })
+    expect(page.total).toBe(40)
+    expect(page.sessions).toBe(40)
+  })
+
+  it('uses the same shared-history id for report drill-down and calls after restart', async () => {
+    const prompt = { type: 'user/message', seq: 0, time: DAY_ONE, data: { role: 'user', content: 'task' } } as unknown as SessionEvent
+    const logs = new Map<string, FakeLog>([
+      ['root', { events: [prompt, message(1, DAY_ONE + 1, 1)] }],
+      ['fork', { events: [prompt, message(1, DAY_ONE + 1, 1), message(2, DAY_TWO, 2)], seeded: true, inheritedEventCount: 2 }],
+    ])
+    const options = { revisions: { root: 'root-rev', fork: 'fork-rev' } }
+    const value = await report(mount(logs, true, options))
+    const rows = value.sessions as { chainId: string; chainSessionIds: string[] }[]
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.chainSessionIds).toHaveLength(2)
+    const restarted = mount(logs, true, options)
+    const page = await calls(restarted, { session: rows[0]!.chainId })
+    expect(page.total).toBe(2)
+    expect(restarted.batches).toEqual([])
+    expect(restarted.exactReads).toEqual([])
+  })
+
   it('pages the folds the report already paid for, without a second read', async () => {
     const logs = new Map<string, FakeLog>([
       ['a', { events: log(0, DAY_ONE, 3), cwd: '/work/a' }],

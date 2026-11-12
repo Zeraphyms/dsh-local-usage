@@ -147,7 +147,7 @@ export function queryCalls(
   const rows: UsageCallRow[] = []
   const totals = emptyBucket()
   const facets = new Map<string, FacetBucket>()
-  const sessionFacets = new Map<string, { sessionId: string; title?: string; calls: number; cost: number }>()
+  const sessionFacets = new Map<string, { sessionId: string; chainId?: string; title?: string; cwd?: string; createdAt: number; members: Set<string>; calls: number; cost: number }>()
   const projectFacets = new Map<string, { path: string; calls: number; cost: number }>()
   const sessions = new Set<string>()
   const projects = new Set<string>()
@@ -157,10 +157,12 @@ export function queryCalls(
   const routeNeedle = query.route === undefined || query.route.length === 0
     ? undefined
     : query.route
-  // A merged fork chain arrives as one comma-separated id set; a bare id is a set of one.
-  const sessionNeedle = query.session === undefined || query.session.length === 0
-    ? undefined
-    : query.session
+  // New callers send one fixed-length chain id. Older callers may still send
+  // an exact session id or a comma-separated set, parsed once per query.
+  const chainNeedle = query.session?.startsWith('chain:') === true ? query.session : undefined
+  const sessionSet = chainNeedle === undefined && query.session !== undefined && query.session.length > 0
+    ? new Set(query.session.split(',').map(id => id.trim()).filter(id => id.length > 0))
+    : undefined
   const projectNeedle = query.project === undefined || query.project.length === 0
     ? undefined
     : query.project
@@ -208,16 +210,31 @@ export function queryCalls(
 
       // The session and project facets see the window, not the filters — same
       // rule as the route facets above, so no picker narrows its own choices.
-      let sessionFacet = sessionFacets.get(input.sessionId)
+      const conversation = input.chainId ?? input.sessionId
+      let sessionFacet = sessionFacets.get(conversation)
       if (sessionFacet === undefined) {
         sessionFacet = {
           sessionId: input.sessionId,
+          ...input.chainId === undefined ? {} : { chainId: input.chainId },
           ...input.title === undefined ? {} : { title: input.title },
+          ...input.cwd === undefined ? {} : { cwd: input.cwd },
+          createdAt: input.createdAt,
+          members: new Set(),
           calls: 0,
           cost: 0,
         }
-        sessionFacets.set(input.sessionId, sessionFacet)
+        sessionFacets.set(conversation, sessionFacet)
       }
+      if (input.createdAt < sessionFacet.createdAt
+        || (input.createdAt === sessionFacet.createdAt && input.sessionId < sessionFacet.sessionId)) {
+        sessionFacet.sessionId = input.sessionId
+        sessionFacet.createdAt = input.createdAt
+        if (input.title === undefined) delete sessionFacet.title
+        else sessionFacet.title = input.title
+        if (input.cwd === undefined) delete sessionFacet.cwd
+        else sessionFacet.cwd = input.cwd
+      }
+      sessionFacet.members.add(input.sessionId)
       sessionFacet.calls += 1
       sessionFacet.cost += cost
       let projectFacet = projectFacets.get(project)
@@ -228,12 +245,9 @@ export function queryCalls(
       projectFacet.calls += 1
       projectFacet.cost += cost
 
-      // The merged-chain session picker sends one chain as a comma set; a bare
-      // id from an older caller still matches as a one-element set.
-      const sessionSet = sessionNeedle !== undefined ? new Set(sessionNeedle.split(',')) : undefined
-
       if (routeNeedle !== undefined && sample.route !== routeNeedle) continue
       if (modelNeedle !== undefined && modelKey(model) !== modelNeedle) continue
+      if (chainNeedle !== undefined && input.chainId !== chainNeedle) continue
       if (sessionSet !== undefined && !sessionSet.has(input.sessionId)) continue
       if (projectNeedle !== undefined && project !== projectNeedle) continue
       if (textNeedle.length > 0
@@ -304,6 +318,9 @@ export function queryCalls(
   const sessionFacetRows: UsageSessionFacet[] = [...sessionFacets.values()]
     .map(facet => ({
       sessionId: facet.sessionId,
+      ...facet.chainId === undefined ? {} : { chainId: facet.chainId },
+      ...facet.cwd === undefined ? {} : { cwd: facet.cwd },
+      ...facet.members.size < 2 ? {} : { chainSessionIds: [...facet.members].sort() },
       ...facet.title === undefined ? {} : { title: facet.title },
       calls: facet.calls,
       cost: facet.cost,

@@ -79,12 +79,10 @@ export interface UsageProjectRow extends UsageCosted {
 }
 
 /**
- * Usage attributed to one session, or to one same-title fork chain of sessions.
+ * Usage attributed to one session, or to ordinary forks sharing inherited conversation history.
  *
- * The harness's edit-resend and retry create a fork: a new session that copies
- * the parent's whole event stream as an inherited prefix and shares its title.
- * The chain is one conversation to a reader, so the report folds it into one
- * row; each fork is still billed only for the events it added.
+ * Shared inherited history establishes membership independently of titles.
+ * Each member is still billed only for events outside its inherited prefix.
  */
 export interface UsageSessionRow extends UsageCosted {
   /** Durable session id. For a merged fork chain, the earliest-created member's id. */
@@ -98,12 +96,13 @@ export interface UsageSessionRow extends UsageCosted {
   /** Latest usage sample time in Unix epoch milliseconds, or `createdAt` when the session recorded none. */
   readonly updatedAt: number
   /**
-   * Every member session id of this row, when the row merges a same-title fork
-   * chain. Absent for a single-session row. The calls page's session filter
-   * accepts the whole set, so selecting the chain shows every segment of the
-   * conversation rather than only the newest fork.
+   * Every contributing member session id of this row, when the row merges a fork
+   * chain. Absent for a single-session row. New Clients filter by chainId;
+   * the member list remains available for display and older callers.
    */
   readonly chainSessionIds?: readonly string[]
+  /** Fixed-length shared-history id accepted by the call-log session filter. */
+  readonly chainId?: string
 }
 
 /**
@@ -177,8 +176,13 @@ export type UsageCallSort = 'time' | 'cost' | 'tokens' | 'output'
  * so a filter never narrows the choices it offers.
  */
 export interface UsageSessionFacet {
-  /** The durable session id, exactly as the log names it. */
+  /** Representative durable session id. */
   readonly sessionId: string
+  /** Shared-history id for this conversation; absent on older Hosts. */
+  readonly chainId?: string
+  /** Contributing member ids, when more than one session belongs to this conversation. */
+  readonly chainSessionIds?: readonly string[]
+  readonly cwd?: string
   /** Folded session title, absent when the log named none. */
   readonly title?: string
   /** Calls this session billed in the window. */
@@ -213,7 +217,7 @@ export interface UsageCallsQuery {
   readonly route?: string
   /** Model identity: every route whose model shares this spelling's model key. */
   readonly model?: string
-  /** Exact durable session id. */
+  /** Shared-history chain id, exact durable session id, or legacy comma-separated ids. */
   readonly session?: string
   /** Exact working directory: every session opened in it, plus the no-directory bucket. */
   readonly project?: string

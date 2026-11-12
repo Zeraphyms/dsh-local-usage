@@ -12,7 +12,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { CallsPage } from '../src/client/CallsPage.tsx'
 import type { UsageCallsReport } from '../src/types.ts'
 
@@ -55,15 +55,11 @@ describe('CallsPage interaction', () => {
     })))
   })
   afterEach(() => {
+    cleanup()
     vi.unstubAllGlobals()
   })
 
-  /** The three selects in the query bar, in reading order. */
-  function selectAt(container: HTMLElement, index: number): HTMLSelectElement {
-    const select = container.querySelectorAll<HTMLSelectElement>('select')[index]
-    if (select === undefined) throw new Error(`no select at ${String(index)}`)
-    return select
-  }
+
 
   function props(): Record<string, unknown> {
     return {
@@ -81,7 +77,7 @@ describe('CallsPage interaction', () => {
     const view = render(createElement(CallsPage, props() as never))
     await screen.findByText('Alpha task')
 
-    fireEvent.change(selectAt(view.container, 0), { target: { value: 'm' } })
+    fireEvent.change(view.getByLabelText('callsFilterModel'), { target: { value: 'm' } })
 
     await waitFor(() => {
       const calls = (fetch as unknown as { mock: { calls: [URL][] } }).mock.calls
@@ -93,7 +89,7 @@ describe('CallsPage interaction', () => {
     const view = render(createElement(CallsPage, props() as never))
     await screen.findByText('Alpha task')
 
-    fireEvent.change(selectAt(view.container, 2), { target: { value: '100' } })
+    fireEvent.change(view.getByLabelText('callsPageSize'), { target: { value: '100' } })
 
     await waitFor(() => {
       const calls = (fetch as unknown as { mock: { calls: [URL][] } }).mock.calls

@@ -113,7 +113,7 @@ export interface CallsQuery {
   readonly data: UsageCallsReport | undefined
   /** Models the filter can choose, most called first. */
   readonly models: readonly CallsModelOption[]
-  /** Session picker options: same-title fork chains grouped, dearest first. The value is the chain's comma-separated id set. */
+  /** Conversations grouped by the Host, dearest first; value is an opaque chain or session id. */
   readonly sessionChainOptions: readonly {
     readonly value: string
     readonly label: string
@@ -283,28 +283,14 @@ export function useCallsQuery({ initialFrom, initialTo, initialSession, initialP
       .sort((left, right) => right.calls - left.calls || left.model.localeCompare(right.model))
   }, [state.data])
 
-  // The session picker groups same-title sessions (a fork chain from the
-  // harness's edit-resend/retry) into one option whose value is the chain's
-  // comma-separated id set — the exact spelling the Host's session filter
-  // accepts. Untitled or unique sessions stay one-option-one-id.
-  const sessionChainOptions = useMemo(() => {
-    const facets = state.data?.sessionFacets ?? []
-    const groups = new Map<string, { value: string; label: string; calls: number; title: string }>()
-    for (const facet of facets) {
-      const label = facet.title ?? ''
-      const current = groups.get(label)
-      if (current === undefined) {
-        groups.set(label, { value: facet.sessionId, label, calls: facet.calls, title: facet.sessionId })
-      } else {
-        current.value = `${current.value},${facet.sessionId}`
-        current.calls += facet.calls
-        current.title = `${current.title}\n${facet.sessionId}`
-      }
-    }
-    return [...groups.values()]
-      .map(group => ({ value: group.value, label: group.label, calls: group.calls, title: group.title }))
-      .sort((left, right) => right.calls - left.calls || left.label.localeCompare(right.label))
-  }, [state.data])
+  // The Host owns grouping; older Hosts without chain metadata keep one option
+  // per session, including duplicate titles and untitled sessions.
+  const sessionChainOptions = useMemo(() => (state.data?.sessionFacets ?? []).map(facet => ({
+    value: facet.chainId ?? facet.sessionId,
+    label: facet.title ?? '',
+    calls: facet.calls,
+    title: [facet.cwd ?? '', ...(facet.chainSessionIds ?? [facet.sessionId])].filter(Boolean).join('\n'),
+  })), [state.data])
 
   return {
     rangeId,

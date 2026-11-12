@@ -125,7 +125,7 @@ function sessionRowOf(row: UsageSessionRow, t: PropsLocale<'usage'>['t']): Stats
   const chainIds = row.chainSessionIds ?? []
   const merged = chainIds.length > 1
   return {
-    key: merged ? chainIds.join(',') : row.sessionId,
+    key: row.chainId ?? (merged ? chainIds.join(',') : row.sessionId),
     name: row.title ?? t('sessionUntitled'),
     detail: merged
       ? `${row.cwd ?? ''} · ${t('chainParts', { count: chainIds.length })}`

@@ -40,7 +40,7 @@ type BatchOutcome<Value> =
 type BatchProjection = <Value>(
   sessionIds: readonly SessionId[],
   project: (source: {
-    readonly header: { readonly createdAt: number; readonly cwd?: string }
+    readonly header: { readonly id: SessionId; readonly createdAt: number; readonly cwd?: string }
     readonly events: readonly SessionEvent[]
   }) => Value,
   signal?: AbortSignal,
@@ -207,6 +207,10 @@ export async function readCorpus(
   if (request.refresh) cache.clear()
 
   const records = await ctx.sessionQuery.listSessions()
+  const subagents = new Set(records.filter(record => {
+    const header = record.header as { readonly origin?: string; readonly delegationDepth?: number }
+    return header.origin === 'subagent' || (header.delegationDepth ?? 0) > 0
+  }).map(record => String(record.header.id)))
   // Every session that contributed, with the fold it contributed from. Kept as
   // pairs rather than as finished inputs because a window is a filter over
   // these folds: deriving a second one — the window before this — costs a
@@ -272,6 +276,7 @@ export async function readCorpus(
         ...source.header.cwd === undefined ? {} : { cwd: source.header.cwd },
         // Reached only for a log with no inherited prefix, by construction above.
         skipBefore: 0,
+        subagent: subagents.has(String(source.header.id)),
       })
       // Counted inside the projector because that is where a session's fold
       // actually completes; the projection reports back only when all of them have.
@@ -310,6 +315,8 @@ export async function readCorpus(
           // those turns were already billed under the parent. Only the events this
           // session owns are its own spend.
           skipBefore: snapshot.inheritedEventCount,
+          seeded: entry.seeded,
+          subagent: subagents.has(entry.id),
         })
       } catch {
         return undefined

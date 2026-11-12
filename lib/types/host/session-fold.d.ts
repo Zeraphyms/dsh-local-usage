@@ -24,6 +24,7 @@ export interface CachedSession {
     readonly title?: string;
     readonly cwd?: string;
     readonly createdAt: number;
+    readonly chainId?: string;
 }
 /** Everything one session's fold reads out of its log. */
 interface SessionFoldSource {
@@ -42,6 +43,8 @@ interface SessionFoldSource {
      * of, which is what the harness's own projection does.
      */
     readonly skipBefore: number;
+    readonly seeded?: boolean;
+    readonly subagent?: boolean;
 }
 /**
  * Fold one session's raw log into the shape the cache keeps.
