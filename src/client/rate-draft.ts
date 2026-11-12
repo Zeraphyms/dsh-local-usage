@@ -15,7 +15,7 @@
  * @module dsh-local-usage/client/rate-draft
  */
 
-import type { UsageModelEdit, UsageModelPrice, UsagePricingUpdate, UsageRate } from '../types.ts'
+import type { UsageModelEdit, UsageModelPrice, UsagePricingUpdate, UsageRate, UsagePriceCurrency } from '../types.ts'
 
 /** One set of four price fields, as typed. */
 export interface PriceFields {
@@ -27,6 +27,10 @@ export interface PriceFields {
 
 /** One model's draft: the switch and both sets of prices. */
 export interface ModelDraft {
+  /** Input unit; omitted means the stored CNY unit. */
+  currency?: UsagePriceCurrency
+  /** CNY per USD captured when the input unit changes. */
+  exchangeRate?: number
   /** Whether the model prices peak separately. */
   peakEnabled: boolean
   /** Prices inside a peak window; ignored while {@link peakEnabled} is false. */
@@ -147,6 +151,7 @@ export function pendingUpdate(
 ): RateDraftResult {
   const writes: Record<string, UsageModelEdit | null> = {}
   const selected = only === undefined ? models : models.filter(card => card.match === only)
+  let currency: UsagePriceCurrency = 'CNY'
 
   for (const card of selected) {
     const draft = drafts[card.match]
@@ -160,15 +165,21 @@ export function pendingUpdate(
       continue
     }
 
-    const offPeak = resolve(draft.offPeak, card.offPeak)
+    currency = draft.currency ?? 'CNY'
+    const factor = currency === 'USD' ? 1 / (draft.exchangeRate ?? 1) : 1
+    const effective = (rate: UsageRate): UsageRate => ({
+      input: Number((rate.input * factor).toPrecision(15)), cacheRead: Number((rate.cacheRead * factor).toPrecision(15)),
+      cacheWrite: Number((rate.cacheWrite * factor).toPrecision(15)), output: Number((rate.output * factor).toPrecision(15)),
+    })
+    const offPeak = resolve(draft.offPeak, effective(card.offPeak))
     if ('field' in offPeak) {
       return { status: 'invalid', model: card.match, set: 'offPeak', field: offPeak.field }
     }
     // The peak set only matters while the switch is on; a flat model keeps
     // whatever peak prices it carries rather than validating fields it ignores.
-    let peak: UsageRate = card.peak
+    let peak: UsageRate = effective(card.peak)
     if (draft.peakEnabled) {
-      const read = resolve(draft.peak, card.peak)
+      const read = resolve(draft.peak, effective(card.peak))
       if ('field' in read) {
         return { status: 'invalid', model: card.match, set: 'peak', field: read.field }
       }
@@ -182,14 +193,14 @@ export function pendingUpdate(
       offPeak: offPeak.rate,
     }
     const unchanged = next.peakEnabled === card.peakEnabled
-      && samePrices(next.offPeak, card.offPeak)
-      && samePrices(next.peak, card.peak)
+      && samePrices(next.offPeak, effective(card.offPeak))
+      && samePrices(next.peak, effective(card.peak))
     if (!unchanged) writes[card.match] = next
   }
 
   return Object.keys(writes).length === 0
     ? { status: 'empty' }
-    : { status: 'ready', update: { models: writes } }
+    : { status: 'ready', update: { models: writes, ...currency === 'USD' ? { currency } : {} } }
 }
 
 /**

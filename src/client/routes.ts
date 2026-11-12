@@ -20,3 +20,6 @@ export const PRICING_PATH = '/api/dsh-local-usage/pricing'
 
 /** Host route this panel asks what a read in flight is doing. */
 export const PROGRESS_PATH = '/api/dsh-local-usage/progress'
+
+/** Host route for the USD/CNY reference rate. */
+export const EXCHANGE_PATH = '/api/dsh-local-usage/exchange-rate'

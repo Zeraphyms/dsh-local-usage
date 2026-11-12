@@ -42,7 +42,7 @@ export type UsageInsightsFallbackConfig = UsageInsightsPriceConfig & {
 };
 /** Plugin configuration; every field has a default, so the plugin mounts bare. */
 export interface UsageInsightsConfig {
-    /** Currency every cost figure is expressed in; the plugin performs no conversion. */
+    /** Report currency; USD editor submissions are converted only when this is CNY. */
     currency: string;
     /** Configured rate cards, matched in order. */
     models: UsageInsightsModelConfig[];
@@ -65,6 +65,8 @@ export interface UsageInsightsConfig {
     warmup: boolean;
     /** How long after activation the background fold starts, in milliseconds. */
     warmupDelayMs: number;
+    /** Refresh USD/CNY on activation and daily at Beijing noon. */
+    exchangeRateAutoRefresh?: boolean;
 }
 /**
  * Shipped defaults: one card per model, matched against the routed model first by

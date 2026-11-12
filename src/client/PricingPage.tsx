@@ -24,6 +24,7 @@ import type { RateRow } from './rate-row.ts'
 import { displayModel, modelOf } from '../model-name.ts'
 import { matchModel } from '../pricing.ts'
 import { css } from './classes.ts'
+import { useExchangeRate } from './useExchangeRate.ts'
 
 /** Props for the pricing page. */
 export interface PricingPageProps {
@@ -50,6 +51,7 @@ export interface PricingPageProps {
 export function PricingPage({
   report, weeks, locale, t, formatCost, onSaveRates, onBack,
 }: PricingPageProps): ReactNode {
+  const exchange = useExchangeRate()
   // Group by the card that actually priced each route, not by the model name
   // the route spells. A substring card named `flash` is the card in effect for
   // `vendor/deepseek-v4-flash`; looking it up by full model name found nothing
@@ -89,6 +91,9 @@ export function PricingPage({
       group.routes += 1
     }
   }
+  for (const card of report.prices) {
+    if (!groups.has(card.match)) groups.set(card.match, { card, names: new Set([card.match]), tokens: 0, cost: 0, routes: 0 })
+  }
   const rows: RateRow[] = [...groups.values()]
     .map(group => {
       const names = [...group.names]
@@ -117,11 +122,26 @@ export function PricingPage({
           </div>
           <p className={css.subtitle}>{t('pricingPageSubtitle')}</p>
         </div>
+        <div className={css.exchange} aria-busy={exchange.busy}>
+          <div className={css.exchangeLine}>
+            <span className={css.exchangeLabel}>{t('exchangeTitle')}</span>
+            <strong className={css.exchangeValue}>{exchange.snapshot === undefined ? '—' : '1 USD = ' + exchange.snapshot.rate.toFixed(3) + ' CNY'}</strong>
+            <button type="button" className={css.exchangeSync} disabled={exchange.busy} onClick={exchange.sync} aria-label={t('exchangeSync')} title={t('exchangeSync')}>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                <path d="M20 7v5h-5M4 17v-5h5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+          <span className={css.exchangeMeta}>{exchange.busy ? t('exchangeSyncing') : exchange.failed ? t(exchange.snapshot === undefined ? 'exchangeUnavailable' : 'exchangeRetained') : t('exchangeSchedule')}</span>
+          {exchange.snapshot === undefined ? null : <span className={css.exchangeMeta}>{t('exchangeDate', { date: exchange.snapshot.date })}</span>}
+        </div>
       </header>
 
       <RateEditor
         rows={rows}
         currency={report.currency}
+        exchangeRate={exchange.snapshot?.rate}
         locale={locale}
         formatCost={formatCost}
         t={t}

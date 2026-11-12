@@ -17,8 +17,10 @@
 
 import { useState, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { UsageModelPrice, UsagePricingUpdate } from '../types.ts'
-import { RATE_FIELDS, type RateField } from './rate-draft.ts'
+import type { UsageModelPrice, UsagePricingUpdate, UsagePriceCurrency } from '../types.ts'
+import { RATE_FIELDS, type RateField, type PriceFields } from './rate-draft.ts'
+import { changeDraftCurrency } from './rate-currency.ts'
+import { PriceCurrencySelect } from './PriceCurrencySelect.tsx'
 import { FIELD_KEYS } from './rate-row.ts'
 import { css } from './classes.ts'
 
@@ -26,14 +28,16 @@ import { css } from './classes.ts'
 interface AddDraft {
   match: string
   peakEnabled: boolean
-  peak: Record<string, string>
-  offPeak: Record<string, string>
+  peak: PriceFields
+  offPeak: PriceFields
+  currency: UsagePriceCurrency
+  exchangeRate?: number
 }
 
 /** An empty draft: every field blank, flat-priced, matching nothing. */
 function emptyDraft(): AddDraft {
   const fields = () => ({ input: '', cacheRead: '', cacheWrite: '', output: '' })
-  return { match: '', peakEnabled: false, peak: fields(), offPeak: fields() }
+  return { match: '', peakEnabled: false, peak: fields(), offPeak: fields(), currency: 'CNY' }
 }
 
 /** Props for the add-card form. */
@@ -41,6 +45,7 @@ export interface AddRateCardProps {
   /** Every match already priced, so a duplicate can be refused. */
   readonly existing: readonly string[]
   readonly currency: string
+  readonly exchangeRate?: number | undefined
   readonly t: PropsLocale<'usage'>['t']
   /** Persist one update; rejects with a message the form shows. */
   readonly onSave: (update: UsagePricingUpdate) => Promise<void>
@@ -51,7 +56,7 @@ export interface AddRateCardProps {
  * @param props - the existing matches, the currency and the save action.
  * @returns the folded form, or the button that opens it.
  */
-export function AddRateCard({ existing, currency, t, onSave }: AddRateCardProps): ReactNode {
+export function AddRateCard({ existing, currency, t, onSave, exchangeRate }: AddRateCardProps): ReactNode {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<AddDraft>(emptyDraft)
   const [busy, setBusy] = useState(false)
@@ -104,6 +109,7 @@ export function AddRateCard({ existing, currency, t, onSave }: AddRateCardProps)
     setFailure(undefined)
     try {
       await onSave({
+        ...draft.currency === 'USD' ? { currency: draft.currency } : {},
         models: {
           [match]: {
             peakEnabled: draft.peakEnabled,
@@ -164,6 +170,16 @@ export function AddRateCard({ existing, currency, t, onSave }: AddRateCardProps)
 
   return (
     <div className={css.rateAddRow}>
+      <PriceCurrencySelect
+        value={draft.currency}
+        disabled={busy}
+        usdAvailable={currency === 'CNY' && exchangeRate !== undefined}
+        onChange={value => {
+          if (exchangeRate === undefined) return
+          setDraft(current => ({ ...current, ...changeDraftCurrency(current, value, exchangeRate), currency: value }))
+        }}
+        t={t}
+      />
       <div className={css.rateAddForm}>
         <label className={css.rateAddField}>
           <span>{t('pricingAddMatch')}</span>
@@ -205,7 +221,7 @@ export function AddRateCard({ existing, currency, t, onSave }: AddRateCardProps)
         </div>
       ) : null}
       <div className={css.rateToolbar}>
-        <span className={css.priceCurrency}>{currency} / 1M</span>
+        <span className={css.priceCurrency}>{draft.currency} / 1M</span>
         <span className={css.rateEditorActions}>
           <button
             type="button"

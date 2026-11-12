@@ -21,7 +21,9 @@ import type {
   UsagePricingUpdate,
 } from '../types.ts'
 import type { UsageInsightsConfig } from './config.ts'
-import { CALLS_PATH, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from './routes.ts'
+import { CALLS_PATH, PRICING_PATH, PROGRESS_PATH, REPORT_PATH, EXCHANGE_PATH } from './routes.ts'
+import { nextBeijingNoon, pricingUpdateInCny } from './exchange-rate.ts'
+import type { ExchangeRateStore } from './exchange-rate.ts'
 import type { CachedSession } from './session-fold.ts'
 import { assembleReport, queryCallPage } from './usage-service.ts'
 
@@ -168,6 +170,8 @@ async function handleReport(
  */
 function parsePricingUpdate(value: unknown): UsagePricingUpdate | undefined {
   if (typeof value !== 'object' || value === null) return undefined
+  const currency = (value as { currency?: unknown }).currency
+  if (currency !== undefined && currency !== 'CNY' && currency !== 'USD') return undefined
   const models = (value as { models?: unknown }).models
   if (typeof models !== 'object' || models === null) return undefined
   const parsed: Record<string, UsageModelEdit | null> = {}
@@ -180,13 +184,15 @@ function parsePricingUpdate(value: unknown): UsagePricingUpdate | undefined {
     if (edit === undefined) return undefined
     parsed[match] = edit
   }
-  return { models: parsed }
+  return { models: parsed, ...currency === undefined ? {} : { currency } }
 }
 
 /** Answer one rate-table write with the table now in effect. */
 async function handlePricing(
   ctx: Context,
   rates: RateStore,
+  exchangeRates: ExchangeRateStore,
+  config: UsageInsightsConfig,
   request: Request,
 ): Promise<Response> {
   const headers = { 'cache-control': 'no-store' }
@@ -204,7 +210,13 @@ async function handlePricing(
     )
   }
   try {
-    const models = await rates.write(update)
+    let converted = update
+    if (update.currency === 'USD') {
+      if (config.currency !== 'CNY') return Response.json({ error: 'USD input requires CNY reporting currency' }, { status: 400, headers })
+      const snapshot = exchangeRates.read() ?? await exchangeRates.refresh()
+      converted = pricingUpdateInCny(update, snapshot.rate)
+    }
+    const models = await rates.write(converted)
     return Response.json({ models }, { headers })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
@@ -246,6 +258,7 @@ export interface RouteDependencies {
   readonly progress: ProgressTracker
   readonly config: UsageInsightsConfig
   readonly rates: RateStore
+  readonly exchangeRates: ExchangeRateStore
   readonly serialize: SerializedRead
   readonly generations: ReadonlyMap<string, number>
   readonly background: () => Promise<void> | undefined
@@ -256,7 +269,7 @@ export interface RouteDependencies {
  * @param deps - the activation's caches, progress, configuration and queue.
  */
 export function registerRoutes(deps: RouteDependencies): void {
-  const { ctx, cache, folds, progress, config, rates, serialize, generations, background } = deps
+  const { ctx, cache, folds, progress, config, rates, exchangeRates, serialize, generations, background } = deps
   ctx.effect(
     () => connectionOf(ctx).fetch.register({
       path: REPORT_PATH,
@@ -291,8 +304,26 @@ export function registerRoutes(deps: RouteDependencies): void {
       path: PRICING_PATH,
       methods: ['POST'],
       requestBody: 'buffered',
-      fetch: request => handlePricing(ctx, rates, request),
+      fetch: request => handlePricing(ctx, rates, exchangeRates, config, request),
     }),
     'dsh-local-usage: pricing route',
+  )
+  ctx.effect(
+    () => connectionOf(ctx).fetch.register({
+      path: EXCHANGE_PATH,
+      methods: ['GET', 'POST'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        const headers = { 'cache-control': 'no-store' }
+        try {
+          const retained = exchangeRates.read()
+          const snapshot = request.method === 'POST' ? await exchangeRates.refresh() : retained
+          return Response.json({ snapshot: snapshot ?? null, nextUpdateAt: nextBeijingNoon(Date.now()) }, { headers })
+        } catch (error: unknown) {
+          return Response.json({ snapshot: exchangeRates.read() ?? null, nextUpdateAt: nextBeijingNoon(Date.now()), error: describe(error) }, { headers, status: 503 })
+        }
+      },
+    }),
+    'dsh-local-usage: USD/CNY route',
   )
 }

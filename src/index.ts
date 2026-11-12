@@ -27,6 +27,7 @@ import type { CachedSession } from './host/session-fold.ts'
 import type { UsageInsightsConfig } from './host/config.ts'
 import { createProgressTracker } from './progress.ts'
 import { createRateStore, pricingFilePath, resolveDshHome } from './rates.ts'
+import { createExchangeRateStore, exchangeRateFilePath, scheduleExchangeRate, exchangeRateIsDue } from './host/exchange-rate.ts'
 
 export type * from './types.ts'
 export { CALLS_PATH, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from './host/routes.ts'
@@ -71,6 +72,7 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
   // The reader's own rate corrections, hydrated once here and mirrored to disk
   // on every write.
   const rates = createRateStore(pricingFilePath(resolveDshHome()))
+  const exchangeRates = createExchangeRateStore(exchangeRateFilePath(resolveDshHome()))
   // Folds keyed by the stored log's own change token, hydrated once here so a
   // restarted process draws the year without re-reading a log it already folded.
   const folds = createFoldCache(foldCacheFilePath(resolveDshHome()))
@@ -121,6 +123,15 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
     generations.set(session.id, (generations.get(session.id) ?? 0) + 1)
     cache.delete(session.id)
   })
+  ctx.effect(() => {
+    if (!resolved.exchangeRateAutoRefresh) return () => { exchangeRates.dispose() }
+    const warn = (error: unknown): void => {
+      ctx.logger.warn('dsh-local-usage: USD/CNY refresh failed: ' + describe(error))
+    }
+    const current = exchangeRates.read()
+    if (current === undefined || exchangeRateIsDue(current, Date.now())) void exchangeRates.refresh().catch(warn)
+    return scheduleExchangeRate(exchangeRates, warn)
+  }, 'dsh-local-usage: daily USD/CNY refresh')
   if (resolved.warmup) {
     ctx.effect(() => {
       const timer = setTimeout(warm, resolved.warmupDelayMs)
@@ -134,6 +145,7 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
     progress,
     config: resolved,
     rates,
+    exchangeRates,
     serialize,
     generations,
     background: () => warming,

@@ -9,6 +9,33 @@
 
 export const rateEditor = String.raw`/* ── Rate editor ──────────────────────────────────────────────────────── */
 
+.dlu-exchange {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  margin-inline-start: auto;
+  padding-block: 2px;
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.dlu-exchangeLine { display: flex; align-items: center; gap: 8px; }
+.dlu-exchangeValue { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dlu-exchangeLabel { white-space: nowrap; }
+.dlu-exchangeMeta { font-size: 10px; line-height: 1.5; }
+.dlu-exchangeSync { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.dlu-exchangeSync:hover { background: color-mix(in oklab, var(--dsw-alias-label-primary) 7%, transparent); }
+.dlu-exchangeSync:focus-visible { outline: 2px solid var(--dsw-alias-link); outline-offset: 2px; }
+.dlu-exchangeSync:disabled { opacity: 0.45; cursor: wait; }
+.dlu-exchange[aria-busy='true'] svg { animation: dlu-exchangeTurn 1s linear infinite; }
+@keyframes dlu-exchangeTurn { to { transform: rotate(360deg); } }
+.dlu-currencySelect { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 8px; font-size: 11px; color: var(--dsw-alias-label-secondary); }
+.dlu-currencySelect select { font: inherit; padding: 4px 8px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
+.dlu-currencyHint { color: var(--dsw-alias-label-tertiary); font-size: 10.5px; }
+@media (max-width: 720px) { .dlu-pricingPage .dlu-dayHeader { flex-wrap: wrap; gap: 12px; } .dlu-exchange { align-items: flex-start; margin-inline-start: 0; } }
+@media (prefers-reduced-motion: reduce) { .dlu-exchange[aria-busy='true'] svg { animation: none; } }
+
 .dlu-editorTitle {
   margin: 0 0 4px;
   font-size: 12.5px;

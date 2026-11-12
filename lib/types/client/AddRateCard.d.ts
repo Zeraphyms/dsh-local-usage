@@ -22,6 +22,7 @@ export interface AddRateCardProps {
     /** Every match already priced, so a duplicate can be refused. */
     readonly existing: readonly string[];
     readonly currency: string;
+    readonly exchangeRate?: number | undefined;
     readonly t: PropsLocale<'usage'>['t'];
     /** Persist one update; rejects with a message the form shows. */
     readonly onSave: (update: UsagePricingUpdate) => Promise<void>;
@@ -31,6 +32,6 @@ export interface AddRateCardProps {
  * @param props - the existing matches, the currency and the save action.
  * @returns the folded form, or the button that opens it.
  */
-export declare function AddRateCard({ existing, currency, t, onSave }: AddRateCardProps): ReactNode;
+export declare function AddRateCard({ existing, currency, t, onSave, exchangeRate }: AddRateCardProps): ReactNode;
 /** Unused today but kept beside the form's types: one card as the update writes it. */
 export type AddedCard = UsageModelPrice;

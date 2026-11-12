@@ -10,7 +10,7 @@
  * @module dsh-local-usage/client/useRateEditor
  */
 import { type RefObject } from 'react';
-import type { UsageModelPrice, UsagePricingUpdate } from '../types.ts';
+import type { UsageModelPrice, UsagePricingUpdate, UsagePriceCurrency } from '../types.ts';
 import { type ModelDrafts, type PriceSet, type RateDraftResult, type RateField } from './rate-draft.ts';
 /** Matches the plugin ships with, mirrored from the host's DEFAULT_CONFIG
  * (src/host/config.ts). A card outside this list is the reader's own addition:
@@ -22,6 +22,7 @@ export interface UseRateEditorOptions {
     readonly models: readonly UsageModelPrice[];
     readonly onSave: (update: UsagePricingUpdate) => Promise<void>;
     readonly table: RefObject<HTMLTableElement>;
+    readonly exchangeRate?: number | undefined;
 }
 export interface RateEditorState {
     readonly drafts: ModelDrafts;
@@ -31,6 +32,7 @@ export interface RateEditorState {
     readonly failure: string | undefined;
     readonly pending: RateDraftResult;
     readonly write: (model: string, set: PriceSet, field: RateField, value: string) => void;
+    readonly switchCurrency: (model: string, currency: UsagePriceCurrency) => void;
     readonly switchPeak: (model: string, peakEnabled: boolean) => void;
     readonly openEditor: (model: string) => void;
     readonly discard: () => void;
@@ -43,4 +45,4 @@ export interface RateEditorState {
  * @param options - the cards in effect, the save action and the sheet ref.
  * @returns drafts, the open row and the handlers the table needs.
  */
-export declare function useRateEditor({ models, onSave, table }: UseRateEditorOptions): RateEditorState;
+export declare function useRateEditor({ models, onSave, table, exchangeRate }: UseRateEditorOptions): RateEditorState;

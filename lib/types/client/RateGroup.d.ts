@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
 import { type ModelDraft, type PriceSet, type RateField } from './rate-draft.ts';
 import type { RateRow } from './rate-row.ts';
+import type { UsagePriceCurrency } from '../types.ts';
 /** Props for one model's block of rows. */
 interface RateGroupProps {
     readonly row: RateRow;
@@ -29,6 +30,8 @@ interface RateGroupProps {
     readonly onEdit: () => void;
     readonly onCancel: () => void;
     readonly onSave: () => void;
+    readonly usdAvailable: boolean;
+    readonly onCurrency: (currency: UsagePriceCurrency) => void;
     readonly onPeak: (enabled: boolean) => void;
     readonly onWrite: (set: PriceSet, field: RateField, value: string) => void;
     /** Delete this card edit, shown only while the group is open. */
@@ -47,5 +50,5 @@ interface RateGroupProps {
  * @param props - one row's card, its draft, and the editor's handlers.
  * @returns a table body, one group per model.
  */
-export declare function RateGroup({ row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, }: RateGroupProps): ReactNode;
+export declare function RateGroup({ row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, usdAvailable, onCurrency, }: RateGroupProps): ReactNode;
 export {};

@@ -29,7 +29,7 @@ What the panel gives you, in one place:
 - **A rate card you configure** — per-model input, cache-read, cache-write and output prices, a fallback rate, and a Beijing-time peak schedule with a multiplier.
 - **A stated basis** — the formula, the rates actually in effect, and the provenance of every figure, on the page itself rather than in documentation only.
 - **The harness's language, not a switch of its own** — every sentence comes from a dictionary and every figure is formatted for the active locale, so the Chinese panel counts in 万/亿 where the English one counts in M/B.
-- **No network egress** — the fold runs inside the dsh process over durable session logs, and what it folds stays on this machine under `<DSH_HOME>/local-usage/`; nothing is uploaded and no external request is made.
+- **Usage stays local** — session folding and model pricing remain on this machine. The exchange-rate service requests public USD/CNY reference data without uploading sessions, usage or model prices.
 
 ## Table of Contents
 
@@ -127,7 +127,7 @@ It reads as an explanation of the figures above rather than a report of its own:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `currency` | `CNY` | Currency every figure is expressed in; the plugin performs no conversion. |
+| `currency` | `CNY` | Report currency; keep CNY to enable USD price input, converted to renminbi when saved. |
 | `models` | The DeepSeek, GLM, GPT, Grok and Kimi cards (below) | Rate cards matched against the routed model, first match wins. |
 | `fallback` | the Flash card | Rate applied to a route no card matches. |
 | `peakWindows` | `09:00-12:00`, `14:00-18:00` | Peak windows in Beijing time; empty disables peak pricing. |
@@ -150,7 +150,15 @@ Each rate card states `input`, `cacheRead`, `cacheWrite`, and `output` in CNY pe
 $DSH_HOME/local-usage/pricing.json     # what the editor writes; ~/.dsh by default
 ```
 
-The file is the only state the *reader* writes. A write goes through `POST /api/dsh-local-usage/pricing` on the same route family the panel reads its report and its progress from, is validated before it is stored, and is persisted through a temporary sibling and a rename, so an interrupted write cannot leave a half-written table behind. **Reset** on a row clears its override and returns the route to its rule. The only durable state the plugin writes for itself is the fold cache described under [The Host fold](#host-fold), which holds samples and counters and never a message body.
+The file is the only state the *reader* writes. A write goes through `POST /api/dsh-local-usage/pricing` on the same route family the panel reads its report and its progress from, is validated before it is stored, and is persisted through a temporary sibling and a rename, so an interrupted write cannot leave a half-written table behind. **Reset** on a row clears its override and returns the route to its rule. The plugin also retains the sample cache described under [The Host fold](#host-fold) and a separate USD/CNY reference cache; neither contains message bodies.
+
+### USD input and exchange rates
+
+The pricing header shows `1 USD = x.xxx CNY` with three decimal places and a manual sync button. The Host refreshes missing or overdue data at activation and once daily at 12:00 Beijing time while running; a missed refresh is caught up on the next start. Frankfurter supplies the latest published USD/CNY reference, whose date remains visible. Weekends and publication times can leave the reference dated to the previous business day. A failed request preserves the last successful rate without inventing a fallback.
+
+New and existing models accept CNY or USD prices per million tokens. Changing units converts the existing fields; saving USD input converts it to CNY on the Host using its current retained rate. Only the converted CNY card is persisted, and the table and usage reports display renminbi. Later exchange refreshes do not reprice saved cards automatically; edit and save a model again to apply a new conversion. USD selection is disabled until a rate is available; CNY editing remains usable.
+
+The separate cache lives at `<DSH_HOME>/local-usage/exchange-rate.json`. `GET /api/dsh-local-usage/exchange-rate` reads it and `POST` synchronizes it. Set `exchangeRateAutoRefresh: false` to disable startup and daily background refreshes while retaining manual synchronization.
 
 ### What the money figure is worth
 
@@ -158,7 +166,7 @@ Cost is this plugin's own arithmetic, not a figure read back from a provider: `t
 
 ### Where the figures come from
 
-The panel states its own provenance in the header's provenance panel: the harness keeps no usage database, so the statistics are folded from the durable session event logs themselves — every session on the host, across all working directories, read through the session query service and replay-validated. That block also names the on-disk shape (`<DSH_HOME>/sessions/<cwd>/<session>/session.v3.jsonl.zstd`), what is left out (a fork's inherited prefix, calls still in flight, unreadable logs), the fact that nothing is uploaded and no external request is made, that the samples it folds are cached on this machine at `<DSH_HOME>/local-usage/fold-cache.json` — samples and counters only, never a message body — and the counts for the read that produced the figures on screen.
+The panel states its own provenance in the header's provenance panel: the harness keeps no usage database, so the statistics are folded from the durable session event logs themselves — every session on the host, across all working directories, read through the session query service and replay-validated. That block also names the on-disk shape (`<DSH_HOME>/sessions/<cwd>/<session>/session.v3.jsonl.zstd`), what is left out (a fork's inherited prefix, calls still in flight, unreadable logs), the fact that sessions and usage stay local while the exchange-rate service requests public reference data, that the samples it folds are cached on this machine at `<DSH_HOME>/local-usage/fold-cache.json` — samples and counters only, never a message body — and the counts for the read that produced the figures on screen.
 
 ### What the figures mean
 
@@ -304,4 +312,4 @@ Both halves export **named members only** — never `export default apply`. A mo
 
 </details>
 
-**Runtime invariant:** The Host half owns four HTTP routes — the folded report, the paged call-log query, the progress of a read in flight, and the rate-table write — plus two sample caches: one in memory keyed by session id, one on disk keyed by session id and the stored log's revision. The browser half registers one localized sidebar entry and the matching `main` panel, and reaches the Host only over those routes. No companion is published, and neither half emits a Cordis event of its own.
+**Runtime invariant:** The Host half owns five HTTP routes — the folded report, the paged call-log query, the progress of a read in flight, the rate-table write, and USD/CNY reference reads and synchronization — plus two sample caches: one in memory keyed by session id, one on disk keyed by session id and the stored log's revision. The browser half registers one localized sidebar entry and the matching `main` panel, and reaches the Host only over those routes. No companion is published, and neither half emits a Cordis event of its own.

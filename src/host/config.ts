@@ -49,7 +49,7 @@ export type UsageInsightsFallbackConfig = UsageInsightsPriceConfig & {
 
 /** Plugin configuration; every field has a default, so the plugin mounts bare. */
 export interface UsageInsightsConfig {
-  /** Currency every cost figure is expressed in; the plugin performs no conversion. */
+  /** Report currency; USD editor submissions are converted only when this is CNY. */
   currency: string
   /** Configured rate cards, matched in order. */
   models: UsageInsightsModelConfig[]
@@ -72,6 +72,8 @@ export interface UsageInsightsConfig {
   warmup: boolean
   /** How long after activation the background fold starts, in milliseconds. */
   warmupDelayMs: number
+  /** Refresh USD/CNY on activation and daily at Beijing noon. */
+  exchangeRateAutoRefresh?: boolean
 }
 
 /**
@@ -132,6 +134,7 @@ export const DEFAULT_CONFIG: UsageInsightsConfig = {
   // Long enough that the fold does not compete with the rest of the boot, short
   // enough that it is usually done before the reader opens the panel.
   warmupDelayMs: 4_000,
+  exchangeRateAutoRefresh: true,
 }
 
 export function resolveConfig(config: UsageInsightsConfig): UsageInsightsConfig {
@@ -143,6 +146,7 @@ export function resolveConfig(config: UsageInsightsConfig): UsageInsightsConfig 
     peakWeekdaysOnly: config.peakWeekdaysOnly ?? DEFAULT_CONFIG.peakWeekdaysOnly,
     warmup: config.warmup ?? DEFAULT_CONFIG.warmup,
     warmupDelayMs: config.warmupDelayMs ?? DEFAULT_CONFIG.warmupDelayMs,
+    exchangeRateAutoRefresh: config.exchangeRateAutoRefresh ?? true,
   }
 }
 

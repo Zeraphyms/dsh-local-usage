@@ -16,7 +16,9 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EXCHANGE_PATH } from '../src/host/routes.ts'
+import { exchangeRateFilePath } from '../src/host/exchange-rate.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
@@ -30,6 +32,8 @@ import { pricingFilePath } from '../src/rates.ts'
 beforeEach(async () => {
   process.env.DSH_HOME = await mkdtemp(join(tmpdir(), 'dlu-assemble-'))
 })
+
+afterEach(() => { vi.unstubAllGlobals() })
 
 const MS_PER_DAY = 86_400_000
 /** A fixed instant, so a window can be expressed as whole days around it. */
@@ -113,6 +117,7 @@ interface Mounted {
   /** The call-log route the same activation registered. */
   readonly calls: { readonly fetch: (request: Request) => Promise<Response> }
   /** The rate-table route the same activation registered. */
+  readonly exchange: { readonly fetch: (request: Request) => Promise<Response> }
   readonly pricing: { readonly fetch: (request: Request) => Promise<Response> }
   /** The progress route the same activation registered. */
   readonly progress: { readonly fetch: (request: Request) => Promise<Response> }
@@ -205,6 +210,7 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
     // Off unless a test asks for it: the mount is per-test, and a fold scheduled
     // by one test would run against a torn-down host in the next.
     warmup: false,
+    exchangeRateAutoRefresh: false,
     ...options.config,
   })
 
@@ -220,6 +226,7 @@ function mount(logs: ReadonlyMap<string, FakeLog>, offersBatch: boolean, options
     route,
     calls: callsRoute,
     pricing,
+    exchange: routes.get(EXCHANGE_PATH)!,
     progress: progressRoute,
     exactReads,
     batches,
@@ -618,6 +625,47 @@ describe('the pricing route', () => {
   /** A flat-priced model card, as the editor writes one. */
 
   const CARD = { peakEnabled: false, peak: RATE, offPeak: RATE }
+
+  it('reads the cached quote without contacting the provider', async () => {
+    const fetchRate = vi.fn(async () => Response.json({ base: 'USD', date: '2026-11-11', rates: { CNY: 7.234 } }))
+    vi.stubGlobal('fetch', fetchRate)
+    const mounted = mount(new Map(), true)
+    const response = await mounted.exchange.fetch(new Request(new URL(EXCHANGE_PATH, 'http://localhost')))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ snapshot: null })
+    expect(fetchRate).not.toHaveBeenCalled()
+  })
+
+  it('synchronizes USD/CNY and saves new or edited USD prices as CNY only once', async () => {
+    const fetchRate = vi.fn(async () => Response.json({ base: 'USD', date: '2026-11-11', rates: { CNY: 7.23456 } }))
+    vi.stubGlobal('fetch', fetchRate)
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 1) }]])
+    const mounted = mount(logs, true)
+    const url = new URL(EXCHANGE_PATH, 'http://localhost')
+    const synced = await mounted.exchange.fetch(new Request(url, { method: 'POST' }))
+    expect(synced.status).toBe(200)
+    expect(await synced.json()).toMatchObject({ snapshot: { rate: 7.235 } })
+    const saved = await post(mounted, { currency: 'USD', models: { 'p/m': CARD } })
+    expect(saved.status).toBe(200)
+    expect(await saved.json()).toMatchObject({ models: { 'p/m': { offPeak: { input: 21.705, output: 65.115 } } } })
+    const stored = JSON.parse(await (await import('node:fs/promises')).readFile(pricingFilePath(process.env.DSH_HOME ?? ''), 'utf8'))
+    expect(stored.models['p/m'].offPeak.input).toBe(21.705)
+    expect(stored.models['p/m'].currency).toBeUndefined()
+    const restarted = mount(logs, true)
+    const cached = await restarted.exchange.fetch(new Request(url))
+    expect(await cached.json()).toMatchObject({ snapshot: { rate: 7.235 } })
+    expect(fetchRate).toHaveBeenCalledTimes(1)
+    expect((await report(restarted)).routeRates).toEqual((await report(mounted)).routeRates)
+  })
+
+  it('refuses unsupported currency and keeps CNY pricing usable without a rate source', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
+    const mounted = mount(new Map(), true)
+    expect((await post(mounted, { currency: 'EUR', models: { model: CARD } })).status).toBe(400)
+    expect((await post(mounted, { currency: 'USD', models: { model: CARD } })).status).toBe(500)
+    expect((await post(mounted, { models: { model: CARD } })).status).toBe(200)
+    expect(await (await import('node:fs/promises')).readFile(exchangeRateFilePath(process.env.DSH_HOME ?? ''), 'utf8').catch(() => '')).toBe('')
+  })
 
   it('stores an override and bills a later report at it', async () => {
     const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 1, 1) }]])

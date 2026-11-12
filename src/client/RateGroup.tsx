@@ -20,6 +20,8 @@ import { FIELD_KEYS } from './rate-row.ts'
 import { formatCompact, formatRate } from './format.ts'
 import type { RateRow } from './rate-row.ts'
 import { css } from './classes.ts'
+import { PriceCurrencySelect } from './PriceCurrencySelect.tsx'
+import type { UsagePriceCurrency } from '../types.ts'
 
 /** The price fields a group shows, one row per set, in reading order. */
 interface PriceSetRow {
@@ -44,6 +46,8 @@ interface RateGroupProps {
   readonly onEdit: () => void
   readonly onCancel: () => void
   readonly onSave: () => void
+  readonly usdAvailable: boolean
+  readonly onCurrency: (currency: UsagePriceCurrency) => void
   readonly onPeak: (enabled: boolean) => void
   readonly onWrite: (set: PriceSet, field: RateField, value: string) => void
   /** Delete this card edit, shown only while the group is open. */
@@ -64,7 +68,7 @@ interface RateGroupProps {
  * @returns a table body, one group per model.
  */
 export function RateGroup({
-  row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel,
+  row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, usdAvailable, onCurrency,
 }: RateGroupProps): ReactNode {
   const card = row.card
   const editing = open && draft !== undefined
@@ -155,6 +159,7 @@ export function RateGroup({
         ? (
           <tr>
             <td colSpan={8} className={css.rateEditorCell}>
+              <PriceCurrencySelect value={draft.currency ?? 'CNY'} disabled={busy} usdAvailable={usdAvailable} onChange={onCurrency} t={t} />
               <div className={css.rateToolbar}>
                 <label className={css.editorToggle}>
                   <input

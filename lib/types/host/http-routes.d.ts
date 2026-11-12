@@ -13,6 +13,7 @@ import type { FoldCache } from '../fold-cache.ts';
 import type { ProgressTracker } from '../progress.ts';
 import type { RateStore } from '../rates.ts';
 import type { UsageInsightsConfig } from './config.ts';
+import type { ExchangeRateStore } from './exchange-rate.ts';
 import type { CachedSession } from './session-fold.ts';
 /** Runs one corpus read after every read queued before it has settled. */
 export type SerializedRead = <T>(task: () => Promise<T>) => Promise<T>;
@@ -24,6 +25,7 @@ export interface RouteDependencies {
     readonly progress: ProgressTracker;
     readonly config: UsageInsightsConfig;
     readonly rates: RateStore;
+    readonly exchangeRates: ExchangeRateStore;
     readonly serialize: SerializedRead;
     readonly generations: ReadonlyMap<string, number>;
     readonly background: () => Promise<void> | undefined;

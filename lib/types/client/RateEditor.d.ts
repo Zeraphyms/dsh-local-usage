@@ -30,6 +30,7 @@ export interface RateEditorProps {
     readonly rows: readonly RateRow[];
     /** Currency every price is expressed in, shown once above the table. */
     readonly currency: string;
+    readonly exchangeRate?: number | undefined;
     /** Active locale id, for the rates as written. */
     readonly locale: string;
     /** Cost formatter, for each row's own spend. */
@@ -44,4 +45,4 @@ export interface RateEditorProps {
  * @param props - the rows, the currency, the dictionary and the save action.
  * @returns the table and its one open editor, if any.
  */
-export declare function RateEditor({ rows, currency, locale, formatCost, t, onSave }: RateEditorProps): ReactNode;
+export declare function RateEditor({ rows, currency, locale, formatCost, t, onSave, exchangeRate }: RateEditorProps): ReactNode;

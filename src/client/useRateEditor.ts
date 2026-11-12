@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import type { UsageModelPrice, UsagePricingUpdate } from '../types.ts'
+import type { UsageModelPrice, UsagePricingUpdate, UsagePriceCurrency } from '../types.ts'
 import {
   draftsFrom,
   pendingUpdate,
@@ -21,6 +21,7 @@ import {
   type RateDraftResult,
   type RateField,
 } from './rate-draft.ts'
+import { changeDraftCurrency } from './rate-currency.ts'
 
 /** How long the saved confirmation stays up. */
 const CONFIRMATION_MS = 2200
@@ -47,6 +48,7 @@ export interface UseRateEditorOptions {
   readonly models: readonly UsageModelPrice[]
   readonly onSave: (update: UsagePricingUpdate) => Promise<void>
   readonly table: RefObject<HTMLTableElement>
+  readonly exchangeRate?: number | undefined
 }
 
 export interface RateEditorState {
@@ -57,6 +59,7 @@ export interface RateEditorState {
   readonly failure: string | undefined
   readonly pending: RateDraftResult
   readonly write: (model: string, set: PriceSet, field: RateField, value: string) => void
+  readonly switchCurrency: (model: string, currency: UsagePriceCurrency) => void
   readonly switchPeak: (model: string, peakEnabled: boolean) => void
   readonly openEditor: (model: string) => void
   readonly discard: () => void
@@ -70,7 +73,7 @@ export interface RateEditorState {
  * @param options - the cards in effect, the save action and the sheet ref.
  * @returns drafts, the open row and the handlers the table needs.
  */
-export function useRateEditor({ models, onSave, table }: UseRateEditorOptions): RateEditorState {
+export function useRateEditor({ models, onSave, table, exchangeRate }: UseRateEditorOptions): RateEditorState {
   const [drafts, setDrafts] = useState<ModelDrafts>(() => draftsFrom(models))
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
@@ -121,6 +124,15 @@ export function useRateEditor({ models, onSave, table }: UseRateEditorOptions): 
       const draft = current[model]
       if (draft === undefined) return current
       return { ...current, [model]: { ...draft, [set]: { ...draft[set], [field]: value } } }
+    })
+  }
+
+  function switchCurrency(model: string, currency: UsagePriceCurrency): void {
+    if (exchangeRate === undefined) return
+    setFailure(undefined)
+    setDrafts(current => {
+      const draft = current[model]
+      return draft === undefined ? current : { ...current, [model]: changeDraftCurrency(draft, currency, exchangeRate) }
     })
   }
 
@@ -197,5 +209,5 @@ export function useRateEditor({ models, onSave, table }: UseRateEditorOptions): 
     }
   }
 
-  return { drafts, editing, busy, saved, failure, pending, write, switchPeak, openEditor, discard, commit, removeCard }
+  return { drafts, editing, busy, saved, failure, pending, write, switchCurrency, switchPeak, openEditor, discard, commit, removeCard }
 }

@@ -330,8 +330,24 @@ export interface UsageModelEdit {
     /** Prices outside one, or the flat price when peak pricing is off. */
     readonly offPeak: UsageRate;
 }
+/** Latest published CNY per USD reference, rounded to three decimals. */
+export interface UsageExchangeRate {
+    readonly rate: number;
+    readonly date: string;
+    readonly updatedAt: number;
+}
+/** Result of reading or synchronizing the independently cached exchange rate. */
+export interface UsageExchangeRateResult {
+    readonly snapshot: UsageExchangeRate | null;
+    readonly nextUpdateAt: number;
+    readonly error?: string;
+}
+/** Currency used for this editor submission; persisted prices remain in CNY. */
+export type UsagePriceCurrency = 'CNY' | 'USD';
 /** One write to the model prices. */
 export interface UsagePricingUpdate {
+    /** Omitted for existing clients; USD is converted by the Host before persistence. */
+    readonly currency?: UsagePriceCurrency;
     /**
      * Cards to write, keyed by their `match`; `null` clears the edit and returns the
      * model to its configured prices.

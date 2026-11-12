@@ -39,6 +39,7 @@ export interface RateEditorProps {
   readonly rows: readonly RateRow[]
   /** Currency every price is expressed in, shown once above the table. */
   readonly currency: string
+  readonly exchangeRate?: number | undefined
   /** Active locale id, for the rates as written. */
   readonly locale: string
   /** Cost formatter, for each row's own spend. */
@@ -54,13 +55,13 @@ export interface RateEditorProps {
  * @param props - the rows, the currency, the dictionary and the save action.
  * @returns the table and its one open editor, if any.
  */
-export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: RateEditorProps): ReactNode {
+export function RateEditor({ rows, currency, locale, formatCost, t, onSave, exchangeRate }: RateEditorProps): ReactNode {
   const models = rows.map(row => row.card)
   const table = useRef<HTMLTableElement>(null)
   const {
     drafts, editing, busy, saved, failure, pending,
-    write, switchPeak, openEditor, discard, commit, removeCard,
-  } = useRateEditor({ models, onSave, table })
+    write, switchCurrency, switchPeak, openEditor, discard, commit, removeCard,
+  } = useRateEditor({ models, onSave, table, exchangeRate })
 
   // Stated rather than omitted: an empty table reads as an editor that was
   // removed, not as a window with nothing to price.
@@ -72,6 +73,7 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: Ra
         <AddRateCard
           existing={[]}
           currency={currency}
+          exchangeRate={exchangeRate}
           t={t}
           onSave={onSave}
         />
@@ -135,6 +137,8 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: Ra
                   onEdit={() => { openEditor(card.match) }}
                   onCancel={discard}
                   onSave={() => { void commit() }}
+                  usdAvailable={currency === 'CNY' && exchangeRate !== undefined}
+                  onCurrency={value => { switchCurrency(card.match, value) }}
                   onPeak={enabled => { switchPeak(card.match, enabled) }}
                   onWrite={(set, field, value) => { write(card.match, set, field, value) }}
                   onDelete={async () => {
@@ -162,6 +166,7 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave }: Ra
         <AddRateCard
           existing={models.map(card => card.match)}
           currency={currency}
+          exchangeRate={exchangeRate}
           t={t}
           onSave={onSave}
         />

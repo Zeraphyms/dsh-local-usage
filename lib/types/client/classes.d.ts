@@ -8,6 +8,14 @@
  */
 /** Every class the panel's stylesheet defines. */
 export declare const css: {
+    readonly currencySelect: "dlu-currencySelect";
+    readonly currencyHint: "dlu-currencyHint";
+    readonly exchange: "dlu-exchange";
+    readonly exchangeLine: "dlu-exchangeLine";
+    readonly exchangeLabel: "dlu-exchangeLabel";
+    readonly exchangeValue: "dlu-exchangeValue";
+    readonly exchangeSync: "dlu-exchangeSync";
+    readonly exchangeMeta: "dlu-exchangeMeta";
     readonly breakdown: "dlu-breakdown";
     readonly breakout: "dlu-breakout";
     readonly callColCost: "dlu-callColCost";

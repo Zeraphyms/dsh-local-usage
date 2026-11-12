@@ -14,7 +14,7 @@
  *
  * @module dsh-local-usage/client/rate-draft
  */
-import type { UsageModelPrice, UsagePricingUpdate, UsageRate } from '../types.ts';
+import type { UsageModelPrice, UsagePricingUpdate, UsageRate, UsagePriceCurrency } from '../types.ts';
 /** One set of four price fields, as typed. */
 export interface PriceFields {
     input: string;
@@ -24,6 +24,10 @@ export interface PriceFields {
 }
 /** One model's draft: the switch and both sets of prices. */
 export interface ModelDraft {
+    /** Input unit; omitted means the stored CNY unit. */
+    currency?: UsagePriceCurrency;
+    /** CNY per USD captured when the input unit changes. */
+    exchangeRate?: number;
     /** Whether the model prices peak separately. */
     peakEnabled: boolean;
     /** Prices inside a peak window; ignored while {@link peakEnabled} is false. */

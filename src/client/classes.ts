@@ -9,6 +9,14 @@
 
 /** Every class the panel's stylesheet defines. */
 export const css = {
+  currencySelect: 'dlu-currencySelect',
+  currencyHint: 'dlu-currencyHint',
+  exchange: 'dlu-exchange',
+  exchangeLine: 'dlu-exchangeLine',
+  exchangeLabel: 'dlu-exchangeLabel',
+  exchangeValue: 'dlu-exchangeValue',
+  exchangeSync: 'dlu-exchangeSync',
+  exchangeMeta: 'dlu-exchangeMeta',
   // The range's detail view: its page frame, the blocks it stacks, the readings
   // inside a block, the bars those readings are drawn as, and its tables.
   breakdown: 'dlu-breakdown',

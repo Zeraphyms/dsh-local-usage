@@ -16,3 +16,5 @@ export declare const CALLS_PATH = "/api/dsh-local-usage/calls";
 export declare const PRICING_PATH = "/api/dsh-local-usage/pricing";
 /** Host route this panel asks what a read in flight is doing. */
 export declare const PROGRESS_PATH = "/api/dsh-local-usage/progress";
+/** Host route for the USD/CNY reference rate. */
+export declare const EXCHANGE_PATH = "/api/dsh-local-usage/exchange-rate";

@@ -14,3 +14,5 @@ export declare const CALLS_PATH = "/api/dsh-local-usage/calls";
 export declare const PRICING_PATH = "/api/dsh-local-usage/pricing";
 /** Exact route the browser half polls while a report is being assembled. */
 export declare const PROGRESS_PATH = "/api/dsh-local-usage/progress";
+/** Read the current USD/CNY reference or POST to synchronize it. */
+export declare const EXCHANGE_PATH = "/api/dsh-local-usage/exchange-rate";

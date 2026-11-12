@@ -40,6 +40,12 @@ The fold cache stores the digest, never the hashed message text. Version 3 inval
 
 `rates.ts` writes a candidate table, writes a temporary sibling, renames it, and only then commits the in-memory table. Writes are queued; a failed write leaves both the old memory table and the old file in effect.
 
+## Exchange rate
+
+`host/exchange-rate.ts` owns one activation-scoped USD/CNY cache, stored independently from model cards. Successful public responses are validated, rounded to three decimals and atomically persisted before memory publication; concurrent callers share one request, bounded by a 12-second timeout and activation cancellation. A disposable timer refreshes at Beijing noon; activation catches up absent or overdue data. The fifth HTTP route reads this cache or synchronizes it via POST.
+
+USD pricing writes carry `currency: USD` and are converted at the Host HTTP layer using the current retained reference before the existing CNY rate store receives them. Cards contain only CNY amounts. Refreshing a quote never rewrites historical cards. The Client tracks input units in drafts and displays the provider reference date beside the quote. Session data remains local; only the public reference endpoint is requested.
+
 ## Client
 
 ```
