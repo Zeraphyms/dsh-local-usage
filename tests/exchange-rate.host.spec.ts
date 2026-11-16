@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createExchangeRateStore, nextBeijingNoon, parseExchangeRate, pricingUpdateInCny, scheduleExchangeRate, exchangeRateIsDue } from '../src/host/exchange-rate.ts'
+import { createExchangeRateStore, expectedQuoteDate, nextBeijingNoon, parseExchangeRate, pricingUpdateInCny, scheduleExchangeRate, exchangeRateIsDue } from '../src/host/exchange-rate.ts'
 import type { ExchangeRateStore } from '../src/host/exchange-rate.ts'
 
 const data = (rate = 7.23456) => ({ base: 'USD', date: '2026-11-11', rates: { CNY: rate } })
@@ -50,6 +50,36 @@ describe('USD/CNY rate cache', () => {
   })
 })
 
+describe('provider release date', () => {
+  it('expects yesterday before the evening release and Friday over a weekend', () => {
+    // Monday 2026-11-16: the release lands around 23:00 Beijing.
+    expect(expectedQuoteDate(Date.UTC(2026, 10, 16, 6, 0))).toBe('2026-11-13')
+    expect(expectedQuoteDate(Date.UTC(2026, 10, 16, 15, 30))).toBe('2026-11-16')
+    // Saturday and Sunday can only have Friday's quote.
+    expect(expectedQuoteDate(Date.UTC(2026, 10, 14, 6, 0))).toBe('2026-11-13')
+    expect(expectedQuoteDate(Date.UTC(2026, 10, 15, 6, 0))).toBe('2026-11-13')
+  })
+
+  it('heals an overdue quote at a bounded rate and leaves a current one alone', async () => {
+    const file = join(await mkdtemp(join(tmpdir(), 'dlu-fx-')), 'rate.json')
+    const fetchRate = vi.fn(async () => ({ base: 'USD', date: '2026-11-13', rates: { CNY: 6.6719 } }))
+    const store = createExchangeRateStore(file, fetchRate)
+    // Before any quote exists the read heals it once.
+    await store.refreshIfStale(Date.UTC(2026, 10, 16, 6, 0))
+    expect(fetchRate).toHaveBeenCalledTimes(1)
+    // Behind the provider, but the retry window has not elapsed yet.
+    await store.refreshIfStale(Date.UTC(2026, 10, 16, 6, 1))
+    expect(fetchRate).toHaveBeenCalledTimes(1)
+    // A stored quote the provider cannot have superseded costs no request.
+    const current = createExchangeRateStore(join(await mkdtemp(join(tmpdir(), 'dlu-fx-')), 'rate.json'), fetchRate)
+    await current.refresh()
+    await current.refreshIfStale(Date.UTC(2026, 10, 16, 6, 0))
+    expect(fetchRate).toHaveBeenCalledTimes(2)
+    store.dispose()
+    current.dispose()
+  })
+})
+
 describe('Beijing noon refresh', () => {
   it('uses UTC+8 regardless of host time zone and advances exactly at noon', () => {
     const noon = Date.UTC(2026, 10, 12, 4)
@@ -64,7 +94,7 @@ describe('Beijing noon refresh', () => {
     const refresh = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ rate: 7, date: '2026-11-12', updatedAt: Date.now() })
     const dispose = vi.fn()
     const warn = vi.fn()
-    const store: ExchangeRateStore = { read: () => undefined, refresh, dispose }
+    const store: ExchangeRateStore = { read: () => undefined, refresh, dispose, refreshIfStale: () => Promise.resolve() }
     const stop = scheduleExchangeRate(store, warn)
     await vi.advanceTimersByTimeAsync(999)
     expect(refresh).not.toHaveBeenCalled()

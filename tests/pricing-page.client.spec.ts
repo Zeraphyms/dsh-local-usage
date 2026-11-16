@@ -54,6 +54,23 @@ const report = {
 } as unknown as UsageInsightsReport
 
 describe('the pricing page and the effective card', () => {
+  it('draws the exchange block before any quote has been read', () => {
+    // Server rendering runs no effect, so this is exactly the state the block
+    // is in on the first frame: present, inert, and saying nothing it cannot.
+    const markup = renderToStaticMarkup(createElement(PricingPage, {
+      report,
+      weeks: 52,
+      locale: 'en',
+      t,
+      formatCost: String,
+      onSaveRates: () => Promise.resolve(),
+      onBack: () => {},
+    }))
+    expect(markup).toContain('dlu-exchangeValue')
+    expect(markup).toContain('exchangeSync')
+    expect(markup).not.toContain('exchangeUpdatedAt')
+  })
+
   const renderPricing = (value: UsageInsightsReport): string => renderToStaticMarkup(createElement(PricingPage, {
     report: value, weeks: 52, locale: 'en', t, formatCost: String,
     onSaveRates: () => Promise.resolve(), onBack: () => {},

@@ -7,6 +7,7 @@ import { RateEditor } from '../src/client/RateEditor.tsx'
 import { changeDraftCurrency } from '../src/client/rate-currency.ts'
 import { draftsFrom, pendingUpdate } from '../src/client/rate-draft.ts'
 import { useExchangeRate } from '../src/client/useExchangeRate.ts'
+import { quotePending } from '../src/client/exchange-label.ts'
 import type { UsagePricingUpdate } from '../src/types.ts'
 const t = ((key: string) => key) as never
 const rate = { input: 7, cacheRead: 0.7, cacheWrite: 7, output: 35 }
@@ -59,6 +60,27 @@ describe('currency input', () => {
     await waitFor(() => { expect(save).toHaveBeenCalledTimes(1) })
     expect(save.mock.calls[0]?.[0]).toMatchObject({ currency: 'USD', models: { test: { offPeak: { output: 6 } } } })
   })
+})
+
+it('calls a quote behind the provider pending release, not stale', () => {
+  expect(quotePending('2026-11-13', '2026-11-16')).toBe(true)
+  expect(quotePending('2026-11-16', '2026-11-16')).toBe(false)
+  // Unknown source state must not accuse the cache of being stuck.
+  expect(quotePending('2026-11-13', undefined)).toBe(false)
+  expect(quotePending(undefined, '2026-11-16')).toBe(false)
+})
+
+it('labels an older quote as awaiting the provider instead of a refresh failure', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+    snapshot: { rate: 6.672, date: '2026-11-13', updatedAt: 1 },
+    expectedDate: '2026-11-16',
+    nextUpdateAt: Date.now() + 60_000,
+  })))
+  const { result } = renderHook(useExchangeRate)
+  await waitFor(() => { expect(result.current.snapshot?.date).toBe('2026-11-13') })
+  expect(result.current.expectedDate).toBe('2026-11-16')
+  // The block decides by comparing the two dates, not by when it last ran.
+  expect(result.current.failed).toBe(false)
 })
 
 it('manual sync uses POST and retains the previous quote when refresh fails', async () => {

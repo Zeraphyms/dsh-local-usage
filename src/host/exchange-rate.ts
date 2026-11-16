@@ -26,6 +26,31 @@ export function exchangeRateIsDue(rate: UsageExchangeRate, now: number): boolean
   return rate.updatedAt < nextBeijingNoon(now) - DAY
 }
 
+/**
+ * The newest quote date the provider can have published by this instant.
+ *
+ * The reference bank publishes one working-day quote around 16:00 CET, which is
+ * 23:00 in Beijing. Asking before that hour can only return the previous
+ * working day, so the panel must not treat that as a failure to refresh.
+ *
+ * @param now - Unix epoch milliseconds.
+ * @returns the latest publishable date, as `YYYY-MM-DD`.
+ */
+export function expectedQuoteDate(now: number): string {
+  const beijing = new Date(now + BEIJING_OFFSET)
+  const minutes = beijing.getUTCHours() * 60 + beijing.getUTCMinutes()
+  let cursor = Date.UTC(beijing.getUTCFullYear(), beijing.getUTCMonth(), beijing.getUTCDate())
+  if (minutes < 23 * 60) cursor -= DAY
+  // Weekends publish nothing, so Friday is the newest available quote.
+  const weekday = new Date(cursor).getUTCDay()
+  if (weekday === 0) cursor -= 2 * DAY
+  else if (weekday === 6) cursor -= DAY
+  return new Date(cursor).toISOString().slice(0, 10)
+}
+
+/** How long to wait before trying again while the provider has no newer quote. */
+const STALE_RETRY_MS = 30 * 60 * 1000
+
 function validDate(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const parsed = new Date(value)
@@ -49,6 +74,12 @@ export interface ExchangeRateStore {
   read(): UsageExchangeRate | undefined
   refresh(): Promise<UsageExchangeRate>
   dispose(): void
+  /**
+   * Fetch when the retained quote is older than the provider could have
+   * published, so a page read heals a missed or early scheduled refresh.
+   * @param now - Unix epoch milliseconds.
+   */
+  refreshIfStale(now: number): Promise<void>
 }
 
 /** Load the previous snapshot; concurrent refreshes share one bounded request. */
@@ -62,6 +93,7 @@ export function createExchangeRateStore(
 ): ExchangeRateStore {
   let snapshot: UsageExchangeRate | undefined
   let inFlight: Promise<UsageExchangeRate> | undefined
+  let lastAttempt = 0
   const lifetime = new AbortController()
   let sequence = 0
   try {
@@ -75,32 +107,42 @@ export function createExchangeRateStore(
   } catch {
     // A missing or malformed cache has no usable rate; the next refresh replaces it.
   }
+  const refresh = (): Promise<UsageExchangeRate> => {
+    if (inFlight !== undefined) return inFlight
+    inFlight = (async () => {
+      lifetime.signal.throwIfAborted()
+      const response = await fetchRate(AbortSignal.any([lifetime.signal, AbortSignal.timeout(12_000)]))
+      const candidate = parseExchangeRate(response, Date.now())
+      if (candidate === undefined) throw new Error('Invalid USD/CNY exchange-rate response')
+      lifetime.signal.throwIfAborted()
+      sequence += 1
+      const temporary = path + '.' + String(process.pid) + '.' + String(sequence) + '.tmp'
+      try {
+        await mkdir(dirname(path), { recursive: true })
+        await writeFile(temporary, JSON.stringify({ version: 1, snapshot: candidate }) + '\n', 'utf8')
+        lifetime.signal.throwIfAborted()
+        await rename(temporary, path)
+      } catch (error: unknown) {
+        await rm(temporary, { force: true }).catch(() => {})
+        throw error
+      }
+      snapshot = candidate
+      return candidate
+    })().finally(() => { inFlight = undefined })
+    return inFlight
+  }
+
   return {
     read: () => snapshot,
     dispose: () => { lifetime.abort() },
-    refresh: () => {
-      if (inFlight !== undefined) return inFlight
-      inFlight = (async () => {
-        lifetime.signal.throwIfAborted()
-        const response = await fetchRate(AbortSignal.any([lifetime.signal, AbortSignal.timeout(12_000)]))
-        const candidate = parseExchangeRate(response, Date.now())
-        if (candidate === undefined) throw new Error('Invalid USD/CNY exchange-rate response')
-        lifetime.signal.throwIfAborted()
-        sequence += 1
-        const temporary = path + '.' + String(process.pid) + '.' + String(sequence) + '.tmp'
-        try {
-          await mkdir(dirname(path), { recursive: true })
-          await writeFile(temporary, JSON.stringify({ version: 1, snapshot: candidate }) + '\n', 'utf8')
-          lifetime.signal.throwIfAborted()
-          await rename(temporary, path)
-        } catch (error: unknown) {
-          await rm(temporary, { force: true }).catch(() => {})
-          throw error
-        }
-        snapshot = candidate
-        return candidate
-      })().finally(() => { inFlight = undefined })
-      return inFlight
+    refresh,
+    refreshIfStale: async (now: number): Promise<void> => {
+      // The provider publishes on working days only, so an older date is not
+      // itself a fault: retry at a bounded rate rather than on every read.
+      if (snapshot !== undefined && snapshot.date >= expectedQuoteDate(now)) return
+      if (now - lastAttempt < STALE_RETRY_MS) return
+      lastAttempt = now
+      await refresh()
     },
   }
 }

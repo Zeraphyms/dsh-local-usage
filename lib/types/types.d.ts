@@ -340,6 +340,14 @@ export interface UsageExchangeRate {
 export interface UsageExchangeRateResult {
     readonly snapshot: UsageExchangeRate | null;
     readonly nextUpdateAt: number;
+    /**
+     * Newest quote date the provider can have published now.
+     *
+     * The provider releases one working-day quote each evening, so a stored date
+     * older than this means the schedule ran before publication, not that the
+     * refresh failed.
+     */
+    readonly expectedDate?: string;
     readonly error?: string;
 }
 /** Currency used for this editor submission; persisted prices remain in CNY. */

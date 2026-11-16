@@ -189,7 +189,8 @@ export declare const zh: {
     exchangeSchedule: string;
     exchangeUnavailable: string;
     exchangeRetained: string;
-    exchangeDate: string;
+    exchangePendingRelease: string;
+    exchangeUpdatedAt: string;
     pricingInputCurrency: string;
     pricingCurrencyCny: string;
     pricingCurrencyUsd: string;
@@ -396,7 +397,8 @@ export declare const en: {
     exchangeSchedule: string;
     exchangeUnavailable: string;
     exchangeRetained: string;
-    exchangeDate: string;
+    exchangePendingRelease: string;
+    exchangeUpdatedAt: string;
     pricingInputCurrency: string;
     pricingCurrencyCny: string;
     pricingCurrencyUsd: string;

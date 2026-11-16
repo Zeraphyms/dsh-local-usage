@@ -22,6 +22,8 @@ import { DataSourceNotes } from './DataSourceNotes.tsx'
 import { RateEditor } from './RateEditor.tsx'
 import type { RateRow } from './rate-row.ts'
 import { displayModel, modelOf } from '../model-name.ts'
+import { formatMoment } from './format.ts'
+import { quotePending } from './exchange-label.ts'
 import { matchModel } from '../pricing.ts'
 import { css } from './classes.ts'
 import { useExchangeRate } from './useExchangeRate.ts'
@@ -131,7 +133,14 @@ export function PricingPage({
             </button>
           </div>
           <span className={css.exchangeMeta}>{exchange.busy ? t('exchangeSyncing') : exchange.failed ? t(exchange.snapshot === undefined ? 'exchangeUnavailable' : 'exchangeRetained') : t('exchangeSchedule')}</span>
-          {exchange.snapshot === undefined ? null : <span className={css.exchangeMeta}>{t('exchangeDate', { date: exchange.snapshot.date })}</span>}
+          {exchange.snapshot === undefined ? null : (
+            <span className={css.exchangeMeta}>
+              {t('exchangeUpdatedAt', { time: formatMoment(exchange.snapshot.updatedAt, locale) })}
+            </span>
+          )}
+          {quotePending(exchange.snapshot?.date, exchange.expectedDate)
+            ? <span className={css.exchangeMeta}>{t('exchangePendingRelease')}</span>
+            : null}
         </div>
       </header>
 

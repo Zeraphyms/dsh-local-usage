@@ -626,14 +626,30 @@ describe('the pricing route', () => {
 
   const CARD = { peakEnabled: false, peak: RATE, offPeak: RATE }
 
-  it('reads the cached quote without contacting the provider', async () => {
+  it('heals a missing quote on read and reports the publishable date', async () => {
     const fetchRate = vi.fn(async () => Response.json({ base: 'USD', date: '2026-11-11', rates: { CNY: 7.234 } }))
     vi.stubGlobal('fetch', fetchRate)
     const mounted = mount(new Map(), true)
     const response = await mounted.exchange.fetch(new Request(new URL(EXCHANGE_PATH, 'http://localhost')))
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ snapshot: null })
-    expect(fetchRate).not.toHaveBeenCalled()
+    const body = await response.json() as { snapshot: { date: string } | null; expectedDate: string }
+    // A page read fills the gap a missed schedule left, so the panel never
+    // shows an empty rate that a working fetch could have supplied.
+    expect(body.snapshot?.date).toBe('2026-11-11')
+    expect(body.expectedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(fetchRate).toHaveBeenCalledTimes(1)
+  })
+
+  it('answers a read with the retained quote without fetching again while it is current', async () => {
+    const today = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const fetchRate = vi.fn(async () => Response.json({ base: 'USD', date: today, rates: { CNY: 7.234 } }))
+    vi.stubGlobal('fetch', fetchRate)
+    const mounted = mount(new Map(), true)
+    const url = new URL(EXCHANGE_PATH, 'http://localhost')
+    await mounted.exchange.fetch(new Request(url))
+    const again = await mounted.exchange.fetch(new Request(url))
+    expect(await again.json()).toMatchObject({ snapshot: { rate: 7.234 } })
+    expect(fetchRate).toHaveBeenCalledTimes(1)
   })
 
   it('synchronizes USD/CNY and saves new or edited USD prices as CNY only once', async () => {
@@ -653,8 +669,12 @@ describe('the pricing route', () => {
     expect(stored.models['p/m'].currency).toBeUndefined()
     const restarted = mount(logs, true)
     const cached = await restarted.exchange.fetch(new Request(url))
-    expect(await cached.json()).toMatchObject({ snapshot: { rate: 7.235 } })
-    expect(fetchRate).toHaveBeenCalledTimes(1)
+    const cachedBody = await cached.json() as { snapshot: { rate: number; date: string } | null; expectedDate: string }
+    expect(cachedBody.snapshot).toMatchObject({ rate: 7.235 })
+    // The restarted process reuses the persisted quote; it only asks again when
+    // the provider has since published a newer one, which the response states.
+    const behind = cachedBody.snapshot!.date < cachedBody.expectedDate
+    expect(fetchRate).toHaveBeenCalledTimes(behind ? 2 : 1)
     expect((await report(restarted)).routeRates).toEqual((await report(mounted)).routeRates)
   })
 

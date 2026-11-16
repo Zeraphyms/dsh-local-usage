@@ -27,7 +27,7 @@ import type { CachedSession } from './host/session-fold.ts'
 import type { UsageInsightsConfig } from './host/config.ts'
 import { createProgressTracker } from './progress.ts'
 import { createRateStore, pricingFilePath, resolveDshHome } from './rates.ts'
-import { createExchangeRateStore, exchangeRateFilePath, scheduleExchangeRate, exchangeRateIsDue } from './host/exchange-rate.ts'
+import { createExchangeRateStore, exchangeRateFilePath, scheduleExchangeRate } from './host/exchange-rate.ts'
 
 export type * from './types.ts'
 export { CALLS_PATH, PRICING_PATH, PROGRESS_PATH, REPORT_PATH } from './host/routes.ts'
@@ -128,8 +128,7 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
     const warn = (error: unknown): void => {
       ctx.logger.warn('dsh-local-usage: USD/CNY refresh failed: ' + describe(error))
     }
-    const current = exchangeRates.read()
-    if (current === undefined || exchangeRateIsDue(current, Date.now())) void exchangeRates.refresh().catch(warn)
+    void exchangeRates.refreshIfStale(Date.now()).catch(warn)
     return scheduleExchangeRate(exchangeRates, warn)
   }, 'dsh-local-usage: daily USD/CNY refresh')
   if (resolved.warmup) {

@@ -22,7 +22,7 @@ import type {
 } from '../types.ts'
 import type { UsageInsightsConfig } from './config.ts'
 import { CALLS_PATH, PRICING_PATH, PROGRESS_PATH, REPORT_PATH, EXCHANGE_PATH } from './routes.ts'
-import { nextBeijingNoon, pricingUpdateInCny } from './exchange-rate.ts'
+import { expectedQuoteDate, nextBeijingNoon, pricingUpdateInCny } from './exchange-rate.ts'
 import type { ExchangeRateStore } from './exchange-rate.ts'
 import type { CachedSession } from './session-fold.ts'
 import { assembleReport, queryCallPage } from './usage-service.ts'
@@ -315,12 +315,26 @@ export function registerRoutes(deps: RouteDependencies): void {
       requestBody: 'buffered',
       fetch: async (request) => {
         const headers = { 'cache-control': 'no-store' }
+        const answer = (): Record<string, unknown> => ({
+          snapshot: exchangeRates.read() ?? null,
+          nextUpdateAt: nextBeijingNoon(Date.now()),
+          expectedDate: expectedQuoteDate(Date.now()),
+        })
         try {
-          const retained = exchangeRates.read()
-          const snapshot = request.method === 'POST' ? await exchangeRates.refresh() : retained
-          return Response.json({ snapshot: snapshot ?? null, nextUpdateAt: nextBeijingNoon(Date.now()) }, { headers })
+          if (request.method === 'POST') {
+            const snapshot = await exchangeRates.refresh()
+            return Response.json({ ...answer(), snapshot }, { headers })
+          }
+          // A read heals a quote the provider has since replaced, at a bounded
+          // rate; a failed heal must still answer with the retained quote.
+          try {
+            await exchangeRates.refreshIfStale(Date.now())
+          } catch (error: unknown) {
+            ctx.logger.warn(`dsh-local-usage: USD/CNY refresh failed: ${describe(error)}`)
+          }
+          return Response.json(answer(), { headers })
         } catch (error: unknown) {
-          return Response.json({ snapshot: exchangeRates.read() ?? null, nextUpdateAt: nextBeijingNoon(Date.now()), error: describe(error) }, { headers, status: 503 })
+          return Response.json({ ...answer(), error: describe(error) }, { headers, status: 503 })
         }
       },
     }),
