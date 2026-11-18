@@ -36,6 +36,7 @@ import type { CachedSession } from './session-fold.ts'
  * @param progress - publishes how far this read has got.
  * @param config - resolved plugin configuration.
  * @param rates - the reader's price edits.
+ * @param cnyPerUsd - CNY per one USD for a card typed in USD, when a reference is retained.
  * @param request - the window to fold and whether to discard the caches first.
  * @returns the complete priced report.
  */
@@ -46,6 +47,7 @@ export async function assembleReport(
   progress: ProgressTracker,
   config: UsageInsightsConfig,
   rates: RateStore,
+  cnyPerUsd: number | undefined,
   request: { refresh: boolean; from: number | undefined; to: number | undefined },
   generations: ReadonlyMap<string, number>,
 ): Promise<UsageInsightsReport> {
@@ -56,7 +58,7 @@ export async function assembleReport(
     // Every contributor in the requested window: the one place a window becomes
     // the inputs a fold prices.
     const inputs = corpus.contributors.map(({ id, fold }) => sessionInputOf(id, fold, request))
-    return buildReport(inputs, pricingOptions(config, rates), {
+    return buildReport(inputs, pricingOptions(config, rates, cnyPerUsd), {
       generatedAt: Date.now(),
       unreadableSessions: corpus.unreadable,
       cached: corpus.cached,
@@ -79,6 +81,7 @@ export async function assembleReport(
  * @param progress - the read's progress.
  * @param config - resolved plugin configuration.
  * @param rates - the reader's price edits.
+ * @param cnyPerUsd - CNY per one USD for a card typed in USD, when a reference is retained.
  * @param query - the call-log query.
  * @param generations - session invalidation generations captured by this read.
  * @returns one page and the totals of every match.
@@ -90,6 +93,7 @@ export async function queryCallPage(
   progress: ProgressTracker,
   config: UsageInsightsConfig,
   rates: RateStore,
+  cnyPerUsd: number | undefined,
   query: UsageCallsQuery,
   generations: ReadonlyMap<string, number>,
   refresh = false,
@@ -106,7 +110,7 @@ export async function queryCallPage(
       from: query.from,
       to: query.to,
     }))
-    return queryCalls(inputs, pricingOptions(config, rates), query, {
+    return queryCalls(inputs, pricingOptions(config, rates, cnyPerUsd), query, {
       generatedAt: Date.now(),
       scannedSessions: inputs.length,
       unreadableSessions: corpus.unreadable,

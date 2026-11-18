@@ -53,6 +53,14 @@ export interface ModelPrice {
    * that matches wins, so specific names precede general ones.
    */
   readonly match: string
+  /**
+   * The unit the card's prices are stated in; omitted means the report currency.
+   *
+   * A card keeps the currency its reader typed, so the sheet shows what was
+   * written; the fold converts a non-report currency to the report currency
+   * when it prices a sample, using one retained reference rate.
+   */
+  readonly currency?: 'CNY' | 'USD'
   /** Whether {@link peak} applies inside the configured windows. */
   readonly peakEnabled: boolean
   /** Prices for a settlement inside a peak window. */
@@ -197,8 +205,10 @@ export function matchModel(
 
 /** Which card priced one settlement, and at which of its two sets of prices. */
 export interface RateSelection {
-  /** Effective prices for this settlement. */
+  /** Effective prices for this settlement, in the card's own unit. */
   readonly rate: PriceRate
+  /** The unit {@link rate} is stated in; omitted means the report currency. */
+  readonly currency?: 'CNY' | 'USD'
   /** Whether a configured model — not the fallback — priced it. */
   readonly matched: boolean
   /** Where the price came from. */
@@ -230,6 +240,7 @@ export function selectRate(
   const peakApplied = peak && card.peakEnabled
   return {
     rate: peakApplied ? card.peak : card.offPeak,
+    ...card.currency === undefined ? {} : { currency: card.currency },
     matched: source === 'model',
     source,
     peakApplied,
@@ -238,16 +249,23 @@ export function selectRate(
 }
 
 /**
- * Price one bucket set at one rate.
+ * Price one bucket set at one rate, converting the card's own unit to the
+ * reporting currency when the card was typed in USD.
  * @param tokens - bucket counts to price.
- * @param rate - currency units per one million tokens for each bucket.
- * @returns the cost in the configured currency.
+ * @param rate - the card's unit prices per one million tokens for each bucket.
+ * @param currency - the unit `rate` is stated in; omitted means the report currency.
+ * @param cnyPerUsd - CNY per one USD, required when the card states USD prices.
+ * @returns the cost in the report currency.
  */
-export function costOf(tokens: UsageTokens, rate: PriceRate): number {
+export function costOf(tokens: UsageTokens, rate: PriceRate, currency?: 'CNY' | 'USD', cnyPerUsd?: number): number {
+  // One conversion per settlement: the card's unit travels with the rate the
+  // matcher resolved, so a USD card and a CNY card can sit beside each other
+  // and both report in CNY.
+  const multiplier = currency === 'USD' ? cnyPerUsd ?? 0 : 1
   return (
     tokens.uncachedInputTokens * rate.input
     + tokens.cacheReadTokens * rate.cacheRead
     + tokens.cacheWriteTokens * rate.cacheWrite
     + tokens.outputTokens * rate.output
-  ) / 1_000_000
+  ) * multiplier / 1_000_000
 }

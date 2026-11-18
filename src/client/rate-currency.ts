@@ -16,5 +16,5 @@ export function changeDraftCurrency(draft: ModelDraft, currency: UsagePriceCurre
     }
     return next
   }
-  return { ...draft, currency, exchangeRate: rate, peak: fields(draft.peak), offPeak: fields(draft.offPeak) }
+  return { ...draft, currency, seededCurrency: currency, exchangeRate: rate, peak: fields(draft.peak), offPeak: fields(draft.offPeak) }
 }

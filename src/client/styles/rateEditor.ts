@@ -30,6 +30,8 @@ export const rateEditor = String.raw`/* ── Rate editor ───────
 .dlu-exchangeSync:disabled { opacity: 0.45; cursor: wait; }
 .dlu-exchange[aria-busy='true'] svg { animation: dlu-exchangeTurn 1s linear infinite; }
 @keyframes dlu-exchangeTurn { to { transform: rotate(360deg); } }
+.dlu-matchEdit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 8px; font-size: 11px; color: var(--dsw-alias-label-secondary); }
+.dlu-matchEdit input { inline-size: 220px; text-align: left; }
 .dlu-currencySelect { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 8px; font-size: 11px; color: var(--dsw-alias-label-secondary); }
 .dlu-currencySelect select { font: inherit; padding: 4px 8px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
 .dlu-currencyHint { color: var(--dsw-alias-label-tertiary); font-size: 10.5px; }

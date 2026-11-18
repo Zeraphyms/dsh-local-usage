@@ -32,6 +32,7 @@ export interface RateEditorState {
     readonly failure: string | undefined;
     readonly pending: RateDraftResult;
     readonly write: (model: string, set: PriceSet, field: RateField, value: string) => void;
+    readonly writeMatch: (model: string, value: string) => void;
     readonly switchCurrency: (model: string, currency: UsagePriceCurrency) => void;
     readonly switchPeak: (model: string, peakEnabled: boolean) => void;
     readonly openEditor: (model: string) => void;

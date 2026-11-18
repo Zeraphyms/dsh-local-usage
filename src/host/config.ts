@@ -178,7 +178,7 @@ function cardOf(
  * @param rates - the store of the reader's edits.
  * @returns the options one fold prices with.
  */
-export function pricingOptions(config: UsageInsightsConfig, rates: RateStore): PricingOptions {
+export function pricingOptions(config: UsageInsightsConfig, rates: RateStore, cnyPerUsd?: number): PricingOptions {
   const windows: PeakWindow[] = []
   for (const spec of config.peakWindows) {
     const window = parsePeakWindow(spec)
@@ -216,5 +216,6 @@ export function pricingOptions(config: UsageInsightsConfig, rates: RateStore): P
     fallback,
     peakWindows: windows,
     peakWeekdaysOnly: config.peakWeekdaysOnly,
+    ...cnyPerUsd === undefined ? {} : { cnyPerUsd },
   }
 }

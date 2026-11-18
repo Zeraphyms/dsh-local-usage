@@ -184,17 +184,21 @@ export function formatPercent(value: number, locale: string): string {
  * it in exponential notation — `2e-7` is not a price a reader can check.
  * @param value - currency units per one million tokens.
  * @param locale - active locale id.
- * @returns the rate as written in the active locale.
+ * @param currency - the unit the card states this rate in; the symbol prefixes
+ *   the number when it differs from the report currency, so a USD card reads as
+ *   a dollar figure rather than a bare number beside CNY neighbours.
+ * @returns the rate as written in the active locale, with its currency symbol.
  */
-export function formatRate(value: number, locale: string): string {
+export function formatRate(value: number, locale: string, currency?: 'CNY' | 'USD'): string {
   if (!Number.isFinite(value)) return '—'
-  if (value === 0) return '0'
+  if (value === 0) return currency === 'USD' ? '$0' : '0'
   const formatter = resolve(
     rateFormatters,
     locale,
     () => new Intl.NumberFormat(locale, { maximumSignificantDigits: 4 }),
   )
-  return formatter === undefined ? String(value) : formatter.format(value)
+  const number = formatter === undefined ? String(value) : formatter.format(value)
+  return currency === 'USD' ? '$' + number : number
 }
 
 /**

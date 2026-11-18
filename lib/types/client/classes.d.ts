@@ -8,6 +8,8 @@
  */
 /** Every class the panel's stylesheet defines. */
 export declare const css: {
+    readonly matchEdit: "dlu-matchEdit";
+    readonly rateUnit: "dlu-rateUnit";
     readonly currencySelect: "dlu-currencySelect";
     readonly currencyHint: "dlu-currencyHint";
     readonly exchange: "dlu-exchange";

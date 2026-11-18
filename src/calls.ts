@@ -190,8 +190,8 @@ export function queryCalls(
       if (query.to !== undefined && sample.time > query.to) continue
       const clock = beijingClock(sample.time)
       const peak = isPeakClock(clock, options.peakWindows, options.peakWeekdaysOnly)
-      const { rate, matched } = selectRate(options.models, options.fallback, sample.route, peak)
-      const cost = costOf(sample.tokens, rate)
+      const { rate, matched, currency } = selectRate(options.models, options.fallback, sample.route, peak)
+      const cost = costOf(sample.tokens, rate, currency, options.cnyPerUsd)
       const model = modelOf(sample.route)
 
       // Facets describe the time window, not the other filters: a reader who has

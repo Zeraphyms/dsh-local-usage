@@ -18,7 +18,6 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EXCHANGE_PATH } from '../src/host/routes.ts'
-import { exchangeRateFilePath } from '../src/host/exchange-rate.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
@@ -652,7 +651,7 @@ describe('the pricing route', () => {
     expect(fetchRate).toHaveBeenCalledTimes(1)
   })
 
-  it('synchronizes USD/CNY and saves new or edited USD prices as CNY only once', async () => {
+  it('synchronizes USD/CNY, persists typed USD prices, and reports in CNY', async () => {
     const fetchRate = vi.fn(async () => Response.json({ base: 'USD', date: '2026-11-11', rates: { CNY: 7.23456 } }))
     vi.stubGlobal('fetch', fetchRate)
     const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 1) }]])
@@ -661,12 +660,15 @@ describe('the pricing route', () => {
     const synced = await mounted.exchange.fetch(new Request(url, { method: 'POST' }))
     expect(synced.status).toBe(200)
     expect(await synced.json()).toMatchObject({ snapshot: { rate: 7.235 } })
+
+    // The batch-level unit lands on each edit; the prices persist as typed.
     const saved = await post(mounted, { currency: 'USD', models: { 'p/m': CARD } })
     expect(saved.status).toBe(200)
-    expect(await saved.json()).toMatchObject({ models: { 'p/m': { offPeak: { input: 21.705, output: 65.115 } } } })
+    expect(await saved.json()).toMatchObject({ models: { 'p/m': { currency: 'USD', offPeak: { input: 3, output: 9 } } } })
     const stored = JSON.parse(await (await import('node:fs/promises')).readFile(pricingFilePath(process.env.DSH_HOME ?? ''), 'utf8'))
-    expect(stored.models['p/m'].offPeak.input).toBe(21.705)
-    expect(stored.models['p/m'].currency).toBeUndefined()
+    expect(stored.models['p/m'].offPeak.input).toBe(3)
+    expect(stored.models['p/m'].currency).toBe('USD')
+
     const restarted = mount(logs, true)
     const cached = await restarted.exchange.fetch(new Request(url))
     const cachedBody = await cached.json() as { snapshot: { rate: number; date: string } | null; expectedDate: string }
@@ -675,16 +677,28 @@ describe('the pricing route', () => {
     // the provider has since published a newer one, which the response states.
     const behind = cachedBody.snapshot!.date < cachedBody.expectedDate
     expect(fetchRate).toHaveBeenCalledTimes(behind ? 2 : 1)
-    expect((await report(restarted)).routeRates).toEqual((await report(mounted)).routeRates)
+    // A USD card reports in CNY: 3/M input and 9/M output at the retained
+    // reference, which the source rounds to three decimals.
+    const value = await (await restarted.route.fetch(new Request(new URL(REPORT_PATH, 'http://localhost')))).json() as { routeRates: { source: string; route: string }[]; models: { route: string; cost: number }[] }
+    const pm = value.routeRates.find(row => row.route === 'p/m')
+    expect(pm).toMatchObject({ source: 'model' })
+    expect(value.models.find(row => row.route === 'p/m')!.cost)
+      .toBeCloseTo((100 * 3 + 10 * 9) / 1_000_000 * 7.235, 12)
   })
 
-  it('refuses unsupported currency and keeps CNY pricing usable without a rate source', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
-    const mounted = mount(new Map(), true)
-    expect((await post(mounted, { currency: 'EUR', models: { model: CARD } })).status).toBe(400)
-    expect((await post(mounted, { currency: 'USD', models: { model: CARD } })).status).toBe(500)
-    expect((await post(mounted, { models: { model: CARD } })).status).toBe(200)
-    expect(await (await import('node:fs/promises')).readFile(exchangeRateFilePath(process.env.DSH_HOME ?? ''), 'utf8').catch(() => '')).toBe('')
+  it('refuses an unknown batch currency and keeps per-edit validation', async () => {
+    const logs = new Map<string, FakeLog>([['a', { events: log(0, DAY_ONE, 1) }]])
+    const mounted = mount(logs, true)
+    expect((await post(mounted, { currency: 'EUR', models: { 'p/m': CARD } })).status).toBe(400)
+    expect((await post(mounted, { models: { 'p/m': { ...CARD, currency: 'EUR' } } })).status).toBe(400)
+    expect((await post(mounted, { models: { 'p/m': { ...CARD, currency: 'USD' } } })).status).toBe(200)
+    const stored = JSON.parse(await (await import('node:fs/promises')).readFile(pricingFilePath(process.env.DSH_HOME ?? ''), 'utf8'))
+    expect(stored.models['p/m'].currency).toBe('USD')
+    // Without a retained reference the USD card cannot price: the route stays
+    // uncosted rather than inventing a rate.
+    const value = await (await mounted.route.fetch(new Request(new URL(REPORT_PATH, 'http://localhost')))).json() as { routeRates: { route: string; source: string }[]; models: { route: string; cost: number }[] }
+    expect(value.routeRates.find(row => row.route === 'p/m')).toMatchObject({ source: 'model' })
+    expect(value.models.find(row => row.route === 'p/m')!.cost).toBe(0)
   })
 
   it('stores an override and bills a later report at it', async () => {

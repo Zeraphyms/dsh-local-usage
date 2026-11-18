@@ -25,10 +25,16 @@ export interface PriceFields {
   output: string
 }
 
-/** One model's draft: the switch and both sets of prices. */
+/** One model's draft: its rule, the switch, and both sets of prices. */
 export interface ModelDraft {
+  /** The match rule as typed; seeded from the card in effect. */
+  match: string
   /** Input unit; omitted means the stored CNY unit. */
   currency?: UsagePriceCurrency
+  /** The unit the seeded fields were rendered in; conversion uses this pair. */
+  seededCurrency?: UsagePriceCurrency
+  /** The unit the card's own prices are stored in. */
+  storedCurrency?: UsagePriceCurrency
   /** CNY per USD captured when the input unit changes. */
   exchangeRate?: number
   /** Whether the model prices peak separately. */
@@ -75,6 +81,15 @@ export type RateDraftResult =
     readonly set: PriceSet
     readonly field: RateField
   }
+  /**
+   * The typed match rule cannot become a card: it is empty, or another card
+   * already claims it. Names the open card and why the rule was refused.
+   */
+  | {
+    readonly status: 'invalid-match'
+    readonly model: string
+    readonly reason: 'empty' | 'duplicate'
+  }
   /** A write to send. */
   | { readonly status: 'ready'; readonly update: UsagePricingUpdate }
 
@@ -102,6 +117,9 @@ export function draftsFrom(models: readonly UsageModelPrice[]): ModelDrafts {
   const drafts: ModelDrafts = {}
   for (const card of models) {
     drafts[card.match] = {
+      match: card.match,
+      // A card stored in USD opens in USD, so the reader sees what was typed.
+      ...card.currency === undefined ? {} : { currency: card.currency, seededCurrency: card.currency, storedCurrency: card.currency },
       peakEnabled: card.peakEnabled,
       peak: fieldsOf(card.peak),
       offPeak: fieldsOf(card.offPeak),
@@ -157,29 +175,61 @@ export function pendingUpdate(
     const draft = drafts[card.match]
     if (draft === undefined) continue
 
+    currency = draft.currency ?? 'CNY'
+
+    // A typed rule that differs from the card's own moves the card: the new
+    // rule claims the prices, and the old rule is released. The fallback card
+    // has no rule of its own to move, so it keeps the drop-only semantics.
+    const typedMatch = draft.match.trim()
+    const renamed = card.match !== '' && typedMatch !== card.match
+    if (renamed) {
+      if (typedMatch.length === 0) {
+        return { status: 'invalid-match', model: card.match, reason: 'empty' }
+      }
+      // The target must be free both among the cards in effect and among the
+      // moves an earlier card in this same save has already claimed.
+      const taken = models.some(candidate => candidate.match === typedMatch)
+        || Object.hasOwn(writes, typedMatch)
+      if (taken) {
+        return { status: 'invalid-match', model: card.match, reason: 'duplicate' }
+      }
+    }
+
     // A card blanked on both sets asks for the edit to be dropped. With the
     // switch off, the peak set is not read at all, so only the flat set counts.
     const blankBoth = isBlank(draft.offPeak) && isBlank(draft.peak)
-    if (blankBoth) {
+    if (blankBoth && !renamed) {
       writes[card.match] = null
       continue
     }
 
-    currency = draft.currency ?? 'CNY'
-    const factor = currency === 'USD' ? 1 / (draft.exchangeRate ?? 1) : 1
-    const effective = (rate: UsageRate): UsageRate => ({
-      input: Number((rate.input * factor).toPrecision(15)), cacheRead: Number((rate.cacheRead * factor).toPrecision(15)),
-      cacheWrite: Number((rate.cacheWrite * factor).toPrecision(15)), output: Number((rate.output * factor).toPrecision(15)),
-    })
-    const offPeak = resolve(draft.offPeak, effective(card.offPeak))
+    // The typed fields are in the draft's view unit; the seeded blanks are in
+    // the seeded unit. Convert only across that pair — never client-side from
+    // USD to CNY for submission, because the Host stores the typed unit.
+    // The typed fields are in the draft's view unit; the seeded blanks are in
+    // the card's stored unit. Blanks convert stored→view so a USD view of a CNY
+    // card completes in USD. The submission stays in the view unit; the Host
+    // stores it typed and converts to the report currency at pricing time.
+    const stored = draft.storedCurrency ?? 'CNY'
+    const view = (rate: UsageRate): UsageRate => {
+      if (stored === currency) return rate
+      const factor = currency === 'USD' ? 1 / (draft.exchangeRate ?? 1) : draft.exchangeRate ?? 1
+      return {
+        input: Number((rate.input * factor).toPrecision(15)),
+        cacheRead: Number((rate.cacheRead * factor).toPrecision(15)),
+        cacheWrite: Number((rate.cacheWrite * factor).toPrecision(15)),
+        output: Number((rate.output * factor).toPrecision(15)),
+      }
+    }
+    const offPeak = resolve(draft.offPeak, view(card.offPeak))
     if ('field' in offPeak) {
       return { status: 'invalid', model: card.match, set: 'offPeak', field: offPeak.field }
     }
     // The peak set only matters while the switch is on; a flat model keeps
     // whatever peak prices it carries rather than validating fields it ignores.
-    let peak: UsageRate = effective(card.peak)
+    let peak: UsageRate = view(card.peak)
     if (draft.peakEnabled) {
-      const read = resolve(draft.peak, effective(card.peak))
+      const read = resolve(draft.peak, view(card.peak))
       if ('field' in read) {
         return { status: 'invalid', model: card.match, set: 'peak', field: read.field }
       }
@@ -188,19 +238,28 @@ export function pendingUpdate(
 
     const next: UsageModelEdit = {
       ...card.route === undefined ? {} : { route: card.route },
+      // The typed unit rides with the card, so the sheet shows what was written
+      // and the fold converts to the report currency at pricing time.
+      ...currency === 'USD' ? { currency } : {},
       peakEnabled: draft.peakEnabled,
       peak,
       offPeak: offPeak.rate,
     }
-    const unchanged = next.peakEnabled === card.peakEnabled
-      && samePrices(next.offPeak, effective(card.offPeak))
-      && samePrices(next.peak, effective(card.peak))
-    if (!unchanged) writes[card.match] = next
+    const unchanged = !renamed
+      && next.peakEnabled === card.peakEnabled
+      && samePrices(next.offPeak, view(card.offPeak))
+      && samePrices(next.peak, view(card.peak))
+    if (!unchanged) {
+      // A rename always writes, even with every price left as it stands: the
+      // move itself is the change the reader asked for.
+      if (renamed) writes[card.match] = null
+      writes[typedMatch] = next
+    }
   }
 
   return Object.keys(writes).length === 0
     ? { status: 'empty' }
-    : { status: 'ready', update: { models: writes, ...currency === 'USD' ? { currency } : {} } }
+    : { status: 'ready', update: { models: writes } }
 }
 
 /**

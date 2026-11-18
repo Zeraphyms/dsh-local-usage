@@ -85,6 +85,8 @@ export interface PricingOptions {
   readonly peakWindows: readonly PeakWindow[]
   /** When true, Saturday and Sunday are never peak. */
   readonly peakWeekdaysOnly: boolean
+  /** CNY per one USD, for converting a card that states USD prices. */
+  readonly cnyPerUsd?: number
 }
 
 /** Report-level facts the Host supplies around a fold. */
@@ -567,8 +569,8 @@ export function buildReport(
       // most frequent allocation in this walk.
       const beijing = beijingClock(sample.time)
       const peak = isPeakClock(beijing, options.peakWindows, options.peakWeekdaysOnly)
-      const { rate, matched } = selectRate(options.models, options.fallback, sample.route, peak)
-      const cost = costOf(sample.tokens, rate)
+      const { rate, matched, currency } = selectRate(options.models, options.fallback, sample.route, peak)
+      const cost = costOf(sample.tokens, rate, currency, options.cnyPerUsd)
       firstSampleTime ??= sample.time
       lastSampleTime = sample.time
 

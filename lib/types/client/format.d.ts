@@ -74,9 +74,12 @@ export declare function formatPercent(value: number, locale: string): string;
  * it in exponential notation — `2e-7` is not a price a reader can check.
  * @param value - currency units per one million tokens.
  * @param locale - active locale id.
- * @returns the rate as written in the active locale.
+ * @param currency - the unit the card states this rate in; the symbol prefixes
+ *   the number when it differs from the report currency, so a USD card reads as
+ *   a dollar figure rather than a bare number beside CNY neighbours.
+ * @returns the rate as written in the active locale, with its currency symbol.
  */
-export declare function formatRate(value: number, locale: string): string;
+export declare function formatRate(value: number, locale: string, currency?: 'CNY' | 'USD'): string;
 /**
  * A token count at the scale the price sheet states volume: thousands, millions,
  * billions.

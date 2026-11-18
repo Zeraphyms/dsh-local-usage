@@ -61,6 +61,15 @@ describe('formatInteger', () => {
 })
 
 describe('formatRate', () => {
+  it('prefixes the dollar symbol for a USD card and leaves CNY bare', () => {
+    expect(formatRate(20, 'en', 'USD')).toBe('$20')
+    expect(formatRate(0, 'en', 'USD')).toBe('$0')
+    expect(formatRate(0.02, 'en', 'USD')).toBe('$0.02')
+    expect(formatRate(20, 'en')).toBe('20')
+    expect(formatRate(20, 'en', 'CNY')).toBe('20')
+    expect(formatRate(0, 'en')).toBe('0')
+  })
+
   it('never renders a price in exponential notation', () => {
     // The bug this replaced: String(2e-7) is "2e-7", which is not a price a
     // reader can check against a provider's published rate card.

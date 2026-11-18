@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createExchangeRateStore, expectedQuoteDate, nextBeijingNoon, parseExchangeRate, pricingUpdateInCny, scheduleExchangeRate, exchangeRateIsDue } from '../src/host/exchange-rate.ts'
+import { createExchangeRateStore, cnyPerUsd, expectedQuoteDate, nextBeijingNoon, parseExchangeRate, scheduleExchangeRate, exchangeRateIsDue } from '../src/host/exchange-rate.ts'
 import type { ExchangeRateStore } from '../src/host/exchange-rate.ts'
 
 const data = (rate = 7.23456) => ({ base: 'USD', date: '2026-11-11', rates: { CNY: rate } })
@@ -110,13 +110,9 @@ describe('Beijing noon refresh', () => {
   })
 })
 
-it('converts all USD buckets once while preserving CNY writes and deletion semantics', () => {
-  const rate = { input: 1, cacheRead: 0.1, cacheWrite: 1.25, output: 5 }
-  const update = { currency: 'USD' as const, models: { model: { peakEnabled: true, peak: rate, offPeak: rate }, deleted: null } }
-  const saved = pricingUpdateInCny(update, 7.235)
-  expect(saved.models.model).toMatchObject({ peak: { input: 7.235, cacheRead: 0.7235, cacheWrite: 9.04375, output: 36.175 } })
-  expect(saved.models.deleted).toBeNull()
-  expect(saved.currency).toBeUndefined()
-  expect(pricingUpdateInCny({ models: update.models }, 7).models).toEqual(update.models)
-  expect(() => pricingUpdateInCny(update, 0)).toThrow()
+it('gives a positive multiplier for a retained reference and fails without one', () => {
+  expect(cnyPerUsd(7.235)).toBe(7.235)
+  expect(cnyPerUsd(0.5)).toBe(0.5)
+  expect(() => cnyPerUsd(0)).toThrow()
+  expect(() => cnyPerUsd(Number.NaN)).toThrow()
 })

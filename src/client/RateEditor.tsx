@@ -60,7 +60,7 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave, exch
   const table = useRef<HTMLTableElement>(null)
   const {
     drafts, editing, busy, saved, failure, pending,
-    write, switchCurrency, switchPeak, openEditor, discard, commit, removeCard,
+    write, writeMatch, switchCurrency, switchPeak, openEditor, discard, commit, removeCard,
   } = useRateEditor({ models, onSave, table, exchangeRate })
 
   // Stated rather than omitted: an empty table reads as an editor that was
@@ -123,6 +123,9 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave, exch
               const invalid = pending.status === 'invalid' && pending.model === card.match
                 ? { set: pending.set, field: pending.field }
                 : undefined
+              const matchError = pending.status === 'invalid-match' && pending.model === card.match
+                ? pending.reason
+                : undefined
               return (
                 <RateGroup
                   key={card.match}
@@ -130,6 +133,7 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave, exch
                   draft={draft}
                   open={open}
                   invalid={invalid}
+                  matchError={matchError}
                   busy={busy}
                   locale={locale}
                   t={t}
@@ -138,6 +142,7 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave, exch
                   onCancel={discard}
                   onSave={() => { void commit() }}
                   usdAvailable={currency === 'CNY' && exchangeRate !== undefined}
+                  onMatch={value => { writeMatch(card.match, value) }}
                   onCurrency={value => { switchCurrency(card.match, value) }}
                   onPeak={enabled => { switchPeak(card.match, enabled) }}
                   onWrite={(set, field, value) => { write(card.match, set, field, value) }}

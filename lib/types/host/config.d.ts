@@ -91,4 +91,4 @@ export declare function resolveConfig(config: UsageInsightsConfig): UsageInsight
  * @param rates - the store of the reader's edits.
  * @returns the options one fold prices with.
  */
-export declare function pricingOptions(config: UsageInsightsConfig, rates: RateStore): PricingOptions;
+export declare function pricingOptions(config: UsageInsightsConfig, rates: RateStore, cnyPerUsd?: number): PricingOptions;

@@ -104,11 +104,14 @@ export function readModelEdit(value: unknown): UsageModelEdit | undefined {
   if (peak === undefined || offPeak === undefined) return undefined
   const route = source.route
   if (route !== undefined && (typeof route !== 'string' || route.length === 0)) return undefined
+  const currency = source.currency
+  if (currency !== undefined && currency !== 'CNY' && currency !== 'USD') return undefined
   return {
     peakEnabled: source.peakEnabled,
     peak,
     offPeak,
     ...route === undefined ? {} : { route },
+    ...currency === undefined || currency === 'CNY' ? {} : { currency },
   }
 }
 

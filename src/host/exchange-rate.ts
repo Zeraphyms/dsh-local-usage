@@ -2,8 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import type { UsageExchangeRate, UsagePricingUpdate, UsageRate } from '../types.ts'
-import { readModelEdit } from '../rates.ts'
+import type { UsageExchangeRate } from '../types.ts'
 
 const SOURCE_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=CNY'
 const BEIJING_OFFSET = 8 * 60 * 60 * 1000
@@ -166,22 +165,16 @@ export function scheduleExchangeRate(store: ExchangeRateStore, onError: (error: 
   }
 }
 
-function convertedRate(rate: UsageRate, multiplier: number): UsageRate {
-  // Preserve useful small cache prices while removing binary multiplication noise.
-  const convert = (value: number): number => Number((value * multiplier).toPrecision(15))
-  return { input: convert(rate.input), cacheRead: convert(rate.cacheRead), cacheWrite: convert(rate.cacheWrite), output: convert(rate.output) }
-}
-
-/** Convert USD input once at save time; the stored model cards remain in CNY. */
-export function pricingUpdateInCny(update: UsagePricingUpdate, rate: number): UsagePricingUpdate {
-  if (update.currency !== 'USD') return { models: update.models }
+/**
+ * The multiplier that turns one USD-priced card into reporting-currency CNY.
+ *
+ * Cards keep the currency they were typed in; the report currency stays CNY, so
+ * a USD card is converted when its samples are priced, not when the reader
+ * saves. The retained reference is the single conversion fact for every card.
+ * @param rate - the retained CNY per USD reference.
+ * @returns the positive multiplier, so a broken cache fails loudly once.
+ */
+export function cnyPerUsd(rate: number): number {
   if (!Number.isFinite(rate) || rate <= 0) throw new Error('USD/CNY exchange rate is unavailable')
-  const models: UsagePricingUpdate['models'] = {}
-  for (const [match, edit] of Object.entries(update.models)) {
-    if (edit === null) { models[match] = null; continue }
-    const converted = readModelEdit({ ...edit, peak: convertedRate(edit.peak, rate), offPeak: convertedRate(edit.offPeak, rate) })
-    if (converted === undefined) throw new Error('Converted CNY price exceeds the allowed range')
-    models[match] = converted
-  }
-  return { models }
+  return rate
 }

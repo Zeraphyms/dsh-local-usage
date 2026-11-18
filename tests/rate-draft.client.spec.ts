@@ -35,6 +35,7 @@ describe('draftsFrom', () => {
   it('opens on both sets of prices, with the switch as configured', () => {
     const drafts = draftsFrom(CARDS)
     expect(drafts.flash).toEqual({
+      match: 'flash',
       peakEnabled: true,
       peak: { input: '2', cacheRead: '0.04', cacheWrite: '2', output: '8' },
       offPeak: { input: '1', cacheRead: '0.02', cacheWrite: '1', output: '4' },
@@ -135,5 +136,42 @@ describe('pendingUpdate', () => {
     const drafts = edit('strict-model', 'peak', 'input', 'nonsense')
     const result = pendingUpdate(drafts, CARDS)
     expect(result).toEqual({ status: 'empty' })
+  })
+
+  it('moves a renamed card to its new rule and releases the old one', () => {
+    const drafts = draftsFrom(CARDS)
+    ;(drafts.flash as ModelDraft).match = 'vendor/deepseek-flash'
+    const result = pendingUpdate(drafts, CARDS, 'flash')
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.update.models.flash).toBeNull()
+    expect(result.update.models['vendor/deepseek-flash']).toMatchObject({ offPeak: FLASH })
+  })
+
+  it('refuses an empty typed rule without touching the card', () => {
+    const drafts = draftsFrom(CARDS)
+    ;(drafts.flash as ModelDraft).match = '   '
+    expect(pendingUpdate(drafts, CARDS, 'flash'))
+      .toEqual({ status: 'invalid-match', model: 'flash', reason: 'empty' })
+  })
+
+  it('refuses a rule another card already claims, including one renamed earlier in the same save', () => {
+    const drafts = draftsFrom(CARDS)
+    ;(drafts.flash as ModelDraft).match = 'strict-model'
+    expect(pendingUpdate(drafts, CARDS, 'flash'))
+      .toEqual({ status: 'invalid-match', model: 'flash', reason: 'duplicate' })
+    // Two renames in one save racing for one rule: the first claims it, the
+    // second is refused because the first's write already holds the rule.
+    const moves = draftsFrom(CARDS)
+    ;(moves.flash as ModelDraft).match = 'shared-rule'
+    ;(moves['strict-model'] as ModelDraft).match = 'shared-rule'
+    expect(pendingUpdate(moves, CARDS))
+      .toEqual({ status: 'invalid-match', model: 'strict-model', reason: 'duplicate' })
+  })
+
+  it('keeps an unchanged rule from producing a no-op write', () => {
+    const drafts = draftsFrom(CARDS)
+    ;(drafts.flash as ModelDraft).match = ' flash '
+    expect(pendingUpdate(drafts, CARDS, 'flash')).toEqual({ status: 'empty' })
   })
 })

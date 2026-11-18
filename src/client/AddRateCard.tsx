@@ -109,9 +109,9 @@ export function AddRateCard({ existing, currency, t, onSave, exchangeRate }: Add
     setFailure(undefined)
     try {
       await onSave({
-        ...draft.currency === 'USD' ? { currency: draft.currency } : {},
         models: {
           [match]: {
+            ...draft.currency === 'USD' ? { currency: draft.currency } : {},
             peakEnabled: draft.peakEnabled,
             offPeak: {
               input: offPeak.input ?? 0,

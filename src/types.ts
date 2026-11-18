@@ -278,6 +278,8 @@ export interface UsageCallsReport {
 export interface UsageModelPrice {
   /** The exact route this card is scoped to, when it came from a per-route edit. */
   readonly route?: string
+  /** The unit the card's prices are stated in; omitted means the report currency. */
+  readonly currency?: UsagePriceCurrency
   /** Case-insensitive substring matched against `provider/model`; empty for the fallback card. */
   readonly match: string
   /** Whether {@link peak} applies inside the configured windows. */
@@ -342,6 +344,8 @@ export interface UsageRouteRate {
 export interface UsageModelEdit {
   /** The exact route this edit is scoped to, for a migrated per-route card. */
   readonly route?: string
+  /** The unit the typed prices are stated in; omitted means the report currency. */
+  readonly currency?: UsagePriceCurrency
   /** Whether the model prices peak separately. */
   readonly peakEnabled: boolean
   /** Prices inside a peak window. */
@@ -377,7 +381,7 @@ export type UsagePriceCurrency = 'CNY' | 'USD'
 
 /** One write to the model prices. */
 export interface UsagePricingUpdate {
-  /** Omitted for existing clients; USD is converted by the Host before persistence. */
+  /** Currency for edits that do not state their own; omitted means the report currency. */
   readonly currency?: UsagePriceCurrency
   /**
    * Cards to write, keyed by their `match`; `null` clears the edit and returns the

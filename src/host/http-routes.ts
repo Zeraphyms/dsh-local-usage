@@ -22,7 +22,7 @@ import type {
 } from '../types.ts'
 import type { UsageInsightsConfig } from './config.ts'
 import { CALLS_PATH, PRICING_PATH, PROGRESS_PATH, REPORT_PATH, EXCHANGE_PATH } from './routes.ts'
-import { expectedQuoteDate, nextBeijingNoon, pricingUpdateInCny } from './exchange-rate.ts'
+import { expectedQuoteDate, nextBeijingNoon } from './exchange-rate.ts'
 import type { ExchangeRateStore } from './exchange-rate.ts'
 import type { CachedSession } from './session-fold.ts'
 import { assembleReport, queryCallPage } from './usage-service.ts'
@@ -91,6 +91,7 @@ async function handleCalls(
   progress: ProgressTracker,
   config: UsageInsightsConfig,
   rates: RateStore,
+  exchangeRates: ExchangeRateStore,
   serialize: SerializedRead,
   generations: ReadonlyMap<string, number>,
   request: Request,
@@ -112,6 +113,7 @@ async function handleCalls(
       progress,
       config,
       rates,
+      exchangeRates.read()?.rate,
       query,
       generations,
       url.searchParams.get('refresh') === '1',
@@ -132,6 +134,7 @@ async function handleReport(
   progress: ProgressTracker,
   config: UsageInsightsConfig,
   rates: RateStore,
+  exchangeRates: ExchangeRateStore,
   serialize: SerializedRead,
   generations: ReadonlyMap<string, number>,
   request: Request,
@@ -145,7 +148,7 @@ async function handleReport(
     // and each walk the whole corpus.
     const pending = background()
     if (pending !== undefined) await pending
-    const report = await serialize(() => assembleReport(ctx, cache, folds, progress, config, rates, {
+    const report = await serialize(() => assembleReport(ctx, cache, folds, progress, config, rates, exchangeRates.read()?.rate, {
       refresh: url.searchParams.get('refresh') === '1',
       from: numberParam(url.searchParams, 'from'),
       to: numberParam(url.searchParams, 'to'),
@@ -180,6 +183,10 @@ function parsePricingUpdate(value: unknown): UsagePricingUpdate | undefined {
       parsed[match] = null
       continue
     }
+    if (typeof candidate === 'object' && candidate !== null) {
+      const own = (candidate as { currency?: unknown }).currency
+      if (own !== undefined && own !== 'CNY' && own !== 'USD') return undefined
+    }
     const edit = readModelEdit(candidate)
     if (edit === undefined) return undefined
     parsed[match] = edit
@@ -191,8 +198,6 @@ function parsePricingUpdate(value: unknown): UsagePricingUpdate | undefined {
 async function handlePricing(
   ctx: Context,
   rates: RateStore,
-  exchangeRates: ExchangeRateStore,
-  config: UsageInsightsConfig,
   request: Request,
 ): Promise<Response> {
   const headers = { 'cache-control': 'no-store' }
@@ -210,12 +215,18 @@ async function handlePricing(
     )
   }
   try {
-    let converted = update
-    if (update.currency === 'USD') {
-      if (config.currency !== 'CNY') return Response.json({ error: 'USD input requires CNY reporting currency' }, { status: 400, headers })
-      const snapshot = exchangeRates.read() ?? await exchangeRates.refresh()
-      converted = pricingUpdateInCny(update, snapshot.rate)
-    }
+    // A batch-level currency applies to the edits that do not state their own;
+    // the prices are persisted in the unit they were typed in, and converted at
+    // pricing time against the retained reference.
+    const batchCurrency = update.currency
+    const converted = batchCurrency === undefined
+      ? update
+      : {
+        models: Object.fromEntries(Object.entries(update.models).map(([match, edit]) => [
+          match,
+          edit === null || edit.currency !== undefined ? edit : { ...edit, currency: batchCurrency },
+        ])),
+      }
     const models = await rates.write(converted)
     return Response.json({ models }, { headers })
   } catch (error: unknown) {
@@ -275,7 +286,7 @@ export function registerRoutes(deps: RouteDependencies): void {
       path: REPORT_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => handleReport(ctx, cache, folds, progress, config, rates, serialize, generations, request, background),
+      fetch: request => handleReport(ctx, cache, folds, progress, config, rates, exchangeRates, serialize, generations, request, background),
     }),
     'dsh-local-usage: report route',
   )
@@ -284,7 +295,7 @@ export function registerRoutes(deps: RouteDependencies): void {
       path: CALLS_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => handleCalls(ctx, cache, folds, progress, config, rates, serialize, generations, request, background),
+      fetch: request => handleCalls(ctx, cache, folds, progress, config, rates, exchangeRates, serialize, generations, request, background),
     }),
     'dsh-local-usage: calls route',
   )
@@ -304,7 +315,7 @@ export function registerRoutes(deps: RouteDependencies): void {
       path: PRICING_PATH,
       methods: ['POST'],
       requestBody: 'buffered',
-      fetch: request => handlePricing(ctx, rates, exchangeRates, config, request),
+      fetch: request => handlePricing(ctx, rates, request),
     }),
     'dsh-local-usage: pricing route',
   )

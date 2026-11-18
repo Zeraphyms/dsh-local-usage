@@ -63,4 +63,47 @@ describe('RateEditor interaction', () => {
     if (update === undefined) throw new Error('save was not called with an update')
     expect(Object.keys(update.models)).toEqual(['b'])
   })
+
+  it('renames a card on save: the new rule claims the prices, the old one is released', async () => {
+    const onSave = vi.fn(async (_update: UsagePricingUpdate) => {})
+    const { container } = render(createElement(RateEditor, {
+      rows: [row('a')],
+      currency: 'CNY',
+      locale: 'zh',
+      formatCost: (value: number) => `¥${value.toFixed(2)}`,
+      t,
+      onSave,
+    }))
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('[data-rate-edit="a"]') as HTMLButtonElement)
+    const matchInput = container.querySelector<HTMLInputElement>('.dlu-matchEdit input')
+    if (matchInput === null) throw new Error('no match input in the open editor')
+    fireEvent.change(matchInput, { target: { value: 'vendor/a' } })
+    fireEvent.click(screen.getByText('pricingSaveOne'))
+
+    await waitFor(() => { expect(onSave).toHaveBeenCalledTimes(1) })
+    const update = onSave.mock.calls[0]?.[0]
+    if (update === undefined) throw new Error('save was not called with an update')
+    expect(update.models.a).toBeNull()
+    expect(update.models['vendor/a']).toMatchObject({ offPeak: RATE })
+  })
+
+  it('refuses an empty typed rule and shows why', async () => {
+    const onSave = vi.fn(async (_update: UsagePricingUpdate) => {})
+    const { container } = render(createElement(RateEditor, {
+      rows: [row('a')],
+      currency: 'CNY',
+      locale: 'zh',
+      formatCost: (value: number) => `¥${value.toFixed(2)}`,
+      t,
+      onSave,
+    }))
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('[data-rate-edit="a"]') as HTMLButtonElement)
+    fireEvent.change(container.querySelector<HTMLInputElement>('.dlu-matchEdit input') as HTMLInputElement, { target: { value: '  ' } })
+    fireEvent.click(screen.getByText('pricingSaveOne'))
+
+    await waitFor(() => { expect(container.querySelector('[role="alert"]')?.textContent).toContain('pricingMatchEmpty') })
+    expect(onSave).not.toHaveBeenCalled()
+  })
 })

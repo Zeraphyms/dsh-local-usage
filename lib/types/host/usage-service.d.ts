@@ -25,10 +25,11 @@ import type { CachedSession } from './session-fold.ts';
  * @param progress - publishes how far this read has got.
  * @param config - resolved plugin configuration.
  * @param rates - the reader's price edits.
+ * @param cnyPerUsd - CNY per one USD for a card typed in USD, when a reference is retained.
  * @param request - the window to fold and whether to discard the caches first.
  * @returns the complete priced report.
  */
-export declare function assembleReport(ctx: Context, cache: Map<string, CachedSession>, folds: FoldCache, progress: ProgressTracker, config: UsageInsightsConfig, rates: RateStore, request: {
+export declare function assembleReport(ctx: Context, cache: Map<string, CachedSession>, folds: FoldCache, progress: ProgressTracker, config: UsageInsightsConfig, rates: RateStore, cnyPerUsd: number | undefined, request: {
     refresh: boolean;
     from: number | undefined;
     to: number | undefined;
@@ -45,8 +46,9 @@ export declare function assembleReport(ctx: Context, cache: Map<string, CachedSe
  * @param progress - the read's progress.
  * @param config - resolved plugin configuration.
  * @param rates - the reader's price edits.
+ * @param cnyPerUsd - CNY per one USD for a card typed in USD, when a reference is retained.
  * @param query - the call-log query.
  * @param generations - session invalidation generations captured by this read.
  * @returns one page and the totals of every match.
  */
-export declare function queryCallPage(ctx: Context, cache: Map<string, CachedSession>, folds: FoldCache, progress: ProgressTracker, config: UsageInsightsConfig, rates: RateStore, query: UsageCallsQuery, generations: ReadonlyMap<string, number>, refresh?: boolean): Promise<UsageCallsReport>;
+export declare function queryCallPage(ctx: Context, cache: Map<string, CachedSession>, folds: FoldCache, progress: ProgressTracker, config: UsageInsightsConfig, rates: RateStore, cnyPerUsd: number | undefined, query: UsageCallsQuery, generations: ReadonlyMap<string, number>, refresh?: boolean): Promise<UsageCallsReport>;

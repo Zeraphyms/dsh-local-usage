@@ -20,7 +20,7 @@ describe('currency input', () => {
     expect(usd.offPeak.input).toBe('1')
     expect(pendingUpdate({ test: usd }, [card], 'test').status).toBe('empty')
     usd.offPeak.output = '6'
-    expect(pendingUpdate({ test: usd }, [card], 'test')).toMatchObject({ status: 'ready', update: { currency: 'USD', models: { test: { offPeak: { output: 6 } } } } })
+    expect(pendingUpdate({ test: usd }, [card], 'test')).toMatchObject({ status: 'ready', update: { models: { test: { currency: 'USD', offPeak: { output: 6 } } } } })
     expect(changeDraftCurrency(usd, 'CNY', 8).offPeak.output).toBe('42')
   })
 
@@ -46,7 +46,7 @@ describe('currency input', () => {
     fireEvent.change(view.getByLabelText('pricingAdd pricingColumnInput'), { target: { value: '1' } })
     fireEvent.click(view.getByText('pricingSaveOne'))
     await waitFor(() => { expect(save).toHaveBeenCalledTimes(1) })
-    expect(save.mock.calls[0]?.[0]).toMatchObject({ currency: 'USD', models: { 'new-model': { offPeak: { input: 1 } } } })
+    expect(save.mock.calls[0]?.[0]).toMatchObject({ models: { 'new-model': { currency: 'USD', offPeak: { input: 1 } } } })
   })
 
   it('edits an existing CNY model in USD without changing other models', async () => {
@@ -58,7 +58,7 @@ describe('currency input', () => {
     fireEvent.change(view.getByLabelText('test rateSetFlat pricingColumnOutput'), { target: { value: '6' } })
     fireEvent.click(view.getByText('pricingSaveOne'))
     await waitFor(() => { expect(save).toHaveBeenCalledTimes(1) })
-    expect(save.mock.calls[0]?.[0]).toMatchObject({ currency: 'USD', models: { test: { offPeak: { output: 6 } } } })
+    expect(save.mock.calls[0]?.[0]).toMatchObject({ models: { test: { currency: 'USD', offPeak: { output: 6 } } } })
   })
 })
 

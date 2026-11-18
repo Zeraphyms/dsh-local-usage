@@ -59,6 +59,7 @@ export interface RateEditorState {
   readonly failure: string | undefined
   readonly pending: RateDraftResult
   readonly write: (model: string, set: PriceSet, field: RateField, value: string) => void
+  readonly writeMatch: (model: string, value: string) => void
   readonly switchCurrency: (model: string, currency: UsagePriceCurrency) => void
   readonly switchPeak: (model: string, peakEnabled: boolean) => void
   readonly openEditor: (model: string) => void
@@ -124,6 +125,16 @@ export function useRateEditor({ models, onSave, table, exchangeRate }: UseRateEd
       const draft = current[model]
       if (draft === undefined) return current
       return { ...current, [model]: { ...draft, [set]: { ...draft[set], [field]: value } } }
+    })
+  }
+
+  function writeMatch(model: string, value: string): void {
+    setSaved(false)
+    setFailure(undefined)
+    setDrafts(current => {
+      const draft = current[model]
+      if (draft === undefined) return current
+      return { ...current, [model]: { ...draft, match: value } }
     })
   }
 
@@ -209,5 +220,5 @@ export function useRateEditor({ models, onSave, table, exchangeRate }: UseRateEd
     }
   }
 
-  return { drafts, editing, busy, saved, failure, pending, write, switchCurrency, switchPeak, openEditor, discard, commit, removeCard }
+  return { drafts, editing, busy, saved, failure, pending, write, writeMatch, switchCurrency, switchPeak, openEditor, discard, commit, removeCard }
 }

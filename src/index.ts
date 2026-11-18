@@ -103,7 +103,7 @@ export function apply(ctx: Context, config: UsageInsightsConfig = DEFAULT_CONFIG
    */
   const warm = (): void => {
     if (warming !== undefined) return
-    warming = serialize(() => assembleReport(ctx, cache, folds, progress, resolved, rates, {
+    warming = serialize(() => assembleReport(ctx, cache, folds, progress, resolved, rates, exchangeRates.read()?.rate, {
       refresh: false,
       from: undefined,
       to: undefined,

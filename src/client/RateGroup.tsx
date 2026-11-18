@@ -38,6 +38,8 @@ interface RateGroupProps {
   readonly open: boolean
   /** The field that holds something which is not a price, when it is here. */
   readonly invalid: { readonly set: PriceSet; readonly field: RateField } | undefined
+  /** Why the typed match rule was refused, while this group is open. */
+  readonly matchError: 'empty' | 'duplicate' | undefined
   readonly busy: boolean
   /** Active locale id, for the rates as written. */
   readonly locale: string
@@ -47,6 +49,7 @@ interface RateGroupProps {
   readonly onCancel: () => void
   readonly onSave: () => void
   readonly usdAvailable: boolean
+  readonly onMatch: (value: string) => void
   readonly onCurrency: (currency: UsagePriceCurrency) => void
   readonly onPeak: (enabled: boolean) => void
   readonly onWrite: (set: PriceSet, field: RateField, value: string) => void
@@ -68,7 +71,7 @@ interface RateGroupProps {
  * @returns a table body, one group per model.
  */
 export function RateGroup({
-  row, draft, open, invalid, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, usdAvailable, onCurrency,
+  row, draft, open, invalid, matchError, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, usdAvailable, onMatch, onCurrency,
 }: RateGroupProps): ReactNode {
   const card = row.card
   const editing = open && draft !== undefined
@@ -103,7 +106,7 @@ export function RateGroup({
               </th>
             )
             : null}
-          <td className={css.rateSet}>{entry.label}</td>
+          <td className={css.rateSet}>{entry.label}<span className={css.rateUnit}>{card.currency === 'USD' ? ' · USD' : ''}</span></td>
           {RATE_FIELDS.map(field => (
             <td key={field} className={css.numeric}>
               {editing
@@ -120,7 +123,7 @@ export function RateGroup({
                     onChange={event => { onWrite(entry.set, field, event.target.value) }}
                   />
                 )
-                : formatRate(entry.rate[field], locale)}
+                : formatRate(entry.rate[field], locale, card.currency)}
             </td>
           ))}
           {index === 0
@@ -159,6 +162,25 @@ export function RateGroup({
         ? (
           <tr>
             <td colSpan={8} className={css.rateEditorCell}>
+              <label className={css.matchEdit}>
+                <span>{t('pricingAddMatch')}</span>
+                <input
+                  className={css.editorField}
+                  type="text"
+                  aria-label={t('pricingAddMatch')}
+                  aria-invalid={matchError !== undefined}
+                  placeholder="provider/model"
+                  disabled={busy}
+                  value={draft.match}
+                  onChange={event => { onMatch(event.target.value) }}
+                />
+                <span className={css.currencyHint}>{t('pricingMatchHint')}</span>
+                {matchError === undefined ? null : (
+                  <span className={css.editorError} role="alert">
+                    {t(matchError === 'empty' ? 'pricingMatchEmpty' : 'pricingMatchDuplicate', { match: draft.match.trim() })}
+                  </span>
+                )}
+              </label>
               <PriceCurrencySelect value={draft.currency ?? 'CNY'} disabled={busy} usdAvailable={usdAvailable} onChange={onCurrency} t={t} />
               <div className={css.rateToolbar}>
                 <label className={css.editorToggle}>

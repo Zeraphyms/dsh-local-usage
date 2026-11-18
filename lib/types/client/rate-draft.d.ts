@@ -22,10 +22,16 @@ export interface PriceFields {
     cacheWrite: string;
     output: string;
 }
-/** One model's draft: the switch and both sets of prices. */
+/** One model's draft: its rule, the switch, and both sets of prices. */
 export interface ModelDraft {
+    /** The match rule as typed; seeded from the card in effect. */
+    match: string;
     /** Input unit; omitted means the stored CNY unit. */
     currency?: UsagePriceCurrency;
+    /** The unit the seeded fields were rendered in; conversion uses this pair. */
+    seededCurrency?: UsagePriceCurrency;
+    /** The unit the card's own prices are stored in. */
+    storedCurrency?: UsagePriceCurrency;
     /** CNY per USD captured when the input unit changes. */
     exchangeRate?: number;
     /** Whether the model prices peak separately. */
@@ -65,6 +71,15 @@ export type RateDraftResult =
     readonly model: string;
     readonly set: PriceSet;
     readonly field: RateField;
+}
+/**
+ * The typed match rule cannot become a card: it is empty, or another card
+ * already claims it. Names the open card and why the rule was refused.
+ */
+ | {
+    readonly status: 'invalid-match';
+    readonly model: string;
+    readonly reason: 'empty' | 'duplicate';
 }
 /** A write to send. */
  | {

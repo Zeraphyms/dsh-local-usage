@@ -1,4 +1,4 @@
-import type { UsageExchangeRate, UsagePricingUpdate } from '../types.ts';
+import type { UsageExchangeRate } from '../types.ts';
 /** Where the host retains its last successful reference rate. */
 export declare function exchangeRateFilePath(dshHome: string): string;
 /** Next Beijing noon, strictly after the supplied epoch milliseconds. */
@@ -34,5 +34,13 @@ export interface ExchangeRateStore {
 export declare function createExchangeRateStore(path: string, fetchRate?: (signal: AbortSignal) => Promise<unknown>): ExchangeRateStore;
 /** Register daily Beijing-noon work; disposal removes the timer and cancels fetches. */
 export declare function scheduleExchangeRate(store: ExchangeRateStore, onError: (error: unknown) => void): () => void;
-/** Convert USD input once at save time; the stored model cards remain in CNY. */
-export declare function pricingUpdateInCny(update: UsagePricingUpdate, rate: number): UsagePricingUpdate;
+/**
+ * The multiplier that turns one USD-priced card into reporting-currency CNY.
+ *
+ * Cards keep the currency they were typed in; the report currency stays CNY, so
+ * a USD card is converted when its samples are priced, not when the reader
+ * saves. The retained reference is the single conversion fact for every card.
+ * @param rate - the retained CNY per USD reference.
+ * @returns the positive multiplier, so a broken cache fails loudly once.
+ */
+export declare function cnyPerUsd(rate: number): number;

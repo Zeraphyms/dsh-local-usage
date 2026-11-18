@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The range summary, its supporting rows and the table block.
  *
  * A fragment of the one sheet the panel injects; order is preserved by
@@ -384,6 +384,13 @@ export const summary = String.raw`/* 鈹€鈹€ Summary: one hero figure, then
   font-size: 11px;
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
+}
+
+/* The card's own unit, shown only when it differs from the report currency. */
+.dlu-rateUnit {
+  margin-inline-start: 4px;
+  font-size: 10px;
+  color: var(--dsw-alias-label-caption);
 }
 
 .dlu-rateTable td.dlu-numeric {

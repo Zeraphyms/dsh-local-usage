@@ -172,6 +172,9 @@ export declare const zh: {
     pricingAdd: string;
     pricingAddMatch: string;
     pricingAddDuplicate: string;
+    pricingMatchHint: string;
+    pricingMatchEmpty: string;
+    pricingMatchDuplicate: string;
     pricingPeakSet: string;
     pricingPeakEnabled: string;
     pricingRemove: string;
@@ -386,6 +389,9 @@ export declare const en: {
     pricingAdd: string;
     pricingAddMatch: string;
     pricingAddDuplicate: string;
+    pricingMatchHint: string;
+    pricingMatchEmpty: string;
+    pricingMatchDuplicate: string;
     pricingPeakSet: string;
     pricingInherited: string;
     peakNoteSeparate: string;

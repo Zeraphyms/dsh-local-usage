@@ -58,6 +58,8 @@ export interface PricingOptions {
     readonly peakWindows: readonly PeakWindow[];
     /** When true, Saturday and Sunday are never peak. */
     readonly peakWeekdaysOnly: boolean;
+    /** CNY per one USD, for converting a card that states USD prices. */
+    readonly cnyPerUsd?: number;
 }
 /** Report-level facts the Host supplies around a fold. */
 export interface ReportMeta {
