@@ -10,6 +10,7 @@
 /** Every class the panel's stylesheet defines. */
 export const css = {
   matchEdit: 'dlu-matchEdit',
+  rateCenter: 'dlu-rateCenter',
   rateUnit: 'dlu-rateUnit',
   currencySelect: 'dlu-currencySelect',
   currencyHint: 'dlu-currencyHint',

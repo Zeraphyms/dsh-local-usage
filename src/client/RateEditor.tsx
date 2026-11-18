@@ -106,9 +106,9 @@ export function RateEditor({ rows, currency, locale, formatCost, t, onSave, exch
             <thead>
               <tr>
                 <th scope="col">{t('pricingTableModel')}</th>
-                <th scope="col">{t('pricingTablePeriod')}</th>
+                <th scope="col" className={css.rateCenter}>{t('pricingTablePeriod')}</th>
                 {RATE_FIELDS.map(field => (
-                  <th key={field} scope="col" className={css.numeric}>{t(FIELD_KEYS[field])}</th>
+                  <th key={field} scope="col" className={css.rateCenter}>{t(FIELD_KEYS[field])}</th>
                 ))}
                 <th scope="col" className={css.numeric}>{t('pricingTableUsage')}</th>
                 <th scope="col">

@@ -106,9 +106,9 @@ export function RateGroup({
               </th>
             )
             : null}
-          <td className={css.rateSet}>{entry.label}<span className={css.rateUnit}>{card.currency === 'USD' ? ' · USD' : ''}</span></td>
+          <td className={css.rateSet + ' ' + css.rateCenter}>{entry.label}<span className={css.rateUnit}>{card.currency === 'USD' ? ' · USD' : ''}</span></td>
           {RATE_FIELDS.map(field => (
-            <td key={field} className={css.numeric}>
+            <td key={field} className={css.numeric + ' ' + css.rateCenter}>
               {editing
                 ? (
                   <input

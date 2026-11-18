@@ -7,7 +7,7 @@
  * @module dsh-local-usage/client/styles/summary
  */
 
-export const summary = String.raw`/* 鈹€鈹€ Summary: one hero figure, then supporting tiles 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+export const summary = String.raw`/* 閳光偓閳光偓 Summary: one hero figure, then supporting tiles 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓 */
 
 /* The figures are the header of the page, not the page: the hero and its tiles
  * share one row so the calendar below them starts high on the screen. */
@@ -35,7 +35,7 @@ export const summary = String.raw`/* 鈹€鈹€ Summary: one hero figure, then
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* The headline figure: exact to the last digit, and never broken across lines 鈥?
+/* The headline figure: exact to the last digit, and never broken across lines 閳?
  * a money amount split over two lines is unreadable, and it changes the height
  * of the block the whole page hangs off.
  *
@@ -99,7 +99,7 @@ export const summary = String.raw`/* 鈹€鈹€ Summary: one hero figure, then
  *
  * This is the rule that keeps a big figure from moving the page. The hero's
  * track is sized by its own content, so a seven-figure total beside these tiles
- * leaves them less room 鈥?and with an auto-fitting grid that narrower room is
+ * leaves them less room 閳?and with an auto-fitting grid that narrower room is
  * what decides how many rows they take, which is a change in the strip's height
  * caused by the data. Pinning the count to the container makes the row count a
  * property of the panel, and the figures inside a tile adapt instead.
@@ -222,7 +222,7 @@ export const summary = String.raw`/* 鈹€鈹€ Summary: one hero figure, then
   font-weight: 400;
 }
 
-/* The pricing page: the day view's frame, because it is the same kind of thing 鈥?
+/* The pricing page: the day view's frame, because it is the same kind of thing 閳?
  * a page the panel replaces itself with, not a panel floating over the figures. */
 .dlu-pricingPage {
   display: flex;
@@ -314,9 +314,17 @@ export const summary = String.raw`/* 鈹€鈹€ Summary: one hero figure, then
 }
 
 /* A column of numbers is read down its right edge, so its heading ends there
- * too: a label flush left over values flush right reads as two columns. */
+ * too: a label flush left over values flush right reads as two columns. The
+ * rate sheet's period and price columns are the exception: a card's four
+ * prices sit side by side and are compared with their neighbours, so each
+ * centers under its own label instead of hanging off one shared edge. */
 .dlu-rateTable .dlu-numeric {
   text-align: end;
+}
+
+.dlu-rateTable td.dlu-rateCenter,
+.dlu-rateTable th.dlu-rateCenter {
+  text-align: center;
 }
 
 .dlu-rateTable td,
