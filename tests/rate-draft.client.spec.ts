@@ -37,6 +37,9 @@ describe('draftsFrom', () => {
     expect(drafts.flash).toEqual({
       match: 'flash',
       peakEnabled: true,
+      tierEnabled: false,
+      tierThresholdK: '',
+      tier: { input: '1', cacheRead: '0.02', cacheWrite: '1', output: '4' },
       peak: { input: '2', cacheRead: '0.04', cacheWrite: '2', output: '8' },
       offPeak: { input: '1', cacheRead: '0.02', cacheWrite: '1', output: '4' },
     })

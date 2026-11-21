@@ -56,6 +56,16 @@ export interface ModelPrice {
      * when it prices a sample, using one retained reference rate.
      */
     readonly currency?: 'CNY' | 'USD';
+    /**
+     * Whether this card bills by request context length instead of the peak
+     * dimension: prompts at or below `tierThresholdK` thousand tokens bill at
+     * `offPeak`, larger ones at `tier`.
+     */
+    readonly tierEnabled?: boolean;
+    /** Context threshold in thousand tokens separating the two tiers. */
+    readonly tierThresholdK?: number;
+    /** Prices for a request above the context threshold. */
+    readonly tier?: PriceRate;
     /** Whether {@link peak} applies inside the configured windows. */
     readonly peakEnabled: boolean;
     /** Prices for a settlement inside a peak window. */
@@ -130,7 +140,7 @@ export interface ModelMatch {
  * @returns the card and whether a configured model claimed the route.
  */
 export declare function matchModel(models: readonly ModelPrice[], fallback: ModelPrice, route: string): ModelMatch;
-/** Which card priced one settlement, and at which of its two sets of prices. */
+/** Which card priced one settlement, at which of its price sets, and why. */
 export interface RateSelection {
     /** Effective prices for this settlement, in the card's own unit. */
     readonly rate: PriceRate;
@@ -142,19 +152,33 @@ export interface RateSelection {
     readonly source: 'model' | 'fallback';
     /** The model's `match` string, present only when a configured model claimed it. */
     readonly model?: string;
+    /**
+     * Which dimension picked the price set: `peak` for the peak window,
+     * `context` for the context-length tier, or `undefined` for a flat card.
+     */
+    readonly appliedBy?: 'peak' | 'context';
+    /** True when the settlement billed at the above-threshold context prices. */
+    readonly tierApplied?: boolean;
     /** Whether the peak prices were used, which is false for a flat-priced model. */
     readonly peakApplied: boolean;
 }
 /**
  * Select the prices one settlement is billed at.
  *
+ * A context-tiered card bills by prompt size — uncached input, cache reads and
+ * cache writes together, which is exactly what the provider counts as the
+ * request's context — and ignores the peak window entirely. A peak-priced card
+ * behaves as before. The two dimensions are mutually exclusive on one card.
+ *
  * @param models - configured cards in match order.
  * @param fallback - card used when no model claims the route.
  * @param route - `provider/model` the usage was attributed to.
  * @param peak - whether the settlement falls inside a peak window.
- * @returns the effective prices, their source, and whether peak pricing applied.
+ * @param promptTokens - the settlement's prompt size in tokens: uncached input
+ *   plus cache reads plus cache writes, the quantity context tiers bill on.
+ * @returns the effective prices, their source, and which dimension applied.
  */
-export declare function selectRate(models: readonly ModelPrice[], fallback: ModelPrice, route: string, peak: boolean): RateSelection;
+export declare function selectRate(models: readonly ModelPrice[], fallback: ModelPrice, route: string, peak: boolean, promptTokens?: number): RateSelection;
 /**
  * Price one bucket set at one rate, converting the card's own unit to the
  * reporting currency when the card was typed in USD.

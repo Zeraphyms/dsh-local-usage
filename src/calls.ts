@@ -190,7 +190,8 @@ export function queryCalls(
       if (query.to !== undefined && sample.time > query.to) continue
       const clock = beijingClock(sample.time)
       const peak = isPeakClock(clock, options.peakWindows, options.peakWeekdaysOnly)
-      const { rate, matched, currency } = selectRate(options.models, options.fallback, sample.route, peak)
+      const promptTokens = sample.tokens.uncachedInputTokens + sample.tokens.cacheReadTokens + sample.tokens.cacheWriteTokens
+      const { rate, matched, currency } = selectRate(options.models, options.fallback, sample.route, peak, promptTokens)
       const cost = costOf(sample.tokens, rate, currency, options.cnyPerUsd)
       const model = modelOf(sample.route)
 

@@ -106,12 +106,25 @@ export function readModelEdit(value: unknown): UsageModelEdit | undefined {
   if (route !== undefined && (typeof route !== 'string' || route.length === 0)) return undefined
   const currency = source.currency
   if (currency !== undefined && currency !== 'CNY' && currency !== 'USD') return undefined
+  // Context tiers are optional and all-or-nothing: a claimed tier needs both a
+  // sane threshold and a sane above-threshold price set.
+  const tierEnabled = source.tierEnabled === true
+  let tierThresholdK: number | undefined
+  let tier: UsageRate | undefined
+  if (tierEnabled) {
+    const raw = source.tierThresholdK
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0 || raw > 2_000_000) return undefined
+    tierThresholdK = raw
+    tier = readRate(source.tier)
+    if (tier === undefined) return undefined
+  }
   return {
     peakEnabled: source.peakEnabled,
     peak,
     offPeak,
     ...route === undefined ? {} : { route },
     ...currency === undefined || currency === 'CNY' ? {} : { currency },
+    ...tierEnabled && tierThresholdK !== undefined && tier !== undefined ? { tierEnabled, tierThresholdK, tier } : {},
   }
 }
 

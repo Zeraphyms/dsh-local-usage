@@ -273,6 +273,16 @@ export interface UsageModelPrice {
     readonly peak: UsageRate;
     /** Prices outside one; the only prices of a flat-priced model. */
     readonly offPeak: UsageRate;
+    /**
+     * Whether this card bills by request context length instead of the peak
+     * dimension: prompts at or below `tierThresholdK` thousand tokens bill at
+     * `offPeak`, larger ones at `tier`.
+     */
+    readonly tierEnabled?: boolean;
+    /** Context threshold in thousand tokens separating the two tiers. */
+    readonly tierThresholdK?: number;
+    /** Prices for a request above the context threshold. */
+    readonly tier?: UsageRate;
 }
 /** The four bucket prices of one card, without the model that supplied them. */
 export interface UsageRate {
@@ -316,6 +326,14 @@ export interface UsageRouteRate {
     readonly peak: UsageRate;
     /** Prices outside one; the flat price when {@link peakEnabled} is false. */
     readonly offPeak: UsageRate;
+    /**
+     * Whether this route bills by context length (see the edit's `tierEnabled`),
+     * with the threshold and the above-threshold prices riding on the row.
+     */
+    readonly tierEnabled?: boolean;
+    readonly tierThresholdK?: number;
+    /** Prices for requests above the context threshold. */
+    readonly tier?: UsageRate;
     /** Which of the two sources supplied the prices. */
     readonly source: UsageRateSource;
     /** Tokens this route was billed for in the window; the table is ordered by it. */
@@ -333,6 +351,16 @@ export interface UsageModelEdit {
     readonly peak: UsageRate;
     /** Prices outside one, or the flat price when peak pricing is off. */
     readonly offPeak: UsageRate;
+    /**
+     * Whether the model bills by request context length instead of the peak
+     * dimension: requests at or below `tierThresholdK` thousand tokens bill at
+     * `offPeak`, larger ones at `tier`.
+     */
+    readonly tierEnabled?: boolean;
+    /** Context threshold in thousand tokens that separates the two tiers. */
+    readonly tierThresholdK?: number;
+    /** Prices for requests above the threshold. */
+    readonly tier?: UsageRate;
 }
 /** Latest published CNY per USD reference, rounded to three decimals. */
 export interface UsageExchangeRate {

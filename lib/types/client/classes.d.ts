@@ -9,6 +9,7 @@
 /** Every class the panel's stylesheet defines. */
 export declare const css: {
     readonly matchEdit: "dlu-matchEdit";
+    readonly tierThreshold: "dlu-tierThreshold";
     readonly rateCenter: "dlu-rateCenter";
     readonly rateUnit: "dlu-rateUnit";
     readonly currencySelect: "dlu-currencySelect";

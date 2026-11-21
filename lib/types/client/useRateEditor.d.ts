@@ -34,6 +34,9 @@ export interface RateEditorState {
     readonly write: (model: string, set: PriceSet, field: RateField, value: string) => void;
     readonly writeMatch: (model: string, value: string) => void;
     readonly switchCurrency: (model: string, currency: UsagePriceCurrency) => void;
+    readonly switchTier: (model: string, enabled: boolean) => void;
+    readonly writeTierField: (model: string, field: RateField, value: string) => void;
+    readonly writeTierThreshold: (model: string, value: string) => void;
     readonly switchPeak: (model: string, peakEnabled: boolean) => void;
     readonly openEditor: (model: string) => void;
     readonly discard: () => void;

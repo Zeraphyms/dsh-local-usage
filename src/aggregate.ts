@@ -569,7 +569,10 @@ export function buildReport(
       // most frequent allocation in this walk.
       const beijing = beijingClock(sample.time)
       const peak = isPeakClock(beijing, options.peakWindows, options.peakWeekdaysOnly)
-      const { rate, matched, currency } = selectRate(options.models, options.fallback, sample.route, peak)
+      // Context tiers bill on the request's prompt size: everything the provider
+      // counted as read at the start of the call, before the generated output.
+      const promptTokens = sample.tokens.uncachedInputTokens + sample.tokens.cacheReadTokens + sample.tokens.cacheWriteTokens
+      const { rate, matched, currency } = selectRate(options.models, options.fallback, sample.route, peak, promptTokens)
       const cost = costOf(sample.tokens, rate, currency, options.cnyPerUsd)
       firstSampleTime ??= sample.time
       lastSampleTime = sample.time
@@ -694,6 +697,9 @@ export function buildReport(
         peakEnabled: match.card.peakEnabled,
         peak: match.card.peak,
         offPeak: match.card.offPeak,
+        ...match.card.tierEnabled === true && match.card.tierThresholdK !== undefined && match.card.tier !== undefined
+          ? { tierEnabled: true, tierThresholdK: match.card.tierThresholdK, tier: match.card.tier }
+          : {},
         source: match.source,
         tokens: bucketTokens(bucket),
       }

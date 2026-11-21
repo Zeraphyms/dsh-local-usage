@@ -24,6 +24,8 @@ interface RateGroupProps {
     } | undefined;
     /** Why the typed match rule was refused, while this group is open. */
     readonly matchError: 'empty' | 'duplicate' | undefined;
+    /** Why the context tier cannot bill, while this group is open. */
+    readonly tierError: 'threshold' | 'tier' | undefined;
     readonly busy: boolean;
     /** Active locale id, for the rates as written. */
     readonly locale: string;
@@ -34,6 +36,9 @@ interface RateGroupProps {
     readonly onSave: () => void;
     readonly usdAvailable: boolean;
     readonly onMatch: (value: string) => void;
+    readonly onTier: (enabled: boolean) => void;
+    readonly onTierField: (field: RateField, value: string) => void;
+    readonly onTierThreshold: (value: string) => void;
     readonly onCurrency: (currency: UsagePriceCurrency) => void;
     readonly onPeak: (enabled: boolean) => void;
     readonly onWrite: (set: PriceSet, field: RateField, value: string) => void;
@@ -53,5 +58,5 @@ interface RateGroupProps {
  * @param props - one row's card, its draft, and the editor's handlers.
  * @returns a table body, one group per model.
  */
-export declare function RateGroup({ row, draft, open, invalid, matchError, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, usdAvailable, onMatch, onCurrency, }: RateGroupProps): ReactNode;
+export declare function RateGroup({ row, draft, open, invalid, matchError, tierError, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, usdAvailable, onMatch, onTier, onTierField, onTierThreshold, onCurrency, }: RateGroupProps): ReactNode;
 export {};

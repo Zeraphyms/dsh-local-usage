@@ -39,6 +39,16 @@ export interface ModelDraft {
   exchangeRate?: number
   /** Whether the model prices peak separately. */
   peakEnabled: boolean
+  /**
+   * Whether the model bills by request context length: prompts at or below
+   * {@link tierThresholdK} thousand tokens bill at the base set, larger ones
+   * at {@link tier}. Enabling it turns the peak dimension off.
+   */
+  tierEnabled?: boolean
+  /** Context threshold in thousand tokens separating the two tiers, as typed. */
+  tierThresholdK?: string
+  /** Prices for requests above the context threshold, as typed. */
+  tier: PriceFields
   /** Prices inside a peak window; ignored while {@link peakEnabled} is false. */
   peak: PriceFields
   /** Prices outside one, or the flat price when {@link peakEnabled} is false. */
@@ -90,6 +100,15 @@ export type RateDraftResult =
     readonly model: string
     readonly reason: 'empty' | 'duplicate'
   }
+  /**
+   * The context tier cannot bill: the threshold is not a positive number, or
+   * the above-threshold set holds text that is not a price.
+   */
+  | {
+    readonly status: 'invalid-tier'
+    readonly model: string
+    readonly reason: 'threshold' | 'tier'
+  }
   /** A write to send. */
   | { readonly status: 'ready'; readonly update: UsagePricingUpdate }
 
@@ -121,6 +140,9 @@ export function draftsFrom(models: readonly UsageModelPrice[]): ModelDrafts {
       // A card stored in USD opens in USD, so the reader sees what was typed.
       ...card.currency === undefined ? {} : { currency: card.currency, seededCurrency: card.currency, storedCurrency: card.currency },
       peakEnabled: card.peakEnabled,
+      ...card.tierEnabled === true && card.tierThresholdK !== undefined && card.tier !== undefined
+        ? { tierEnabled: true, tierThresholdK: String(card.tierThresholdK), tier: fieldsOf(card.tier) }
+        : { tierEnabled: false, tierThresholdK: '', tier: fieldsOf(card.offPeak) },
       peak: fieldsOf(card.peak),
       offPeak: fieldsOf(card.offPeak),
     }
@@ -198,6 +220,7 @@ export function pendingUpdate(
     // A card blanked on both sets asks for the edit to be dropped. With the
     // switch off, the peak set is not read at all, so only the flat set counts.
     const blankBoth = isBlank(draft.offPeak) && isBlank(draft.peak)
+      && (!draft.tierEnabled || isBlank(draft.tier))
     if (blankBoth && !renamed) {
       writes[card.match] = null
       continue
@@ -227,13 +250,30 @@ export function pendingUpdate(
     }
     // The peak set only matters while the switch is on; a flat model keeps
     // whatever peak prices it carries rather than validating fields it ignores.
+    // A context-tiered card ignores the peak dimension entirely: the two
+    // selectors are alternatives, not a matrix.
     let peak: UsageRate = view(card.peak)
-    if (draft.peakEnabled) {
+    if (draft.peakEnabled && !draft.tierEnabled) {
       const read = resolve(draft.peak, view(card.peak))
       if ('field' in read) {
         return { status: 'invalid', model: card.match, set: 'peak', field: read.field }
       }
       peak = read.rate
+    }
+    // The tier pair is read only while the switch is on: a threshold that is not
+    // a positive number, or an above-threshold set holding non-prices, is a
+    // save that would misbill every request above it.
+    let tierFields: { tierThresholdK: number; tier: UsageRate } | undefined
+    if (draft.tierEnabled) {
+      const threshold = Number(draft.tierThresholdK?.trim())
+      if (!Number.isFinite(threshold) || threshold <= 0) {
+        return { status: 'invalid-tier', model: card.match, reason: 'threshold' }
+      }
+      const read = resolve(draft.tier, view(card.tier ?? card.offPeak))
+      if ('field' in read) {
+        return { status: 'invalid-tier', model: card.match, reason: 'tier' }
+      }
+      tierFields = { tierThresholdK: threshold, tier: read.rate }
     }
 
     const next: UsageModelEdit = {
@@ -241,14 +281,25 @@ export function pendingUpdate(
       // The typed unit rides with the card, so the sheet shows what was written
       // and the fold converts to the report currency at pricing time.
       ...currency === 'USD' ? { currency } : {},
-      peakEnabled: draft.peakEnabled,
+      peakEnabled: draft.peakEnabled && !draft.tierEnabled,
       peak,
       offPeak: offPeak.rate,
+      ...tierFields === undefined
+        ? {}
+        : { tierEnabled: true, tierThresholdK: tierFields.tierThresholdK, tier: tierFields.tier },
     }
+    // The unchanged check compares like with like: a tiered card's above-threshold
+    // set against the card's own, both in the view unit.
+    const cardTier = card.tierEnabled === true && card.tier !== undefined ? card.tier : undefined
     const unchanged = !renamed
       && next.peakEnabled === card.peakEnabled
       && samePrices(next.offPeak, view(card.offPeak))
       && samePrices(next.peak, view(card.peak))
+      && (next.tierEnabled !== true || next.tier === undefined || next.tierThresholdK === undefined || (
+        cardTier !== undefined
+        && card.tierThresholdK === next.tierThresholdK
+        && samePrices(next.tier, view(cardTier))
+      ))
     if (!unchanged) {
       // A rename always writes, even with every price left as it stands: the
       // move itself is the change the reader asked for.

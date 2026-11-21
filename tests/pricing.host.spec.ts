@@ -212,3 +212,27 @@ describe('costOf', () => {
     }, FALLBACK.offPeak)).toBe(0)
   })
 })
+
+describe('context tiers', () => {
+  const FALLBACK: ModelPrice = { match: '', peakEnabled: false, peak: { input: 4, cacheRead: 0.4, cacheWrite: 4, output: 16 }, offPeak: { input: 2, cacheRead: 0.2, cacheWrite: 2, output: 8 } }
+  const BASE = { input: 10, cacheRead: 1, cacheWrite: 12.5, output: 50 }
+  const ABOVE = { input: 20, cacheRead: 2, cacheWrite: 25, output: 75 }
+  const CARDS: ModelPrice[] = [{ match: 'gpt-6-astra', peakEnabled: true, peak: ABOVE, offPeak: BASE, tierEnabled: true, tierThresholdK: 272, tier: ABOVE }]
+
+  it('bills by the request prompt size and ignores the peak window', () => {
+    // 272K exactly sits in the base tier; one token above it does not.
+    const at = selectRate(CARDS, FALLBACK, 'p/gpt-6-astra', true, 272000)
+    expect(at).toMatchObject({ rate: BASE, appliedBy: 'context', tierApplied: false, peakApplied: false })
+    const above = selectRate(CARDS, FALLBACK, 'p/gpt-6-astra', true, 272001)
+    expect(above).toMatchObject({ rate: ABOVE, appliedBy: 'context', tierApplied: true })
+    // The prompt size is the whole context: cache reads and writes count.
+    const viaCache = selectRate(CARDS, FALLBACK, 'p/gpt-6-astra', true, 100000 + 150000 + 22001)
+    expect(viaCache).toMatchObject({ tierApplied: true })
+  })
+
+  it('prices every settlement of a non-tiered card as before', () => {
+    const flat = selectRate([{ match: 'glm-5.3-flash', peakEnabled: false, peak: BASE, offPeak: BASE }], FALLBACK, 'x/glm-5.3-flash', true, 999_999)
+    expect(flat).toMatchObject({ rate: BASE, peakApplied: false })
+    expect(flat.appliedBy).toBeUndefined()
+  })
+})

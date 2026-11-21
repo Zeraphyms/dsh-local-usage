@@ -28,6 +28,9 @@ import { css } from './classes.ts'
 interface AddDraft {
   match: string
   peakEnabled: boolean
+  tierEnabled: boolean
+  tierThresholdK: string
+  tier: PriceFields
   peak: PriceFields
   offPeak: PriceFields
   currency: UsagePriceCurrency
@@ -37,7 +40,7 @@ interface AddDraft {
 /** An empty draft: every field blank, flat-priced, matching nothing. */
 function emptyDraft(): AddDraft {
   const fields = () => ({ input: '', cacheRead: '', cacheWrite: '', output: '' })
-  return { match: '', peakEnabled: false, peak: fields(), offPeak: fields(), currency: 'CNY' }
+  return { match: '', peakEnabled: false, tierEnabled: false, tierThresholdK: '', tier: fields(), peak: fields(), offPeak: fields(), currency: 'CNY' }
 }
 
 /** Props for the add-card form. */
@@ -72,6 +75,10 @@ export function AddRateCard({ existing, currency, t, onSave, exchangeRate }: Add
     setDraft(current => ({ ...current, peak: { ...current.peak, [field]: value } }))
     setInvalid(undefined)
   }
+  const writeTier = (field: RateField, value: string): void => {
+    setDraft(current => ({ ...current, tier: { ...current.tier, [field]: value } }))
+    setInvalid(undefined)
+  }
 
   /** One typed bucket: a number, `undefined` for blank, `null` for text that is not a price. */
   const readField = (text: string): number | undefined | null => {
@@ -97,13 +104,28 @@ export function AddRateCard({ existing, currency, t, onSave, exchangeRate }: Add
     }
     if (Object.keys(offPeak).length === 0) { setInvalid('input'); return }
     const peak: Record<string, number> = {}
-    if (draft.peakEnabled) {
+    if (draft.peakEnabled && !draft.tierEnabled) {
       for (const field of RATE_FIELDS) {
         const value = readField(draft.peak[field] ?? '')
         if (value === null) { setInvalid(field); return }
         if (value !== undefined) peak[field] = value
       }
       if (Object.keys(peak).length === 0) { setInvalid('input'); return }
+    }
+    // The context tier is all-or-nothing: a threshold and an above-threshold
+    // set, both sane, or none of it.
+    let tierFields: { tierEnabled: true; tierThresholdK: number; tier: Record<string, number> } | undefined
+    if (draft.tierEnabled) {
+      const threshold = Number(draft.tierThresholdK.trim())
+      if (!Number.isFinite(threshold) || threshold <= 0) { setFailure(t('pricingTierThresholdInvalid')); return }
+      const tier: Record<string, number> = {}
+      for (const field of RATE_FIELDS) {
+        const value = readField(draft.tier[field] ?? '')
+        if (value === null) { setInvalid(field); return }
+        if (value !== undefined) tier[field] = value
+      }
+      if (Object.keys(tier).length === 0) { setInvalid('input'); return }
+      tierFields = { tierEnabled: true, tierThresholdK: threshold, tier }
     }
     setBusy(true)
     setFailure(undefined)
@@ -112,7 +134,7 @@ export function AddRateCard({ existing, currency, t, onSave, exchangeRate }: Add
         models: {
           [match]: {
             ...draft.currency === 'USD' ? { currency: draft.currency } : {},
-            peakEnabled: draft.peakEnabled,
+            peakEnabled: draft.peakEnabled && !draft.tierEnabled,
             offPeak: {
               input: offPeak.input ?? 0,
               cacheRead: offPeak.cacheRead ?? 0,
@@ -124,6 +146,16 @@ export function AddRateCard({ existing, currency, t, onSave, exchangeRate }: Add
               cacheRead: peak.cacheRead ?? 0,
               cacheWrite: peak.cacheWrite ?? 0,
               output: peak.output ?? 0,
+            },
+            ...tierFields === undefined ? {} : {
+              tierEnabled: true,
+              tierThresholdK: tierFields.tierThresholdK,
+              tier: {
+                input: tierFields.tier.input ?? 0,
+                cacheRead: tierFields.tier.cacheRead ?? 0,
+                cacheWrite: tierFields.tier.cacheWrite ?? 0,
+                output: tierFields.tier.output ?? 0,
+              },
             },
           },
         },
@@ -203,13 +235,52 @@ export function AddRateCard({ existing, currency, t, onSave, exchangeRate }: Add
         <label className={css.editorToggle}>
           <input
             type="checkbox"
-            checked={draft.peakEnabled}
+            checked={draft.tierEnabled}
             disabled={busy}
+            onChange={event => { setDraft(current => ({ ...current, tierEnabled: event.target.checked, peakEnabled: event.target.checked ? false : current.peakEnabled })); setInvalid(undefined) }}
+          />
+          <span>{t('pricingTierEnabled')}</span>
+        </label>
+        <label className={css.editorToggle}>
+          <input
+            type="checkbox"
+            checked={draft.peakEnabled}
+            disabled={busy || draft.tierEnabled}
             onChange={event => { setDraft(current => ({ ...current, peakEnabled: event.target.checked })); setInvalid(undefined) }}
           />
           <span>{t('pricingPeakEnabled')}</span>
         </label>
       </div>
+      {draft.tierEnabled ? (
+        <div className={css.rateAddForm}>
+          <label className={css.rateAddField}>
+            <span>{t('pricingTierThreshold')}</span>
+            <input
+              className={css.editorField + ' ' + css.rateField}
+              type="text"
+              inputMode="decimal"
+              aria-label={t('pricingTierThreshold')}
+              disabled={busy}
+              value={draft.tierThresholdK}
+              onChange={event => { setDraft(current => ({ ...current, tierThresholdK: event.target.value })); setInvalid(undefined) }}
+            />
+          </label>
+          {RATE_FIELDS.map(field => (
+            <label key={field} className={css.rateAddField}>
+              <span>{t('pricingTierSet', { field: t(FIELD_KEYS[field]) })}</span>
+              <input
+                className={css.editorField + ' ' + css.rateField}
+                type="text"
+                inputMode="decimal"
+                aria-label={t('pricingTierSet', { field: t(FIELD_KEYS[field]) })}
+                disabled={busy}
+                value={draft.tier[field] ?? ''}
+                onChange={event => { writeTier(field, event.target.value) }}
+              />
+            </label>
+          ))}
+        </div>
+      ) : null}
       {draft.peakEnabled ? (
         <div className={css.rateAddForm}>
           {RATE_FIELDS.map(field => (

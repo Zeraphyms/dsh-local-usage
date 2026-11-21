@@ -25,10 +25,20 @@ import type { UsagePriceCurrency } from '../types.ts'
 
 /** The price fields a group shows, one row per set, in reading order. */
 interface PriceSetRow {
-  readonly set: PriceSet
+  /** Which set this row edits: a peak half, the flat base, or the context tier. */
+  readonly set: PriceSet | 'tier'
   readonly label: string
   readonly rate: UsageRate
 }
+
+/**
+ * Which dimension governs the sheet rows while this group is open.
+ *
+ * Peak and context tier are alternatives, never a matrix: one request is billed
+ * by the time of day or by how long its prompt was, and the editor shows the
+ * reader exactly the rows their card will use.
+ */
+type PriceDimension = 'peak' | 'context'
 
 /** Props for one model's block of rows. */
 interface RateGroupProps {
@@ -40,6 +50,8 @@ interface RateGroupProps {
   readonly invalid: { readonly set: PriceSet; readonly field: RateField } | undefined
   /** Why the typed match rule was refused, while this group is open. */
   readonly matchError: 'empty' | 'duplicate' | undefined
+  /** Why the context tier cannot bill, while this group is open. */
+  readonly tierError: 'threshold' | 'tier' | undefined
   readonly busy: boolean
   /** Active locale id, for the rates as written. */
   readonly locale: string
@@ -50,6 +62,9 @@ interface RateGroupProps {
   readonly onSave: () => void
   readonly usdAvailable: boolean
   readonly onMatch: (value: string) => void
+  readonly onTier: (enabled: boolean) => void
+  readonly onTierField: (field: RateField, value: string) => void
+  readonly onTierThreshold: (value: string) => void
   readonly onCurrency: (currency: UsagePriceCurrency) => void
   readonly onPeak: (enabled: boolean) => void
   readonly onWrite: (set: PriceSet, field: RateField, value: string) => void
@@ -71,7 +86,7 @@ interface RateGroupProps {
  * @returns a table body, one group per model.
  */
 export function RateGroup({
-  row, draft, open, invalid, matchError, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, usdAvailable, onMatch, onCurrency,
+  row, draft, open, invalid, matchError, tierError, busy, locale, t, formatCost, onEdit, onCancel, onSave, onPeak, onWrite, onDelete, deleteLabel, usdAvailable, onMatch, onTier, onTierField, onTierThreshold, onCurrency,
 }: RateGroupProps): ReactNode {
   const card = row.card
   const editing = open && draft !== undefined
@@ -118,9 +133,9 @@ export function RateGroup({
                     aria-label={`${name} ${entry.label} ${t(FIELD_KEYS[field])}`}
                     aria-invalid={invalid?.set === entry.set && invalid.field === field}
                     data-rate-field={card.match}
-                    value={draft[entry.set][field]}
+                    value={entry.set === 'tier' ? draft.tier[field] : draft[entry.set][field]}
                     disabled={busy}
-                    onChange={event => { onWrite(entry.set, field, event.target.value) }}
+                    onChange={event => { if (entry.set === 'tier') onTierField(field, event.target.value); else onWrite(entry.set as PriceSet, field, event.target.value) }}
                   />
                 )
                 : formatRate(entry.rate[field], locale, card.currency)}
@@ -186,8 +201,39 @@ export function RateGroup({
                 <label className={css.editorToggle}>
                   <input
                     type="checkbox"
-                    checked={draft.peakEnabled}
+                    checked={draft.tierEnabled === true}
                     disabled={busy}
+                    onChange={event => { onTier(event.target.checked) }}
+                  />
+                  <span>{t('pricingTierEnabled')}</span>
+                </label>
+                {draft.tierEnabled === true ? (
+                  <>
+                    <label className={css.tierThreshold}>
+                      <span>{t('pricingTierThreshold')}</span>
+                      <input
+                        className={css.editorField}
+                        type="text"
+                        inputMode="decimal"
+                        aria-label={t('pricingTierThreshold')}
+                        disabled={busy}
+                        value={draft.tierThresholdK ?? ''}
+                        onChange={event => { onTierThreshold(event.target.value) }}
+                      />
+                    </label>
+                    <span className={css.currencyHint}>{t('pricingTierHint')}</span>
+                    {tierError === undefined ? null : (
+                      <span className={css.editorError} role="alert">
+                        {t(tierError === 'threshold' ? 'pricingTierThresholdInvalid' : 'pricingTierInvalid')}
+                      </span>
+                    )}
+                  </>
+                ) : null}
+                <label className={css.editorToggle}>
+                  <input
+                    type="checkbox"
+                    checked={draft.peakEnabled}
+                    disabled={busy || draft.tierEnabled === true}
                     onChange={event => { onPeak(event.target.checked) }}
                   />
                   <span>{t('pricingPeakEnabled')}</span>
@@ -237,12 +283,25 @@ export function RateGroup({
  * @param t - dictionary lookup, for the row labels.
  * @returns one entry per set, peak first.
  */
+function priceDimension(card: UsageModelPrice, draft: ModelDraft | undefined, editing: boolean): PriceDimension {
+  const tierEnabled = editing && draft !== undefined ? draft.tierEnabled === true : card.tierEnabled === true
+  return tierEnabled ? 'context' : 'peak'
+}
+
 function priceSets(
   card: UsageModelPrice,
   draft: ModelDraft | undefined,
   editing: boolean,
   t: PropsLocale<'usage'>['t'],
 ): PriceSetRow[] {
+  const dimension = priceDimension(card, draft, editing)
+  if (dimension === 'context') {
+    // The base set bills at or below the threshold; the tier row bills above it.
+    return [
+      { set: 'offPeak', label: t('rateSetContextBase'), rate: card.offPeak },
+      { set: 'tier', label: t('rateSetContextTier'), rate: card.tier ?? card.offPeak },
+    ]
+  }
   const peakEnabled = editing && draft !== undefined ? draft.peakEnabled : card.peakEnabled
   const offPeak: PriceSetRow = {
     set: 'offPeak',

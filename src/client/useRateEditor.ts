@@ -61,6 +61,9 @@ export interface RateEditorState {
   readonly write: (model: string, set: PriceSet, field: RateField, value: string) => void
   readonly writeMatch: (model: string, value: string) => void
   readonly switchCurrency: (model: string, currency: UsagePriceCurrency) => void
+  readonly switchTier: (model: string, enabled: boolean) => void
+  readonly writeTierField: (model: string, field: RateField, value: string) => void
+  readonly writeTierThreshold: (model: string, value: string) => void
   readonly switchPeak: (model: string, peakEnabled: boolean) => void
   readonly openEditor: (model: string) => void
   readonly discard: () => void
@@ -156,6 +159,48 @@ export function useRateEditor({ models, onSave, table, exchangeRate }: UseRateEd
     })
   }
 
+  /**
+   * Turn context-tier billing on or off. Enabling it collapses the peak
+   * dimension — the two selectors price one request, not a matrix — and seeds
+   * the threshold from the card's own tier when it had one.
+   */
+  function switchTier(model: string, enabled: boolean): void {
+    setSaved(false)
+    setFailure(undefined)
+    setDrafts(current => {
+      const draft = current[model]
+      if (draft === undefined) return current
+      return {
+        ...current,
+        [model]: {
+          ...draft,
+          tierEnabled: enabled,
+          peakEnabled: enabled ? false : draft.peakEnabled,
+        },
+      }
+    })
+  }
+
+  function writeTierField(model: string, field: RateField, value: string): void {
+    setSaved(false)
+    setFailure(undefined)
+    setDrafts(current => {
+      const draft = current[model]
+      if (draft === undefined) return current
+      return { ...current, [model]: { ...draft, tier: { ...draft.tier, [field]: value } } }
+    })
+  }
+
+  function writeTierThreshold(model: string, value: string): void {
+    setSaved(false)
+    setFailure(undefined)
+    setDrafts(current => {
+      const draft = current[model]
+      if (draft === undefined) return current
+      return { ...current, [model]: { ...draft, tierThresholdK: value } }
+    })
+  }
+
   function openEditor(model: string): void {
     if (editing !== undefined && editing !== model) {
       const previous = models.find(candidate => candidate.match === editing)
@@ -220,5 +265,5 @@ export function useRateEditor({ models, onSave, table, exchangeRate }: UseRateEd
     }
   }
 
-  return { drafts, editing, busy, saved, failure, pending, write, writeMatch, switchCurrency, switchPeak, openEditor, discard, commit, removeCard }
+  return { drafts, editing, busy, saved, failure, pending, write, writeMatch, switchCurrency, switchTier, writeTierField, writeTierThreshold, switchPeak, openEditor, discard, commit, removeCard }
 }

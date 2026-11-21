@@ -36,6 +36,16 @@ export interface ModelDraft {
     exchangeRate?: number;
     /** Whether the model prices peak separately. */
     peakEnabled: boolean;
+    /**
+     * Whether the model bills by request context length: prompts at or below
+     * {@link tierThresholdK} thousand tokens bill at the base set, larger ones
+     * at {@link tier}. Enabling it turns the peak dimension off.
+     */
+    tierEnabled?: boolean;
+    /** Context threshold in thousand tokens separating the two tiers, as typed. */
+    tierThresholdK?: string;
+    /** Prices for requests above the context threshold, as typed. */
+    tier: PriceFields;
     /** Prices inside a peak window; ignored while {@link peakEnabled} is false. */
     peak: PriceFields;
     /** Prices outside one, or the flat price when {@link peakEnabled} is false. */
@@ -80,6 +90,15 @@ export type RateDraftResult =
     readonly status: 'invalid-match';
     readonly model: string;
     readonly reason: 'empty' | 'duplicate';
+}
+/**
+ * The context tier cannot bill: the threshold is not a positive number, or
+ * the above-threshold set holds text that is not a price.
+ */
+ | {
+    readonly status: 'invalid-tier';
+    readonly model: string;
+    readonly reason: 'threshold' | 'tier';
 }
 /** A write to send. */
  | {
